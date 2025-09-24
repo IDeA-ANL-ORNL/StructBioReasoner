@@ -231,3 +231,14 @@ docs/build/
 !data/examples/
 data/test/*.db
 data/examples/*.db
+
+# Analysis Results and Temporary Directories
+ubiquitin_*_analysis_*/
+ubiquitin_*_results_*.json
+*_analysis_results.json
+*.dcd
+*.xtc
+*.trr
+*.gro
+*.top
+*.itp
