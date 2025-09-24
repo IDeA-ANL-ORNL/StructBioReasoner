@@ -62,6 +62,15 @@ cp .env.example .env
 # Edit .env with your OpenAI API key
 ```
 
+Also need to install Jnana code here: `../Jnana`:
+```bash
+# Clone Jnana repo
+cd ..
+https://github.com/acadev/Jnana.git
+cd Jnana
+pip install -e .
+```
+
 ### Basic Usage
 
 ```bash
