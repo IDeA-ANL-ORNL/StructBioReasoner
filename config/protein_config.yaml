@@ -1,0 +1,277 @@
+# StructBioReasoner Configuration
+# Extends Jnana configuration for protein engineering applications
+
+# Jnana Integration Settings
+jnana:
+  config_path: "../Jnana/config/models.yaml"  # Path to Jnana configuration
+  enable_protognosis: true
+  enable_biomni: false  # Disabled for now
+  enable_wisteria_ui: true
+
+# Protein Engineering Specific Settings
+protein_engineering:
+  # Default protein analysis settings
+  default_analysis:
+    include_structure: true
+    include_sequence: true
+    include_evolution: true
+    include_energetics: true
+    include_dynamics: false  # Computationally expensive
+
+  # Mutation design parameters
+  mutation_design:
+    max_mutations_per_hypothesis: 5
+    consider_conservative_mutations: true
+    include_combinatorial_designs: false
+    energy_cutoff_kcal_mol: 2.0  # Maximum destabilization allowed
+
+  # Validation thresholds
+  validation:
+    min_sequence_identity: 0.3  # For homology-based predictions
+    max_rmsd_threshold: 3.0     # For structure comparisons
+    min_confidence_score: 0.6   # For AI predictions
+
+# Knowledge Sources Configuration
+knowledge_sources:
+  # Protein databases
+  databases:
+    pdb:
+      enabled: true
+      api_url: "https://www.rcsb.org/pdb/rest/webservices"
+      local_cache: "./data/pdb_cache"
+      update_frequency: "weekly"
+    
+    uniprot:
+      enabled: true
+      api_url: "https://www.uniprot.org/uniprot/"
+      local_cache: "./data/uniprot_cache"
+      update_frequency: "monthly"
+    
+    alphafold_db:
+      enabled: true
+      api_url: "https://alphafold.ebi.ac.uk/api/"
+      local_cache: "./data/alphafold_cache"
+      download_structures: false  # Set to true to download structure files
+
+  # Literature processing
+  literature:
+    adaparse:
+      enabled: true
+      pdf_directory: "./data/literature/pdfs"
+      output_directory: "./data/literature/parsed"
+      parser_config: "protein_optimized"
+      num_workers: 8
+      quality_threshold: 0.95
+    
+    hiperrag:
+      enabled: true
+      index_path: "./data/literature/hiperrag_index"
+      model: "sentence-transformers/all-MiniLM-L6-v2"  # Default model
+      batch_size: 32
+      max_sequence_length: 512
+      similarity_threshold: 0.7
+
+  # Knowledge graph
+  knowledge_graph:
+    enabled: true
+    database_type: "neo4j"  # Options: neo4j, networkx
+    connection:
+      uri: "bolt://localhost:7687"
+      username: "neo4j"
+      password: "${NEO4J_PASSWORD}"
+    
+    # Graph schema configuration
+    schema:
+      protein_nodes: ["Protein", "Domain", "Residue", "Mutation"]
+      relationship_types: ["CONTAINS", "INTERACTS_WITH", "AFFECTS", "HOMOLOGOUS_TO"]
+    
+    # Data import settings
+    import_settings:
+      batch_size: 1000
+      enable_constraints: true
+      create_indexes: true
+
+# Computational Tools Configuration
+tools:
+  # PyMOL for visualization
+  pymol:
+    enabled: true
+    executable_path: "pymol"  # Use system PATH
+    headless_mode: true
+    ray_trace_quality: 2
+    image_format: "png"
+    image_resolution: [1024, 768]
+
+  # BioPython for sequence/structure analysis
+  biopython:
+    enabled: true
+    pdb_parser: "PDBParser"  # Options: PDBParser, MMCIFParser
+    sequence_alignment_tool: "muscle"  # Options: muscle, clustalo
+    blast_database: "nr"
+
+  # Rosetta (requires license)
+  rosetta:
+    enabled: false  # Set to true if license available
+    executable_path: "/path/to/rosetta/bin"
+    score_function: "ref2015"
+    relax_protocol: "fast_relax"
+    design_protocol: "fixbb"
+
+  # AlphaFold2 (local installation)
+  alphafold:
+    enabled: false  # Set to true if locally installed
+    model_path: "/path/to/alphafold/models"
+    database_path: "/path/to/alphafold/databases"
+    max_sequence_length: 2000
+
+  # ESM (Facebook's protein language model)
+  esm:
+    enabled: true
+    model_name: "esm2_t33_650M_UR50D"  # Options: esm2_t6_8M_UR50D, esm2_t12_35M_UR50D, etc.
+    device: "auto"  # Options: auto, cpu, cuda
+    batch_size: 1
+
+  # Molecular dynamics (optional)
+  molecular_dynamics:
+    enabled: false
+    engine: "openmm"  # Options: openmm, gromacs, amber
+    force_field: "amber14"
+    water_model: "tip3p"
+    simulation_time_ns: 10
+
+# Agent Configuration
+agents:
+  # Structural Analysis Agent
+  structural_analysis:
+    enabled: true
+    capabilities:
+      - "active_site_identification"
+      - "cavity_analysis" 
+      - "interface_prediction"
+      - "conformational_sampling"
+    tools: ["pymol", "biopython", "esm"]
+    confidence_threshold: 0.7
+
+  # Evolutionary Conservation Agent
+  evolutionary_conservation:
+    enabled: true
+    capabilities:
+      - "msa_generation"
+      - "conservation_scoring"
+      - "coevolution_analysis"
+      - "phylogenetic_inference"
+    tools: ["biopython", "muscle", "esm"]
+    min_sequences_for_msa: 50
+
+  # Energetic Analysis Agent
+  energetic_analysis:
+    enabled: true
+    capabilities:
+      - "stability_prediction"
+      - "binding_affinity_estimation"
+      - "folding_energy_calculation"
+    tools: ["rosetta", "esm"]  # Rosetta optional
+    energy_units: "kcal/mol"
+
+  # Mutation Design Agent
+  mutation_design:
+    enabled: true
+    capabilities:
+      - "rational_mutation_proposal"
+      - "library_design"
+      - "saturation_mutagenesis_planning"
+      - "combinatorial_optimization"
+    tools: ["rosetta", "esm", "biopython"]
+    max_mutations_per_round: 10
+
+  # Literature Analysis Agent
+  literature_analysis:
+    enabled: true
+    capabilities:
+      - "paper_retrieval"
+      - "experimental_data_extraction"
+      - "method_comparison"
+      - "precedent_identification"
+    tools: ["adaparse", "hiperrag"]
+    max_papers_per_query: 100
+
+# User Interface Configuration
+ui:
+  # Terminal interface settings
+  terminal:
+    enable_protein_viewer: true
+    enable_sequence_viewer: true
+    enable_mutation_tracker: true
+    max_structures_displayed: 5
+
+  # Web interface settings (optional)
+  web:
+    enabled: false
+    port: 8080
+    enable_3d_viewer: true
+    enable_real_time_updates: true
+
+  # Visualization settings
+  visualization:
+    default_representation: "cartoon"
+    color_scheme: "by_chain"
+    show_sidechains: false
+    show_hydrogen_bonds: true
+    animation_speed: 1.0
+
+# Performance and Resource Settings
+performance:
+  # Computational resources
+  max_concurrent_agents: 5
+  max_memory_gb: 16
+  enable_gpu_acceleration: true
+  gpu_memory_fraction: 0.8
+
+  # Caching settings
+  cache:
+    enabled: true
+    max_size_gb: 10
+    ttl_hours: 24
+    cache_structures: true
+    cache_predictions: true
+
+  # Parallel processing
+  parallel:
+    max_workers: 8
+    chunk_size: 100
+    enable_multiprocessing: true
+
+# Logging and Monitoring
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  format: "structured"
+  output_file: "./logs/struct_bio_reasoner.log"
+  max_file_size_mb: 100
+  backup_count: 5
+
+  # Component-specific logging
+  components:
+    agents: "INFO"
+    tools: "WARNING"
+    knowledge_graph: "INFO"
+    literature: "INFO"
+
+# Development and Testing Settings
+development:
+  debug_mode: false
+  enable_profiling: false
+  mock_expensive_tools: false  # Use mock responses for expensive computations
+  test_data_path: "./tests/data"
+  benchmark_data_path: "./benchmarks/data"
+
+# Security Settings
+security:
+  api_rate_limits:
+    pdb_api: 100  # requests per minute
+    uniprot_api: 60
+    alphafold_api: 30
+  
+  data_privacy:
+    anonymize_sequences: false
+    encrypt_sensitive_data: false
+    audit_log_access: true

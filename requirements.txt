@@ -1,0 +1,42 @@
+# StructBioReasoner Core Dependencies
+# Python 3.8+ required
+
+# AI and OpenAI Integration
+openai>=1.0.0
+
+# Core Scientific Computing
+numpy>=1.21.0
+scipy>=1.7.0
+pandas>=1.3.0
+matplotlib>=3.5.0
+
+# Structural Biology
+biopython>=1.79
+# pymol-open-source>=2.5.0  # Install via: pip install pymol-open-source
+# Note: PyMOL works best when installed via Homebrew: brew install pymol
+
+# Async and Web
+aiohttp>=3.8.0
+requests>=2.25.0
+
+# Configuration and Environment
+pyyaml>=6.0
+python-dotenv>=0.19.0
+
+# Database
+sqlalchemy>=1.4.0
+
+# CLI and Progress
+click>=8.0.0
+rich>=12.0.0
+tqdm>=4.62.0
+
+# Optional Development Dependencies
+# pytest>=7.0.0
+# black>=23.0.0
+# jupyter>=1.0.0
+
+# Installation Notes:
+# 1. PyMOL: Install via Homebrew for best results: brew install pymol
+# 2. OpenAI API: Set OPENAI_API_KEY in .env file
+# 3. Python 3.8+ required for async features
