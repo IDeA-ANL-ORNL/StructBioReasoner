@@ -3,7 +3,7 @@
 
 # Jnana Integration Settings
 jnana:
-  config_path: "../Jnana/config/models.yaml"  # Path to Jnana configuration
+  config_path: "../Jnana/config/models.example.yaml"  # Path to Jnana configuration
   enable_protognosis: true
   enable_biomni: false  # Disabled for now
   enable_wisteria_ui: true
