@@ -18,7 +18,35 @@ biopython>=1.79
 # Molecular Dynamics
 # openmm>=8.0.0  # Install via: conda install -c conda-forge openmm
 # mdtraj>=1.9.0  # Install via: conda install -c conda-forge mdtraj
+# pdbfixer>=1.9  # Install via: conda install -c conda-forge pdbfixer
 # Note: OpenMM works best when installed via conda due to CUDA dependencies
+
+# Machine Learning and Deep Learning
+torch>=1.12.0  # For ESM and other ML models
+torchvision>=0.13.0
+fair-esm>=2.0.0  # ESM protein language models
+biotite>=0.37.0  # For protein structure analysis
+
+# RFDiffusion dependencies (optional - requires separate installation)
+# hydra-core>=1.2.0
+# omegaconf>=2.2.0
+# Note: RFDiffusion requires separate installation from GitHub
+
+# Rosetta dependencies (optional - requires license and separate installation)
+# Note: Rosetta requires separate installation and academic/commercial license
+
+# AlphaFold dependencies (optional - requires separate installation)
+# tensorflow>=2.9.0
+# dm-haiku>=0.0.9
+# dm-tree>=0.1.7
+# immutabledict>=2.2.1
+# ml-collections>=0.1.1
+# chex>=0.1.5
+# Note: AlphaFold requires separate installation and large database downloads
+
+# Additional scientific computing
+scikit-learn>=1.1.0
+seaborn>=0.12.0
 
 # Async and Web
 aiohttp>=3.8.0

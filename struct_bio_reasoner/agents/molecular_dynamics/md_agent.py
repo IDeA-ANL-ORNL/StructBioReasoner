@@ -14,9 +14,10 @@ from datetime import datetime
 
 from ...tools.openmm_wrapper import OpenMMWrapper
 from ...data.protein_hypothesis import ProteinHypothesis
+from ...core.base_agent import BaseAgent
 
 
-class MolecularDynamicsAgent:
+class MolecularDynamicsAgent(BaseAgent):
     """
     Agent specialized in molecular dynamics simulations for protein engineering.
     
@@ -30,21 +31,20 @@ class MolecularDynamicsAgent:
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize MD agent.
-        
+
         Args:
             config: Agent configuration
         """
-        self.config = config
-        self.logger = logging.getLogger(__name__)
-        
-        # Agent configuration
-        self.agent_id = config.get("agent_id", f"md_agent_{uuid.uuid4().hex[:8]}")
-        self.capabilities = config.get("capabilities", [
+        # Initialize base agent
+        super().__init__(config)
+
+        # MD-specific capabilities
+        self.capabilities = [
             "thermostability_prediction",
-            "mutation_validation", 
+            "mutation_validation",
             "flexibility_analysis",
             "dynamics_hypothesis_generation"
-        ])
+        ]
         
         # MD simulation parameters
         self.simulation_config = config.get("simulation", {
@@ -542,3 +542,66 @@ class MolecularDynamicsAgent:
             'generated_hypotheses': len(self.generated_hypotheses),
             'simulation_config': self.simulation_config
         }
+
+    async def generate_hypotheses(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Generate molecular dynamics-based hypotheses for protein engineering.
+
+        Args:
+            context: Analysis context containing protein information
+
+        Returns:
+            List of hypothesis dictionaries
+        """
+        hypotheses = []
+
+        try:
+            # Extract context information
+            protein_sequence = context.get('protein_sequence', '')
+            target_protein = context.get('target_protein', 'unknown')
+            analysis_goals = context.get('analysis_goals', [])
+
+            # Generate thermostability hypothesis
+            if 'thermostability' in str(analysis_goals).lower() or 'stability' in str(analysis_goals).lower():
+                thermo_hypothesis = {
+                    'title': 'Molecular Dynamics Thermostability Validation',
+                    'strategy': 'thermostability_validation',
+                    'approach': 'temperature_gradient_simulation',
+                    'description': f'Validate thermostability predictions for {target_protein} using MD simulations at multiple temperatures',
+                    'confidence': 0.75,
+                    'source': 'MolecularDynamicsAgent',
+                    'execution_plan': {
+                        'simulation_temperatures': [300, 320, 340, 360, 380, 400],  # K
+                        'simulation_time_ns': 10,
+                        'analysis_metrics': ['RMSD', 'RMSF', 'radius_of_gyration', 'secondary_structure'],
+                        'validation_approach': 'temperature_dependent_stability_scoring'
+                    },
+                    'expected_outcomes': [
+                        'Quantitative stability scores at different temperatures',
+                        'Identification of unfolding initiation sites',
+                        'Validation of mutation effects on thermostability'
+                    ]
+                }
+                hypotheses.append(thermo_hypothesis)
+
+            # Generate mutation validation hypothesis
+            mutation_hypothesis = {
+                'title': 'MD-Based Mutation Effect Validation',
+                'strategy': 'mutation_validation',
+                'approach': 'comparative_simulation_analysis',
+                'description': f'Compare wild-type and mutant {target_protein} dynamics to validate predicted mutation effects',
+                'confidence': 0.70,
+                'source': 'MolecularDynamicsAgent'
+            }
+            hypotheses.append(mutation_hypothesis)
+
+            self.logger.info(f"Generated {len(hypotheses)} MD-based hypotheses")
+
+        except Exception as e:
+            self.logger.error(f"Error generating MD hypotheses: {e}")
+
+        return hypotheses
+
+    def get_capabilities(self) -> List[str]:
+        """Get list of agent capabilities."""
+        return self.capabilities

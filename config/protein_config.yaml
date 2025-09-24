@@ -112,39 +112,109 @@ tools:
   # OpenMM for molecular dynamics simulations
   openmm:
     enabled: true
+    platform: "CUDA"  # CUDA, OpenCL, CPU
+    precision: "mixed"  # single, mixed, double
+    output_dir: "openmm_outputs"
+
+    # Force field settings
     force_field: "amber14-all.xml"
     water_model: "amber14/tip3pfb.xml"
-    temperature: 300  # K
-    pressure: 1.0     # atm
-    step_size: 2.0    # femtoseconds
+
+    # Simulation parameters
+    temperature: 300  # Kelvin
+    pressure: 1.0     # bar
+    timestep: 2.0     # femtoseconds
     friction: 1.0     # 1/picosecond
-    equilibration_steps: 10000
-    production_steps: 500000  # 1ns default
-    report_interval: 1000
-    trajectory_interval: 5000
-    preferred_platform: "CUDA"  # Options: CUDA, OpenCL, CPU
 
-  # Rosetta (requires license)
+    # Production simulation
+    production_steps: 5000000    # 10 ns at 2 fs timestep
+    equilibration_steps: 250000  # 0.5 ns equilibration
+
+    # Analysis parameters
+    trajectory_interval: 1000    # Save every 2 ps
+    energy_interval: 100         # Energy every 0.2 ps
+
+    # Thermostability analysis
+    temperature_range: [300, 400]  # K
+    temperature_steps: 11
+    stability_threshold: 0.3       # RMSD threshold for unfolding
+
+  # RFDiffusion for generative protein design
+  rfdiffusion:
+    enabled: true  # Enable for mock mode functionality
+    model_path: ""  # Path to RFDiffusion model (empty for mock mode)
+    output_dir: "rfdiffusion_outputs"
+
+    # Generation parameters
+    num_designs: 10
+    sampling_steps: 200
+    guidance_scale: 1.0
+
+    # Design constraints
+    min_length: 50
+    max_length: 500
+    secondary_structure_weight: 0.5
+
+    # Motif scaffolding
+    motif_rmsd_threshold: 1.0
+    scaffold_diversity_threshold: 0.3
+
+  # Rosetta for computational protein design
   rosetta:
-    enabled: false  # Set to true if license available
-    executable_path: "/path/to/rosetta/bin"
+    enabled: true  # Enable for mock mode functionality
+    rosetta_path: "/path/to/rosetta/bin"  # Path for real installation
+    database_path: "/path/to/rosetta/database"  # Path for real installation
+    output_dir: "rosetta_outputs"
+
+    # Scoring and design
     score_function: "ref2015"
-    relax_protocol: "fast_relax"
-    design_protocol: "fixbb"
+    num_processors: 1
+    relax_rounds: 5
+    design_iterations: 10
 
-  # AlphaFold2 (local installation)
+    # Energy thresholds
+    energy_threshold: -100.0
+    stability_improvement_target: 5.0
+
+  # AlphaFold for structure prediction
   alphafold:
-    enabled: false  # Set to true if locally installed
-    model_path: "/path/to/alphafold/models"
-    database_path: "/path/to/alphafold/databases"
-    max_sequence_length: 2000
+    enabled: true  # Enable for mock mode functionality
+    alphafold_path: "/path/to/alphafold"  # Path for real installation
+    database_path: "/path/to/alphafold/databases"  # Path for real installation
+    output_dir: "alphafold_outputs"
 
-  # ESM (Facebook's protein language model)
+    # Prediction parameters
+    model_preset: "monomer"  # monomer, multimer
+    max_template_date: "2022-01-01"
+    use_gpu: true
+    num_ensemble: 1
+    num_multimer_predictions_per_model: 5
+
+    # Confidence thresholds
+    high_confidence_threshold: 90.0
+    medium_confidence_threshold: 70.0
+    low_confidence_threshold: 50.0
+
+  # ESM for protein language model analysis
   esm:
     enabled: true
-    model_name: "esm2_t33_650M_UR50D"  # Options: esm2_t6_8M_UR50D, esm2_t12_35M_UR50D, etc.
-    device: "auto"  # Options: auto, cpu, cuda
+    output_dir: "esm_outputs"
+    device: "auto"  # auto, cuda, cpu
+
+    # Model settings
+    esm2_model: "esm2_t33_650M_UR50D"
+    esmfold_model: "esm2_t36_3B_UR50D"
+    embedding_layer: 33
+
+    # Analysis parameters
+    max_sequence_length: 1024
     batch_size: 1
+    conservation_threshold: 0.8
+    functional_site_threshold: 0.9
+
+    # ESMFold settings
+    esmfold_confidence_threshold: 70.0
+    chunk_size: 64
 
   # Molecular dynamics (optional)
   molecular_dynamics:
@@ -209,6 +279,78 @@ agents:
       rmsf_threshold: 0.2  # nm
       stability_score_threshold: 70.0
       confidence_threshold: 0.6
+
+  # RFDiffusion Generative Design Agent
+  rfdiffusion_agent:
+    enabled: true  # Enable for mock mode functionality
+    capabilities:
+      - "de_novo_protein_design"
+      - "motif_scaffolding"
+      - "protein_interaction_design"
+      - "structure_optimization"
+    tools: ["rfdiffusion"]
+    design_strategies:
+      - "de_novo_design"
+      - "motif_scaffolding"
+      - "interaction_design"
+      - "structure_optimization"
+    max_designs_per_hypothesis: 5
+    confidence_threshold: 0.7
+    diversity_threshold: 0.3
+
+  # Rosetta Computational Design Agent
+  rosetta_agent:
+    enabled: true  # Enable for mock mode functionality
+    capabilities:
+      - "energy_based_design"
+      - "stability_optimization"
+      - "loop_modeling_design"
+      - "interface_optimization"
+    tools: ["rosetta"]
+    design_strategies:
+      - "energy_optimization"
+      - "stability_enhancement"
+      - "loop_engineering"
+      - "interface_design"
+    energy_threshold: -100.0
+    stability_improvement_target: 5.0
+    design_iterations: 10
+
+  # AlphaFold Structure Prediction Agent
+  alphafold_agent:
+    enabled: true  # Enable for mock mode functionality
+    capabilities:
+      - "structure_prediction"
+      - "confidence_analysis"
+      - "mutation_impact_prediction"
+      - "comparative_structure_analysis"
+    tools: ["alphafold"]
+    analysis_strategies:
+      - "structure_prediction"
+      - "confidence_analysis"
+      - "mutation_impact"
+      - "comparative_analysis"
+    high_confidence_threshold: 90.0
+    medium_confidence_threshold: 70.0
+    low_confidence_threshold: 50.0
+
+  # ESM Language Model Agent
+  esm_agent:
+    enabled: true
+    capabilities:
+      - "sequence_embedding_analysis"
+      - "conservation_analysis"
+      - "functional_site_prediction"
+      - "mutation_effect_prediction"
+    tools: ["esm"]
+    analysis_strategies:
+      - "sequence_analysis"
+      - "conservation_analysis"
+      - "functional_prediction"
+      - "mutation_design"
+    conservation_threshold: 0.8
+    functional_site_threshold: 0.9
+    mutation_confidence_threshold: 0.7
 
   # Mutation Design Agent
   mutation_design:
