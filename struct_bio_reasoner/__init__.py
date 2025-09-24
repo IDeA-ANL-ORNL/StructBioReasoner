@@ -19,10 +19,12 @@ from .agents.structural.structural_agent import StructuralAnalysisAgent
 from .agents.evolutionary.conservation_agent import EvolutionaryConservationAgent
 from .agents.energetic.energy_agent import EnergeticAnalysisAgent
 from .agents.design.mutation_agent import MutationDesignAgent
+from .agents.molecular_dynamics.md_agent import MolecularDynamicsAgent
 
 # Tool imports
 from .tools.pymol_wrapper import PyMOLWrapper
 from .tools.biopython_utils import BioPythonUtils
+from .tools.openmm_wrapper import OpenMMWrapper
 
 # Utility imports
 from .utils.protein_utils import load_protein_structure, analyze_sequence
@@ -35,6 +37,7 @@ VERSION_INFO = {
     "python_required": ">=3.8",
     "dependencies": {
         "core": ["biopython", "pymol-open-source", "numpy", "pandas"],
+        "molecular_dynamics": ["openmm", "mdtraj"],
         "optional": ["rosetta", "alphafold", "esm"],
         "databases": ["neo4j", "networkx"]
     }
@@ -44,8 +47,8 @@ VERSION_INFO = {
 DEFAULT_CONFIG = {
     "jnana_config_path": "../Jnana/config/models.yaml",
     "protein_config_path": "config/protein_config.yaml",
-    "enable_tools": ["pymol", "biopython"],
-    "enable_agents": ["structural", "evolutionary", "energetic", "design"],
+    "enable_tools": ["pymol", "biopython", "openmm"],
+    "enable_agents": ["structural", "evolutionary", "energetic", "design", "molecular_dynamics"],
     "knowledge_graph": True,
     "literature_processing": True,
     "enable_biomni": False  # Disabled by default
@@ -159,7 +162,15 @@ def check_tool_availability():
         tools_status["neo4j"] = True
     except ImportError:
         tools_status["neo4j"] = False
-    
+
+    # Check OpenMM
+    try:
+        import openmm
+        import mdtraj
+        tools_status["openmm"] = True
+    except ImportError:
+        tools_status["openmm"] = False
+
     return tools_status
 
 # Run compatibility checks on import

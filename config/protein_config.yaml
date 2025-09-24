@@ -109,6 +109,21 @@ tools:
     sequence_alignment_tool: "muscle"  # Options: muscle, clustalo
     blast_database: "nr"
 
+  # OpenMM for molecular dynamics simulations
+  openmm:
+    enabled: true
+    force_field: "amber14-all.xml"
+    water_model: "amber14/tip3pfb.xml"
+    temperature: 300  # K
+    pressure: 1.0     # atm
+    step_size: 2.0    # femtoseconds
+    friction: 1.0     # 1/picosecond
+    equilibration_steps: 10000
+    production_steps: 500000  # 1ns default
+    report_interval: 1000
+    trajectory_interval: 5000
+    preferred_platform: "CUDA"  # Options: CUDA, OpenCL, CPU
+
   # Rosetta (requires license)
   rosetta:
     enabled: false  # Set to true if license available
@@ -170,8 +185,30 @@ agents:
       - "stability_prediction"
       - "binding_affinity_estimation"
       - "folding_energy_calculation"
-    tools: ["rosetta", "esm"]  # Rosetta optional
+    tools: ["rosetta", "esm", "openmm"]  # Rosetta optional
     energy_units: "kcal/mol"
+
+  # Molecular Dynamics Agent
+  molecular_dynamics:
+    enabled: true
+    capabilities:
+      - "thermostability_prediction"
+      - "mutation_validation"
+      - "flexibility_analysis"
+      - "dynamics_hypothesis_generation"
+    tools: ["openmm"]
+    simulation:
+      temperature: 300  # K
+      pressure: 1.0     # atm
+      equilibration_steps: 10000
+      production_steps: 500000  # 1ns default
+      force_field: "amber14-all.xml"
+      water_model: "amber14/tip3pfb.xml"
+    analysis:
+      rmsd_threshold: 0.3  # nm
+      rmsf_threshold: 0.2  # nm
+      stability_score_threshold: 70.0
+      confidence_threshold: 0.6
 
   # Mutation Design Agent
   mutation_design:

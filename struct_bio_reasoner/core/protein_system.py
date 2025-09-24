@@ -180,9 +180,20 @@ class ProteinEngineeringSystem(JnanaSystem):
                 self.logger.info("BioPython utilities initialized")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize BioPython: {e}")
-        
+
+        # Initialize OpenMM wrapper
+        if "openmm" in self.enable_tools:
+            try:
+                from ..tools.openmm_wrapper import OpenMMWrapper
+                openmm_config = self.protein_config.get("tools", {}).get("openmm", {})
+                self.protein_tools["openmm"] = OpenMMWrapper(openmm_config)
+                await self.protein_tools["openmm"].initialize()
+                self.logger.info("OpenMM wrapper initialized")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize OpenMM: {e}")
+
         # TODO: Initialize other tools (Rosetta, AlphaFold, ESM, etc.)
-        
+
         self.logger.info(f"Initialized {len(self.protein_tools)} protein tools")
     
     async def _initialize_protein_agents(self):

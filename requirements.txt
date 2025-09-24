@@ -15,6 +15,11 @@ biopython>=1.79
 # pymol-open-source>=2.5.0  # Install via: pip install pymol-open-source
 # Note: PyMOL works best when installed via Homebrew: brew install pymol
 
+# Molecular Dynamics
+# openmm>=8.0.0  # Install via: conda install -c conda-forge openmm
+# mdtraj>=1.9.0  # Install via: conda install -c conda-forge mdtraj
+# Note: OpenMM works best when installed via conda due to CUDA dependencies
+
 # Async and Web
 aiohttp>=3.8.0
 requests>=2.25.0
