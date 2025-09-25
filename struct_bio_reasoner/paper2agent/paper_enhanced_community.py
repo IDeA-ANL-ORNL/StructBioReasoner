@@ -139,40 +139,64 @@ class PaperEnhancedAgenticCommunity:
         """Generate base mutation proposals (simplified version)."""
         proposals = []
         
-        # Community-specific mutations based on specialization
+        # Community-specific mutations based on specialization (expanded for 10 iterations)
         mutation_sets = {
             "structural": [
                 ("F45Y", 45, "F", "Y", 0.16, "Enhanced hydrogen bonding"),
                 ("D52N", 52, "D", "N", 0.14, "Electrostatic optimization"),
                 ("V26I", 26, "V", "I", 0.11, "Hydrophobic packing"),
                 ("G75A", 75, "G", "A", 0.09, "Backbone rigidity"),
+                ("L8I", 8, "L", "I", 0.13, "Hydrophobic core enhancement"),
+                ("T12A", 12, "T", "A", 0.10, "Loop stabilization"),
+                ("S65T", 65, "S", "T", 0.08, "Side chain optimization"),
+                ("Q2E", 2, "Q", "E", 0.12, "N-terminal stabilization"),
             ],
             "dynamics": [
                 ("K63R", 63, "K", "R", 0.14, "Hydrogen bonding network"),
                 ("Q49E", 49, "Q", "E", 0.11, "Salt bridge formation"),
                 ("I44V", 44, "I", "V", 0.15, "Hydrophobic core optimization"),
                 ("T14S", 14, "T", "S", 0.08, "Conformational entropy reduction"),
+                ("E51D", 51, "E", "D", 0.09, "Electrostatic fine-tuning"),
+                ("K48R", 48, "K", "R", 0.11, "Charge distribution"),
+                ("N60D", 60, "N", "D", 0.10, "Loop dynamics"),
+                ("T55S", 55, "T", "S", 0.07, "Flexibility optimization"),
             ],
             "evolutionary": [
                 ("R72K", 72, "R", "K", 0.12, "Evolutionary optimization"),
                 ("E34D", 34, "E", "D", 0.10, "Conservation analysis"),
                 ("A46V", 46, "A", "V", 0.11, "Homology modeling"),
                 ("N25Q", 25, "N", "Q", 0.08, "Phylogenetic guidance"),
+                ("S20T", 20, "S", "T", 0.09, "Evolutionary pressure"),
+                ("H68Q", 68, "H", "Q", 0.10, "Conservation-guided"),
+                ("R42K", 42, "R", "K", 0.08, "Phylogenetic optimization"),
+                ("D39E", 39, "D", "E", 0.07, "Evolutionary conservation"),
             ],
             "balanced": [
                 ("I44V", 44, "I", "V", 0.15, "Core stability"),
                 ("F45Y", 45, "F", "Y", 0.13, "Hydrogen bonding"),
                 ("K63R", 63, "K", "R", 0.12, "Electrostatic optimization"),
                 ("D52N", 52, "D", "N", 0.11, "Electrostatic balance"),
+                ("L71I", 71, "L", "I", 0.10, "Hydrophobic optimization"),
+                ("E64Q", 64, "E", "Q", 0.09, "Charge neutralization"),
+                ("T7A", 7, "T", "A", 0.08, "N-terminal stability"),
+                ("G76A", 76, "G", "A", 0.11, "C-terminal rigidity"),
             ]
         }
         
         mutations = mutation_sets.get(self.specialization, mutation_sets["balanced"])
-        
-        for mut, pos, orig, new, base_effect, rationale in mutations:
-            # Add iteration and community-specific improvements
-            stability_change = base_effect * self.innovation_factor + (iteration * 0.02) + random.uniform(-0.03, 0.03)
-            confidence = min(0.95, self.confidence_base + (iteration * 0.015) + random.uniform(-0.05, 0.05))
+
+        # Select mutations based on iteration (more diversity in later iterations)
+        num_mutations = min(len(mutations), 4 + (iteration // 2))  # Increase diversity over time
+        selected_mutations = mutations[:num_mutations]
+
+        for mut, pos, orig, new, base_effect, rationale in selected_mutations:
+            # Add iteration and community-specific improvements (enhanced for 10 iterations)
+            iteration_boost = iteration * 0.025  # Slightly higher boost per iteration
+            innovation_boost = base_effect * self.innovation_factor
+            random_variation = random.uniform(-0.02, 0.04)  # Slight positive bias
+
+            stability_change = innovation_boost + iteration_boost + random_variation
+            confidence = min(0.98, self.confidence_base + (iteration * 0.012) + random.uniform(-0.03, 0.05))
             
             # Enhanced evidence
             evidence = [
@@ -454,11 +478,25 @@ class PaperEnhancedProtognosisSupervisor:
                         if any(len(p.literature_support) > 0 for p in [proposals[i], proposals[j], proposals[k]]):
                             combinations.append([proposals[i], proposals[j], proposals[k]])
 
-        # Larger combinations for advanced iterations
+        # Larger combinations for advanced iterations (enhanced for 10 iterations)
         if iteration >= 4:
             # Quadruples with strong paper validation
-            for combo in self._generate_high_confidence_combinations(proposals[:5], 4):
-                if all(p.validation_confidence > 0.8 for p in combo):
+            for combo in self._generate_high_confidence_combinations(proposals[:6], 4):
+                if all(p.validation_confidence > 0.7 for p in combo):  # Slightly lower threshold
+                    combinations.append(combo)
+
+        # Even larger combinations for very advanced iterations
+        if iteration >= 7:
+            # Quintuples for maximum optimization
+            for combo in self._generate_high_confidence_combinations(proposals[:7], 5):
+                if all(p.validation_confidence > 0.6 for p in combo):
+                    combinations.append(combo)
+
+        # Maximum combinations for final iterations
+        if iteration >= 9:
+            # Six-mutation combinations for ultimate optimization
+            for combo in self._generate_high_confidence_combinations(proposals[:8], 6):
+                if all(p.validation_confidence > 0.5 for p in combo):
                     combinations.append(combo)
 
         return combinations

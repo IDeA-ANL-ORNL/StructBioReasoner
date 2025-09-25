@@ -58,7 +58,7 @@ class Paper2AgentThermostabilitySimulation:
         # Simulation parameters
         self.baseline_stability = 45.20  # kcal/mol
         self.current_stability = self.baseline_stability
-        self.iterations = 5
+        self.iterations = 10  # Extended to 10 iterations for maximum improvement
         
         logger.info("Initialized Paper2Agent Enhanced Thermostability Simulation")
     
