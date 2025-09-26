@@ -162,6 +162,7 @@ class OpenMMWrapper:
             
             # Add solvent and ions
             modeller = Modeller(pdb.topology, pdb.positions)
+            modeller.addHydrogens(forcefield)
             modeller.addSolvent(forcefield, padding=1.0*unit.nanometer, ionicStrength=0.1*unit.molar)
             
             # Create system
@@ -181,14 +182,20 @@ class OpenMMWrapper:
             platform = openmm.Platform.getPlatformByName(self.preferred_platform)
             simulation = Simulation(modeller.topology, system, integrator, platform)
             simulation.context.setPositions(modeller.positions)
+
+            output_dir = tempfile.mkdtemp(prefix=f"openmm_{simulation_id}_")
+            sim_pdb = os.path.join(output_dir, f"{simulation_id}_start.pdb")
+            with open(sim_pdb, 'w') as f:
+                PDBFile.writeFile(simulation.topology, modeller.positions, f)
             
             # Store simulation
             self.current_simulations[simulation_id] = {
+                'output_dir': output_dir,
                 'simulation': simulation,
                 'topology': modeller.topology,
                 'system': system,
                 'integrator': integrator,
-                'pdb_file': pdb_file,
+                'pdb_file': sim_pdb,
                 'mutations': mutations or [],
                 'setup_complete': True
             }
@@ -261,9 +268,8 @@ class OpenMMWrapper:
             
             # Setup output files
             if output_dir is None:
-                output_dir = tempfile.mkdtemp(prefix=f"openmm_{simulation_id}_")
-            
-            os.makedirs(output_dir, exist_ok=True)
+                # output_dir = tempfile.mkdtemp(prefix=f"openmm_{simulation_id}_")
+                output_dir = sim_data['output_dir']
             
             trajectory_file = os.path.join(output_dir, f"{simulation_id}_trajectory.dcd")
             log_file = os.path.join(output_dir, f"{simulation_id}_log.txt")
