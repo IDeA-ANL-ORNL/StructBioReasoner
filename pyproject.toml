@@ -1,0 +1,20 @@
+[project]
+name = 'struct_bio_reasoner'
+version = '0.1.0'
+authors = [
+    {name='Matt Sinclair', email='msinclair@anl.gov'}
+]
+description='''
+A flexible abstracted version of BindCraft (https://github.com/martinpacesa/BindCraft)
+wherein the folding model and inverse folding models can be swapped out in a generalizable
+framework.
+'''
+readme = 'README.md'
+requires-python = '>= 3.10'
+license = 'MIT'
+dependencies = [
+]
+
+[project.urls]
+Homepage = 'https://github.com/msinclair-py/bindcraft'
+Issues = 'https://github.com/msinclair-py/bindcraft/issues'
