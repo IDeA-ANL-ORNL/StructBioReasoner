@@ -34,24 +34,27 @@ StructBioReasoner
 
 ### Installing MDAgent
 
+**Quick Setup**:
+
 ```bash
 # Clone MDAgent repository
 git clone https://github.com/msinclair-py/MDAgent.git
-cd MDAgent
 
-# Install dependencies
-pip install -r requirements.txt
+# Add to Python path
+export PYTHONPATH="${PYTHONPATH}:/path/to/MDAgent"
 
-# Install MDAgent
-pip install -e .
+# Verify installation
+python -c "from agents import Builder, MDSimulator, MDCoordinator; print('Success!')"
 ```
+
+**For detailed installation instructions**, see: [`docs/MDAGENT_SETUP.md`](MDAGENT_SETUP.md)
 
 ### Installing Trajectory Analysis Tools (Optional)
 
 For detailed trajectory analysis:
 
 ```bash
-pip install mdtraj
+pip install mdtraj numpy
 ```
 
 ## Configuration

@@ -85,7 +85,7 @@ class MDAgentAdapter(BaseAgent):
     async def initialize(self) -> bool:
         """
         Initialize MDAgent components.
-        
+
         Returns:
             True if initialization successful, False otherwise
         """
@@ -93,17 +93,31 @@ class MDAgentAdapter(BaseAgent):
             self.logger.error("MDAgent not available - cannot initialize adapter")
             self.initialized = False
             return False
-        
+
         try:
             # Import MDAgent components
-            from agents import Builder, MDSimulator, MDCoordinator
-            
+            # Note: MDAgent should be installed and available in Python path
+            # The agents are defined in agents.py at the root of MDAgent repo
+            try:
+                # Try importing from mdagent package (if installed as package)
+                from mdagent.agents import Builder, MDSimulator, MDCoordinator
+            except ImportError:
+                try:
+                    # Try importing from agents module (if MDAgent is in PYTHONPATH)
+                    from agents import Builder, MDSimulator, MDCoordinator
+                except ImportError as e:
+                    self.logger.error(f"Cannot import MDAgent components: {e}")
+                    self.logger.info("Make sure MDAgent is installed and in PYTHONPATH")
+                    self.logger.info("Install from: https://github.com/msinclair-py/MDAgent")
+                    self.initialized = False
+                    return False
+
             # Create Academy manager
             self.manager = await Manager.from_exchange_factory(
                 factory=LocalExchangeFactory(),
                 executors=ThreadPoolExecutor(),
             )
-            
+
             # Launch MDAgent components
             self.builder_handle = await self.manager.launch(Builder)
             self.simulator_handle = await self.manager.launch(MDSimulator)
@@ -111,11 +125,11 @@ class MDAgentAdapter(BaseAgent):
                 MDCoordinator,
                 args=(self.builder_handle, self.simulator_handle)
             )
-            
+
             self.initialized = True
             self.logger.info("MDAgent components initialized successfully")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Failed to initialize MDAgent: {e}")
             self.initialized = False
