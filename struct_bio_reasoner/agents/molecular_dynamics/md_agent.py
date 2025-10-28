@@ -45,7 +45,11 @@ class MolecularDynamicsAgent(BaseAgent):
             "flexibility_analysis",
             "dynamics_hypothesis_generation"
         ]
-        
+
+        # Backend selection: 'openmm' or 'mdagent'
+        self.backend = config.get("md_backend", "openmm")
+        self.logger.info(f"MD agent using backend: {self.backend}")
+
         # MD simulation parameters
         self.simulation_config = config.get("simulation", {
             "temperature": 300,  # K
@@ -55,7 +59,7 @@ class MolecularDynamicsAgent(BaseAgent):
             "force_field": "amber14-all.xml",
             "water_model": "amber14/tip3pfb.xml"
         })
-        
+
         # Analysis parameters
         self.analysis_config = config.get("analysis", {
             "rmsd_threshold": 0.3,  # nm
@@ -63,102 +67,184 @@ class MolecularDynamicsAgent(BaseAgent):
             "stability_score_threshold": 70.0,
             "confidence_threshold": 0.6
         })
-        
-        # Tools
+
+        # Tools (backend-specific)
         self.openmm_wrapper = None
+        self.mdagent_adapter = None
         self.initialized = False
-        
+
         # State
         self.active_simulations = {}
         self.completed_analyses = {}
         self.generated_hypotheses = []
     
     async def initialize(self):
-        """Initialize the MD agent."""
+        """Initialize the MD agent with selected backend."""
         try:
-            # Initialize OpenMM wrapper
+            if self.backend == "mdagent":
+                # Initialize MDAgent adapter
+                from .mdagent_adapter import MDAgentAdapter
+                self.mdagent_adapter = MDAgentAdapter(self.config)
+                await self.mdagent_adapter.initialize()
+
+                if not self.mdagent_adapter.is_ready():
+                    self.logger.warning("MDAgent not available - falling back to OpenMM")
+                    self.backend = "openmm"
+                else:
+                    self.initialized = True
+                    self.logger.info(f"MD agent {self.agent_id} initialized with MDAgent backend")
+                    return
+
+            # Initialize OpenMM wrapper (default or fallback)
             self.openmm_wrapper = OpenMMWrapper(self.simulation_config)
             await self.openmm_wrapper.initialize()
-            
+
             if not self.openmm_wrapper.is_ready():
                 self.logger.warning("OpenMM not available - MD agent will operate in limited mode")
                 self.initialized = False
                 return
-            
+
             self.initialized = True
-            self.logger.info(f"MD agent {self.agent_id} initialized successfully")
-            
+            self.logger.info(f"MD agent {self.agent_id} initialized successfully with OpenMM backend")
+
         except Exception as e:
             self.logger.error(f"Failed to initialize MD agent: {e}")
             self.initialized = False
     
     def is_ready(self) -> bool:
         """Check if MD agent is ready."""
-        return self.initialized and self.openmm_wrapper and self.openmm_wrapper.is_ready()
+        if self.backend == "mdagent":
+            return self.initialized and self.mdagent_adapter and self.mdagent_adapter.is_ready()
+        else:
+            return self.initialized and self.openmm_wrapper and self.openmm_wrapper.is_ready()
     
     async def generate_thermostability_hypothesis(self, structure_data: Dict[str, Any],
                                                 protein_name: str = "unknown") -> Optional[ProteinHypothesis]:
         """
         Generate thermostability hypothesis based on MD simulation.
-        
+
         Args:
             structure_data: Protein structure data
             protein_name: Name of the protein
-            
+
         Returns:
             Generated hypothesis or None if failed
         """
         if not self.is_ready():
             self.logger.error("MD agent not ready")
             return None
-        
+
+        # Route to appropriate backend
+        if self.backend == "mdagent":
+            return await self._generate_thermostability_mdagent(structure_data, protein_name)
+        else:
+            return await self._generate_thermostability_openmm(structure_data, protein_name)
+
+    async def _generate_thermostability_openmm(self, structure_data: Dict[str, Any],
+                                              protein_name: str = "unknown") -> Optional[ProteinHypothesis]:
+        """Generate thermostability hypothesis using OpenMM backend."""
         try:
             # Create simulation ID
             simulation_id = f"thermo_{protein_name}_{uuid.uuid4().hex[:8]}"
-            
+
             # Setup and run simulation
-            self.logger.info(f"Setting up thermostability simulation for {protein_name}")
-            
+            self.logger.info(f"Setting up thermostability simulation for {protein_name} (OpenMM)")
+
             if not await self.openmm_wrapper.setup_simulation(structure_data, simulation_id):
                 return None
-            
+
             # Run equilibration and production
             if not await self.openmm_wrapper.run_equilibration(simulation_id):
                 return None
-            
+
             trajectory_file = await self.openmm_wrapper.run_production(simulation_id)
             if not trajectory_file:
                 return None
-            
+
             # Analyze trajectory
             analysis = await self.openmm_wrapper.analyze_trajectory(simulation_id)
             if not analysis:
                 return None
-            
+
             # Predict thermostability
             thermo_prediction = await self.openmm_wrapper.predict_thermostability(simulation_id)
             if not thermo_prediction:
                 return None
-            
+
             # Generate hypothesis based on results
             hypothesis = await self._create_thermostability_hypothesis(
                 protein_name, analysis, thermo_prediction, simulation_id
             )
-            
+
             # Store results
             self.completed_analyses[simulation_id] = {
                 'analysis': analysis,
                 'thermostability': thermo_prediction,
                 'hypothesis': hypothesis
             }
-            
+
             # Cleanup simulation
             await self.openmm_wrapper.cleanup_simulation(simulation_id)
-            
+
             return hypothesis
-            
+
         except Exception as e:
-            self.logger.error(f"Thermostability hypothesis generation failed: {e}")
+            self.logger.error(f"Thermostability hypothesis generation failed (OpenMM): {e}")
+            return None
+
+    async def _generate_thermostability_mdagent(self, structure_data: Dict[str, Any],
+                                               protein_name: str = "unknown") -> Optional[ProteinHypothesis]:
+        """Generate thermostability hypothesis using MDAgent backend."""
+        try:
+            self.logger.info(f"Setting up thermostability simulation for {protein_name} (MDAgent)")
+
+            # Extract PDB path from structure data
+            pdb_path = structure_data.get('pdb_path')
+            if not pdb_path:
+                self.logger.error("No PDB path in structure data")
+                return None
+
+            # Run MDAgent simulation
+            from pathlib import Path
+            result = await self.mdagent_adapter.run_md_simulation(
+                pdb_path=Path(pdb_path),
+                protein_name=protein_name
+            )
+
+            if not result or not result.get('success'):
+                self.logger.error("MDAgent simulation failed")
+                return None
+
+            # Convert MDAgent results to hypothesis format
+            # For now, create a basic hypothesis - will enhance with trajectory analysis
+            hypothesis = ProteinHypothesis(
+                title=f"MDAgent thermostability analysis of {protein_name}",
+                content=f"""
+                MDAgent simulation completed successfully for {protein_name}.
+
+                Simulation Details:
+                - Backend: MDAgent
+                - Solvent Model: {result.get('solvent_model', 'unknown')}
+                - Simulation ID: {result.get('simulation_id', 'unknown')}
+
+                Analysis pending trajectory processing.
+                """.strip(),
+                description=f"MDAgent-based thermostability prediction for {protein_name}",
+                hypothesis_type="md_thermostability_mdagent",
+                generation_timestamp=datetime.now().isoformat(),
+                metadata={
+                    'backend': 'mdagent',
+                    'simulation_id': result.get('simulation_id'),
+                    'mdagent_results': result,
+                    'agent_id': self.agent_id
+                }
+            )
+
+            self.generated_hypotheses.append(hypothesis)
+            return hypothesis
+
+        except Exception as e:
+            self.logger.error(f"Thermostability hypothesis generation failed (MDAgent): {e}")
             return None
     
     async def validate_mutations(self, structure_data: Dict[str, Any],
@@ -532,16 +618,26 @@ class MolecularDynamicsAgent(BaseAgent):
 
     def get_agent_status(self) -> Dict[str, Any]:
         """Get current status of the MD agent."""
-        return {
+        status = {
             'agent_id': self.agent_id,
             'initialized': self.initialized,
-            'openmm_ready': self.openmm_wrapper.is_ready() if self.openmm_wrapper else False,
+            'backend': self.backend,
             'capabilities': self.capabilities,
             'active_simulations': len(self.active_simulations),
             'completed_analyses': len(self.completed_analyses),
             'generated_hypotheses': len(self.generated_hypotheses),
             'simulation_config': self.simulation_config
         }
+
+        # Add backend-specific status
+        if self.backend == "mdagent":
+            status['mdagent_ready'] = self.mdagent_adapter.is_ready() if self.mdagent_adapter else False
+            if self.mdagent_adapter:
+                status['mdagent_capabilities'] = self.mdagent_adapter.get_capabilities()
+        else:
+            status['openmm_ready'] = self.openmm_wrapper.is_ready() if self.openmm_wrapper else False
+
+        return status
 
     async def generate_hypotheses(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
         """

@@ -242,3 +242,4 @@ ubiquitin_*_results_*.json
 *.gro
 *.top
 *.itp
+structbio_venv
