@@ -23,8 +23,8 @@ git+https://github.com/openmm/pdbfixer.git
 # Note: OpenMM works best when installed via conda due to CUDA dependencies
 
 # Machine Learning and Deep Learning
-#torch>=1.12.0  # For ESM and other ML models
-#torchvision>=0.13.0
+torch>=1.12.0  # For ESM and other ML models
+torchvision>=0.13.0
 fair-esm>=2.0.0  # ESM protein language models
 biotite>=0.37.0  # For protein structure analysis
 

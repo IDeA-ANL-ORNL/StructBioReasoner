@@ -161,6 +161,7 @@ class StructuralAnalysisAgent:
             except Exception as e:
                 self.logger.debug(f"Failed to load from AlphaFold: {e}")
         
+        # TODO: Add CHAI-1 folding structure prediction
         return None
     
     async def _identify_active_sites(self, 
