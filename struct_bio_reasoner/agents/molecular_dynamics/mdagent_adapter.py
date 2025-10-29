@@ -81,7 +81,14 @@ class MDAgentAdapter(BaseAgent):
         self.completed_simulations = {}
         
         self.logger.info(f"MDAgentAdapter initialized with {self.solvent_model} solvent")
-    
+
+    def __del__(self):
+        """Destructor to ensure manager is cleaned up."""
+        # Note: This is a safety net. Proper cleanup should use async cleanup() method
+        if hasattr(self, 'manager') and self.manager is not None:
+            self.logger.warning("MDAgentAdapter deleted without proper cleanup - manager still active")
+            # We can't call async cleanup from __del__, so just log a warning
+
     async def initialize(self) -> bool:
         """
         Initialize MDAgent components.
@@ -112,11 +119,15 @@ class MDAgentAdapter(BaseAgent):
                     self.initialized = False
                     return False
 
-            # Create Academy manager
+            # Create Academy manager using async context manager pattern
+            # This ensures the exchange client is properly initialized
             self.manager = await Manager.from_exchange_factory(
                 factory=LocalExchangeFactory(),
                 executors=ThreadPoolExecutor(),
             )
+
+            # Enter the manager context to initialize exchange client
+            await self.manager.__aenter__()
 
             # Launch MDAgent components
             self.builder_handle = await self.manager.launch(Builder)
@@ -133,6 +144,13 @@ class MDAgentAdapter(BaseAgent):
         except Exception as e:
             self.logger.error(f"Failed to initialize MDAgent: {e}")
             self.initialized = False
+            # Clean up manager if it was created
+            if self.manager:
+                try:
+                    await self.manager.__aexit__(None, None, None)
+                except:
+                    pass
+                self.manager = None
             return False
     
     async def generate_hypotheses(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -500,15 +518,24 @@ class MDAgentAdapter(BaseAgent):
     async def cleanup(self) -> None:
         """Clean up MDAgent resources."""
         try:
-            # Close Academy manager
+            # Exit and close Academy manager context
             if self.manager:
-                await self.manager.__aexit__(None, None, None)
-            
+                try:
+                    await self.manager.__aexit__(None, None, None)
+                    self.logger.info("Academy manager context exited successfully")
+                except Exception as e:
+                    self.logger.warning(f"Error exiting manager context: {e}")
+                finally:
+                    self.manager = None
+                    self.builder_handle = None
+                    self.simulator_handle = None
+                    self.coordinator_handle = None
+
             # Call parent cleanup
             await super().cleanup()
-            
+
             self.logger.info("MDAgent adapter cleanup completed")
-            
+
         except Exception as e:
             self.logger.error(f"MDAgent adapter cleanup failed: {e}")
 

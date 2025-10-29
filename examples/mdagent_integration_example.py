@@ -126,17 +126,17 @@ async def example_mdagent_expert_role():
     
     # Create and initialize expert
     expert = MDAgentExpert(config)
-    
+
     # Note: MDAgent expert requires MDAgent to be installed
     # If not available, this will fail gracefully
     try:
         await expert.initialize()
-        
+
         if expert.initialized:
             # Get expert capabilities
             capabilities = expert.get_capabilities()
             logger.info(f"Expert Capabilities: {capabilities}")
-            
+
             # Example task (requires PDB file)
             # Uncomment and modify with your PDB file path
             """
@@ -147,7 +147,7 @@ async def example_mdagent_expert_role():
                     "name": "ubiquitin"
                 }
             }
-            
+
             result = await expert.execute_task(task)
             logger.info(f"Task Result: {result.get('status')}")
             if result.get('status') == 'success':
@@ -156,11 +156,18 @@ async def example_mdagent_expert_role():
             """
         else:
             logger.warning("MDAgent expert not initialized (MDAgent may not be installed)")
-            
+
     except Exception as e:
         logger.error(f"MDAgent expert initialization failed: {e}")
         logger.info("This is expected if MDAgent is not installed")
-    
+    finally:
+        # Always clean up the expert to properly shut down Academy manager
+        try:
+            await expert.cleanup()
+            logger.info("Expert cleaned up successfully")
+        except Exception as e:
+            logger.warning(f"Expert cleanup warning: {e}")
+
     logger.info("Example 2 completed")
 
 

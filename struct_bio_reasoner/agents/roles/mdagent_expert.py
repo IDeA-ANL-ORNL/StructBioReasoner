@@ -344,8 +344,28 @@ class MDAgentExpert(BaseRole):
                 "simulations_completed": self.simulations_completed,
                 "successful_simulations": self.successful_simulations,
                 "failed_simulations": self.failed_simulations,
-                "success_rate": (self.successful_simulations / self.simulations_completed 
+                "success_rate": (self.successful_simulations / self.simulations_completed
                                if self.simulations_completed > 0 else 0.0)
             }
         }
+
+    async def cleanup(self) -> None:
+        """
+        Clean up MDAgent expert resources.
+
+        This ensures the MDAgent adapter and Academy manager are properly shut down.
+        """
+        try:
+            # Clean up MDAgent adapter
+            if self.md_adapter:
+                await self.md_adapter.cleanup()
+                self.logger.info("MDAgent adapter cleaned up")
+
+            # Call parent cleanup
+            await super().cleanup()
+
+            self.logger.info("MDAgent Expert cleanup completed")
+
+        except Exception as e:
+            self.logger.error(f"MDAgent Expert cleanup failed: {e}")
 
