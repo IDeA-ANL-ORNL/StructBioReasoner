@@ -206,6 +206,7 @@ class MolecularDynamicsAgent(BaseAgent):
 
             # Run MDAgent simulation
             from pathlib import Path
+            print("aboutu to run mdagent")
             result = await self.mdagent_adapter.run_md_simulation(
                 pdb_path=Path(pdb_path),
                 protein_name=protein_name

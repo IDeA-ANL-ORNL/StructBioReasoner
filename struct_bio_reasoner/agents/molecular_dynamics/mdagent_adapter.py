@@ -107,7 +107,7 @@ class MDAgentAdapter(BaseAgent):
             # The agents are defined in agents.py at the root of MDAgent repo
             try:
                 # Try importing from mdagent package (if installed as package)
-                from mdagent.agents import Builder, MDSimulator, MDCoordinator
+                from MDAgent.agents import Builder, MDSimulator, MDCoordinator
             except ImportError:
                 try:
                     # Try importing from agents module (if MDAgent is in PYTHONPATH)
@@ -180,6 +180,7 @@ class MDAgentAdapter(BaseAgent):
                 return []
             
             # Run MD simulation using MDAgent
+            self.logger.info("RUNNNNINNNNG MDDDD")
             simulation_result = await self.run_md_simulation(
                 pdb_path=Path(pdb_path),
                 protein_name=target_protein

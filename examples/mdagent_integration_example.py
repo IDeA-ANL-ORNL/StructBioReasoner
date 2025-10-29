@@ -99,6 +99,7 @@ async def example_basic_md_agent(backend: str = "openmm"):
         logger.info(f"\n✅ Generated {len(hypotheses)} hypotheses")
         for i, hyp in enumerate(hypotheses, 1):
             logger.info(f"Hypothesis {i}: {hyp.get('title', 'Untitled')}")
+            print(hyp)
     else:
         logger.info(f"\n⚠️  PDB file not found: {pdb_path}")
         logger.info("   To run simulation, download 1ubq.pdb to data/ directory")
@@ -139,7 +140,7 @@ async def example_mdagent_expert_role():
 
             # Example task (requires PDB file)
             # Uncomment and modify with your PDB file path
-            """
+            
             task = {
                 "task_type": "thermostability_analysis",
                 "protein_data": {
@@ -153,7 +154,7 @@ async def example_mdagent_expert_role():
             if result.get('status') == 'success':
                 logger.info(f"Expert Assessment: {result.get('expert_assessment')}")
                 logger.info(f"Recommendations: {result.get('recommendations')}")
-            """
+            
         else:
             logger.warning("MDAgent expert not initialized (MDAgent may not be installed)")
 
