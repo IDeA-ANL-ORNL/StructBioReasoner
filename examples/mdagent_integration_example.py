@@ -144,7 +144,7 @@ async def example_mdagent_expert_role():
             task = {
                 "task_type": "thermostability_analysis",
                 "protein_data": {
-                    "pdb_path": "data/1ubq.pdb",
+                    "pdb_path": "/eagle/FoundEpidem/avasan/IDEAL/Agents/StructBioReasoner/data/1ubq.pdb",
                     "name": "ubiquitin"
                 }
             }
