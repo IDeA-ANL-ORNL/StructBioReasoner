@@ -80,24 +80,30 @@ async def example_basic_md_agent(backend: str = "openmm"):
     # Get agent status
     status = md_agent.get_agent_status()
     logger.info(f"MD Agent Status: {status}")
-    
+
     # Example: Generate hypotheses (requires PDB file)
-    # Uncomment and modify with your PDB file path
-    """
-    context = {
-        'protein_sequence': 'MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG',
-        'target_protein': 'ubiquitin',
-        'pdb_path': 'data/1ubq.pdb',
-        'analysis_goals': ['thermostability']
-    }
-    
-    hypotheses = await md_agent.generate_hypotheses(context)
-    logger.info(f"Generated {len(hypotheses)} hypotheses")
-    for i, hyp in enumerate(hypotheses, 1):
-        logger.info(f"Hypothesis {i}: {hyp.get('title', 'Untitled')}")
-    """
-    
-    logger.info(f"Example 1 completed with {backend} backend")
+    # Check if PDB file exists
+    pdb_path = Path("data/1ubq.pdb")
+    if pdb_path.exists():
+        logger.info(f"\n🧬 Running simulation with {pdb_path}")
+        logger.info("💡 TIP: Run 'nvidia-smi' in another terminal to see GPU usage!")
+
+        context = {
+            'protein_sequence': 'MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG',
+            'target_protein': 'ubiquitin',
+            'pdb_path': str(pdb_path),
+            'analysis_goals': ['thermostability']
+        }
+
+        hypotheses = await md_agent.generate_hypotheses(context)
+        logger.info(f"\n✅ Generated {len(hypotheses)} hypotheses")
+        for i, hyp in enumerate(hypotheses, 1):
+            logger.info(f"Hypothesis {i}: {hyp.get('title', 'Untitled')}")
+    else:
+        logger.info(f"\n⚠️  PDB file not found: {pdb_path}")
+        logger.info("   To run simulation, download 1ubq.pdb to data/ directory")
+
+    logger.info(f"\nExample 1 completed with {backend} backend")
 
 
 async def example_mdagent_expert_role():
