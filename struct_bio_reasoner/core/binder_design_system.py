@@ -85,11 +85,11 @@ class BinderDesignSystem(JnanaSystem):
         self.knowledge_graph_enabled = knowledge_graph
         self.literature_processing_enabled = literature_processing
         
-        # Initialize protein-specific components
+        # Initialize design-specific components
         self.design_tools = {}
         self.design_agents = {}
         self.knowledge_foundation = None
-        
+
         # System state
         self.design_system_ready = False
         
@@ -148,34 +148,34 @@ class BinderDesignSystem(JnanaSystem):
         # Start base Jnana system
         await super().start()
         
-        # Initialize protein-specific components
+        # Initialize design-specific components
         #await self._initialize_design_tools()
         await self._initialize_design_agents()
         await self._initialize_knowledge_foundation()
-        
-        self.protein_system_ready = True
+
+        self.design_system_ready = True
         self.logger.info("BinderDesignSystem started successfully")
     
     async def _initialize_design_tools(self):
-        """Initialize protein-specific tools."""
-        self.logger.info("Initializing protein tools...")
-        
+        """Initialize design-specific tools."""
+        self.logger.info("Initializing design tools...")
+
         # Initialize PyMOL wrapper
         if "pymol" in self.enable_tools:
             try:
                 pymol_config = self.binder_config.get("tools", {}).get("pymol", {})
-                self.protein_tools["pymol"] = PyMOLWrapper(pymol_config)
-                await self.protein_tools["pymol"].initialize()
+                self.design_tools["pymol"] = PyMOLWrapper(pymol_config)
+                await self.design_tools["pymol"].initialize()
                 self.logger.info("PyMOL wrapper initialized")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize PyMOL: {e}")
-        
+
         # Initialize BioPython utilities
         if "biopython" in self.enable_tools:
             try:
                 biopython_config = self.binder_config.get("tools", {}).get("biopython", {})
-                self.protein_tools["biopython"] = BioPythonUtils(biopython_config)
-                await self.protein_tools["biopython"].initialize()
+                self.design_tools["biopython"] = BioPythonUtils(biopython_config)
+                await self.design_tools["biopython"].initialize()
                 self.logger.info("BioPython utilities initialized")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize BioPython: {e}")
@@ -185,15 +185,15 @@ class BinderDesignSystem(JnanaSystem):
             try:
                 from ..tools.openmm_wrapper import OpenMMWrapper
                 openmm_config = self.binder_config.get("tools", {}).get("openmm", {})
-                self.protein_tools["openmm"] = OpenMMWrapper(openmm_config)
-                await self.protein_tools["openmm"].initialize()
+                self.design_tools["openmm"] = OpenMMWrapper(openmm_config)
+                await self.design_tools["openmm"].initialize()
                 self.logger.info("OpenMM wrapper initialized")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize OpenMM: {e}")
 
         # TODO: Initialize other tools (Rosetta, AlphaFold, ESM, etc.)
 
-        self.logger.info(f"Initialized {len(self.protein_tools)} protein tools")
+        self.logger.info(f"Initialized {len(self.design_tools)} design tools")
     
     async def _initialize_design_agents(self):
         """Initialize protein-specific agents."""
@@ -215,14 +215,13 @@ class BinderDesignSystem(JnanaSystem):
             except Exception as e:
                 self.logger.warning(f"Failed to initialize BindCraft agent: {e}")
         
-        # Initialize evolutionary conservation agent
+        # Initialize molecular dynamics agent
         if "molecular_dynamics" in self.enable_agents:
             try:
                 md_config = agent_configs.get("molecular_dynamics", {})
                 self.design_agents['molecular_dynamics'] = MDAgentAdapter(
                     agent_id="molecular_dynamics",
-                    config=md_config,
-                    #model_manager=self.model_manager
+                    config=md_config
                 )
                 self.logger.info("MD agent initialized")
             except Exception as e:
@@ -277,6 +276,7 @@ class BinderDesignSystem(JnanaSystem):
             "strategy": strategy,
             "enable_bindcraft_design": "computational_design" in self.design_agents,
             "enable_md_simulation": 'molecular_dynamics' in self.design_agents,
+            "computational_design": {}  # Empty dict for design config
         }
         
         # Generate base hypothesis using Jnana
@@ -286,7 +286,7 @@ class BinderDesignSystem(JnanaSystem):
         protein_hypothesis = ProteinHypothesis.from_unified_hypothesis(
             base_hypothesis,
             protein_id=protein_id,
-            mutation_context=biological_context # this goes into `protein_metadata`
+            biological_context=biological_context # this goes into `protein_metadata`
         )
         if "computational_design" in self.design_agents:
             #I want to append design_config to the task_params

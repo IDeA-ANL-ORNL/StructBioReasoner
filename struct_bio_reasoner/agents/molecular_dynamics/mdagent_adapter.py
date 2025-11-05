@@ -14,7 +14,7 @@ import dill as pickle
 import asyncio
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 
 # MDAgent imports (from https://github.com/msinclair-py/MDAgent)
@@ -216,26 +216,26 @@ class MDAgentAdapter(BaseAgent):
         
         return hypotheses
     
-    async def run_md_simulation(self, 
-                               pdb_path: Path,
+    async def run_md_simulation(self,
+                               pdb_path: Union[Path, List[Path]],
                                protein_name: str = "unknown",
                                custom_build_kwargs: Optional[Dict[str, Any]] = None,
-                               custom_sim_kwargs: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+                               custom_sim_kwargs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Run complete MD simulation using MDAgent coordinator.
-        
+
         Args:
-            pdb_path: Path to input PDB file
+            pdb_path: Path to input PDB file or list of PDB files
             protein_name: Name of the protein
             custom_build_kwargs: Custom build parameters (optional)
             custom_sim_kwargs: Custom simulation parameters (optional)
-            
+
         Returns:
-            Simulation results dictionary or None if failed
+            Simulation results dictionary
         """
         if not self.is_ready():
             self.logger.error("MDAgent adapter not ready")
-            return None
+            return {}
         
         try:
             # Create simulation directory
@@ -280,10 +280,10 @@ class MDAgentAdapter(BaseAgent):
             
             self.logger.info(f"MDAgent simulation completed: {sim_id}")
             return analysis
-            
+
         except Exception as e:
             self.logger.error(f"MDAgent simulation failed: {e}")
-            return None
+            return {}
     
     async def _analyze_mdagent_results(self,
                                       sim_id: str,

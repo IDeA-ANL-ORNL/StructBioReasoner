@@ -69,15 +69,15 @@ class BinderAnalysis:
 
 
 @dataclass
-class MDAnalysis:
+class SimAnalysis:
     """"""
     analysis_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     protein_id: str = ''
 
     # Simulation analysis
     simulation_time_in_ns: int
-    rmsd: list[float] = field(default_factory=list)
-    rmsf: list[float] = field(default_factory=list)
+    rmsd: dict = field(default_factory=dict)
+    rmsf: dict = field(default_factory=dict)
 
     # Analysis metadata
     tools_used: list[str] = field(default_factory=list)
@@ -198,7 +198,7 @@ class ProteinHypothesis(UnifiedHypothesis):
         self.evolutionary_analysis: Optional[EvolutionaryAnalysis] = None
         self.energetic_analysis: Optional[EnergeticAnalysis] = None
         self.binder_analysis: Optional[BinderAnalysis] = None
-        self.md_analysis: Optional[MDAnalysis] = None
+        self.md_analysis: Optional[SimAnalysis] = None
         
         # Experimental validation
         self.experimental_validations: List[ExperimentalValidation] = []
@@ -211,20 +211,20 @@ class ProteinHypothesis(UnifiedHypothesis):
             self.hypothesis_type = "protein_engineering"
     
     @classmethod
-    def from_unified_hypothesis(cls, 
+    def from_unified_hypothesis(cls,
                               unified_hypothesis: UnifiedHypothesis,
                               protein_id: str = "",
                               protein_name: str = "",
-                              mutation_context: Optional[Dict] = None) -> 'ProteinHypothesis':
+                              biological_context: Optional[Dict] = None) -> 'ProteinHypothesis':
         """
         Create a ProteinHypothesis from a UnifiedHypothesis.
-        
+
         Args:
             unified_hypothesis: Base hypothesis to extend
             protein_id: Target protein identifier
             protein_name: Protein name
-            mutation_context: Mutation-specific context
-            
+            biological_context: Biological context information
+
         Returns:
             ProteinHypothesis instance
         """
@@ -259,13 +259,13 @@ class ProteinHypothesis(UnifiedHypothesis):
             "biomedical_domains": unified_hypothesis.biomedical_domains + ["protein_engineering"],
             "metadata": unified_hypothesis.metadata,
             "tags": unified_hypothesis.tags + ["protein", "structural_biology"],
-            
+
             # Protein-specific fields
             "protein_id": protein_id,
             "protein_name": protein_name,
-            "protein_metadata": mutation_context or {}
+            "protein_metadata": biological_context or {}
         }
-        
+
         return cls(**hypothesis_data)
 
     def add_binder_analysis(self, analysis: BinderAnalysis):
@@ -276,8 +276,8 @@ class ProteinHypothesis(UnifiedHypothesis):
         # Update metadata
         self.metadata['has_binder_analysis'] = True
         self.metadata['binder_confidence'] = analysis.confidence_score
-    
-    def add_md_analysis(self, analysis: BinderAnalysis):
+
+    def add_md_analysis(self, analysis: SimAnalysis):
         """"""
         self.md_analysis = analysis
         self.update_at = time.time()
@@ -289,7 +289,7 @@ class ProteinHypothesis(UnifiedHypothesis):
     def add_structural_analysis(self, analysis: StructuralAnalysis):
         """Add structural analysis results."""
         self.structural_analysis = analysis
-        self.updated_at = time.time()
+        self.update_at = time.time()
         
         # Update metadata
         self.metadata["has_structural_analysis"] = True
