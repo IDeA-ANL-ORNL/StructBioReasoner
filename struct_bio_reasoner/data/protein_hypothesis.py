@@ -58,7 +58,7 @@ class BinderAnalysis:
     total_sequences: int = 10
     passing_sequences: int = 0
     passing_structures: int = 0
-    success_rate: float = False
+    success_rate: float = 0.0
     checkpoint_file: str = ''
     # Top binder features
 

@@ -49,13 +49,16 @@ async def run_interactive_mode(system: BinderDesignSystem, args):
     """Run the system in interactive mode."""
     print("🧬 Starting BinderDesignReasoner in Interactive Mode")
     print("=" * 60)
-    
+
     # Set research goal
     if args.goal:
         research_goal = args.goal
     else:
         research_goal = input("Enter your binder design research goal: ")
-    
+
+    # Ensure research goal is a simple string (workaround for tuple assignment error)
+    research_goal = str(research_goal).strip()
+
     session_id = await system.set_research_goal(research_goal)
     print(f"Session created: {session_id}")
     
@@ -67,13 +70,16 @@ async def run_batch_mode(system: BinderDesignSystem, args):
     """Run the system in batch mode."""
     print("🧬 Starting BinderDesignReasoner in Batch Mode")
     print("=" * 60)
-    
+
     # Set research goal
     if not args.goal:
         print("Error: Research goal is required for batch mode")
         return
-    
-    session_id = await system.set_research_goal(args.goal)
+
+    # Ensure research goal is a simple string (workaround for tuple assignment error)
+    research_goal = str(args.goal).strip()
+
+    session_id = await system.set_research_goal(research_goal)
     print(f"Session created: {session_id}")
     
     # Determine strategies
@@ -95,13 +101,16 @@ async def run_hybrid_mode(system: BinderDesignSystem, args):
     """Run the system in hybrid mode."""
     print("🧬 Starting BinderDesignReasoner in Hybrid Mode")
     print("=" * 60)
-    
+
     # Set research goal
     if not args.goal:
         print("Error: Research goal is required for hybrid mode")
         return
-    
-    session_id = await system.set_research_goal(args.goal)
+
+    # Ensure research goal is a simple string (workaround for tuple assignment error)
+    research_goal = str(args.goal).strip()
+
+    session_id = await system.set_research_goal(research_goal)
     print(f"Session created: {session_id}")
     
     # Determine strategies
