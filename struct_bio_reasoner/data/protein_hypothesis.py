@@ -59,7 +59,7 @@ class BinderAnalysis:
     passing_sequences: int
     passing_structures: int
     success_rate: float
-
+    checkpoint_file: str = ''
     # Top binder features
 
     # Analysis metadata

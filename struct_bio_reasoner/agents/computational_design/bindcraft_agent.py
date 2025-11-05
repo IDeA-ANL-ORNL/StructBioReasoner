@@ -1,4 +1,4 @@
-
+import dill as pickle
 import asyncio
 import logging
 import uuid
@@ -34,10 +34,10 @@ class BindCraftAgent(BaseAgent):
         self.logger.info(f'BindCraft agent using: {self.fold_backend},{self.inv_fold_backend}')
 
         # NOTE: look at bindcraft for this
-        self.bindcraft_config = config['bindcraft_config']
+        #self.bindcraft_config = config['bindcraft_config']
 
-        if 'target_sequence' not in self.bindcraft_config:
-            raise AttributeError('`target_sequence` not defined in config!')
+        #if 'target_sequence' not in self.bindcraft_config:
+        #    raise AttributeError('`target_sequence` not defined in config!')
 
     async def initialize(self):
         """"""
@@ -50,6 +50,14 @@ class BindCraftAgent(BaseAgent):
 
     def cleanup(self):
         pass
+
+    def write_checkpoint(self, results: dict[str, Any]):
+        #Use timestemp tom get unique name
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        checkpoint_file = f'bindcraft_checkpoint_{timestamp}.pkl'
+        pickle.dump(results, open(checkpoint_file, 'wb'))
+        return checkpoint_file
+
 
     async def generate_binder_hypothesis(self, 
                                          data: dict[str, Any]) -> Optional[ProteinHypothesis]:
@@ -64,7 +72,7 @@ class BindCraftAgent(BaseAgent):
                                           data: dict[str, Any]) -> Optional[ProteinHypothesis]:
         """"""
         # prepare output paths
-        cwd = self.bindcraft_config.get('cwd', os.getcwd())
+        cwd = data.get('cwd', os.getcwd())
         cwd.mkdir(exist_ok=True)
 
         fasta_dir = cwd / "fastas"
@@ -80,12 +88,12 @@ class BindCraftAgent(BaseAgent):
 
         if_kwargs = data.get('if_kwargs', {
             'num_seqs': data.get('nseqs', 25),
-            'batch_size': self.bindcraft_config.get('batch_size', 250),
-            'max_retries': self.bindcraft_config.get('retries', 5),
+            'batch_size': data.get('batch_size', 250),
+            'max_retries': data.get('retries', 5),
             'sampling_temp': data.get('temp', '0.1'),
-            'model_name': self.bindcraft_config.get('mpnn_model', 'v_48_020'),
+            'model_name': data.get('mpnn_model', 'v_48_020'),
             'model_weights': data.get('mpnn_weights', 'soluble_model_weights'),
-            'proteinmpnn_path': self.bindcraft_config.get('proteinmpnn_path', '/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN'),
+            'proteinmpnn_path': data.get('proteinmpnn_path', '/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN'),
             'device': device
         })
 
@@ -196,21 +204,23 @@ class BindCraftAgent(BaseAgent):
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> BinderAnalysis:
-        self.RUN # WE LEFT OFF HERE
-        all_cycles = task_params['all_cycles']
+        result = self._generate_binder_hypothesis(task_params) # WE LEFT OFF HERE
+        # Write result to file
+        all_cycles = result['all_cycles']
         passing_structures = len(
             [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
         )
 
         analysis = BinderAnalysis(
             protein_id='',
-            n_rounds = task_params['n_rounds'],
-            total_sequences = task_params['total_sequences_generated'],
-            passing_sequences = task_params['total_sequences_filtered'],
-            passing_structures = passing_structures
+            n_rounds = result['n_rounds'],
+            total_sequences = result['total_sequences_generated'],
+            passing_sequences = result['total_sequences_filtered'],
+            passing_structures = passing_structures,
             success_rate = passing_structures  / total_sequences if total_sequences > 0 else 0.0
         )
 
+        analysis.checkpoint_file = self.write_checkpoint(result) 
         analysis.confidence_score = self._calculate_confidence(analysis)
         analysis.tools_used = self._get_tools_used()
 

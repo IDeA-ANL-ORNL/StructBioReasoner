@@ -207,10 +207,10 @@ class BinderDesignSystem(JnanaSystem):
             try:
                 design_config = agent_configs.get('computational_design', {})
                 self.design_agents['computational_design'] = BindCraftAgent(
-                    agent_id='binder_design',
-                    config=design_config,
-                    # NOTE: put this in the agent: model_manager=self.model_manager
-                )
+                                                                agent_id='binder_design',
+                                                                config=design_config,
+                                                                # NOTE: put this in the agent: model_manager=self.model_manager
+                                                                )
                 self.logger.info("BindCraft agent initialized")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize BindCraft agent: {e}")
@@ -288,9 +288,53 @@ class BinderDesignSystem(JnanaSystem):
             protein_id=protein_id,
             mutation_context=biological_context # this goes into `protein_metadata`
         )
-        
+        if "computational_design" in self.design_agents:
+            #I want to append design_config to the task_params
+            #design_config = self.binder_config.get("agents", {}).get("computational_design", {})
+            #For now design config is hardcoded
+            design_config = {
+                'cwd': '/eagle/FoundEpidem/avasan/Work/StructBioReasoner/data',
+                'target_sequence': 'MSTGEELQK',
+                'binder_sequence': 'MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF',
+                'device': 'cuda:0',
+                'n_rounds': 3,
+                'if_kwargs': {
+                    'num_seqs': 25,
+                    'batch_size': 250,
+                    'max_retries': 5,
+                    'sampling_temp': '0.1',
+                    'model_name': 'v_48_020',
+                    'model_weights': 'soluble_model_weights',
+                    'proteinmpnn_path': '/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN',
+                },
+                'qc_kwargs': {
+                    'max_repeat': 4,
+                    'max_appearance_ratio': 0.33,
+                    'max_charge': 5,
+                    'max_charge_ratio': 0.5,
+                    'max_hydrophobic_ratio': 0.8,
+                    'min_diversity': 8,
+                    'bad_motifs': None,
+                    'bad_n_termini': None
+                }
+                #'fold_backend': 'chai',
+                #'inv_fold_backend': 'proteinmpnn'
+            }
+
+            task_params['computational_design'].update(design_config)
+            
+            bindcraft_analysis = await self.design_agents["computational_design"].analyze_hypothesis(
+                protein_hypothesis, task_params
+            )
+            protein_hypothesis.add_binder_analysis(bindcraft_analysis)
+
+        if "molecular_dynamics" in self.design_agents:
+            md_analysis = await self.design_agents['molecular_dynamics'].analyze_hypothesis(
+                protein_hypothesis, task_params
+            )
+            protein_hypothesis.add_md_analysis(md_analysis)
         # Enhance with protein-specific analysis
-        await self._enhance_protein_hypothesis(protein_hypothesis, task_params)
+        #await self._enhance_protein_hypothesis(protein_hypothesis, task_params)
         
         return protein_hypothesis
     
@@ -323,18 +367,18 @@ class BinderDesignSystem(JnanaSystem):
         """Get protein system status."""
         base_status = self.get_system_status()
         
-        protein_status = {
-            "protein_system_ready": self.protein_system_ready,
-            "enabled_tools": list(self.protein_tools.keys()),
+        design_status = {
+            "protein_system_ready": self.design_system_ready,
+            "enabled_tools": list(self.design_tools.keys()),
             "enabled_agents": list(self.design_agents.keys()),
             "knowledge_graph_enabled": self.knowledge_graph_enabled,
             "literature_processing_enabled": self.literature_processing_enabled,
             "knowledge_foundation_ready": self.knowledge_foundation is not None,
-            "tool_status": {name: tool.is_ready() for name, tool in self.protein_tools.items()},
+            "tool_status": {name: tool.is_ready() for name, tool in self.design_tools.items()},
             "agent_status": {name: agent.is_ready() for name, agent in self.design_agents.items()}
         }
         
-        return {**base_status, "protein_engineering": protein_status}
+        return {**base_status, "computational_design": design_status}
 
     async def stop(self):
         """Stop the protein engineering system."""
@@ -349,8 +393,8 @@ class BinderDesignSystem(JnanaSystem):
         # Clean up temporary configuration files
         self._cleanup_jnana_config()
 
-        self.protein_system_ready = False
-        self.logger.info("ProteinEngineeringSystem stopped")
+        self.design_system_ready = False
+        self.logger.info("BinderDesignSystem stopped")
 
     def _cleanup_jnana_config(self):
         """Clean up temporary Jnana configuration modifications."""

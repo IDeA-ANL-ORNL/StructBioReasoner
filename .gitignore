@@ -243,3 +243,4 @@ ubiquitin_*_results_*.json
 *.top
 *.itp
 structbio_venv
+pics
