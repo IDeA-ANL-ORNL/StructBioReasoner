@@ -204,7 +204,7 @@ class BindCraftAgent(BaseAgent):
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> BinderAnalysis:
-        result = self._generate_binder_hypothesis(task_params) # WE LEFT OFF HERE
+        result = await self._generate_binder_hypothesis(task_params) # WE LEFT OFF HERE
         # Write result to file
         all_cycles = result['all_cycles']
         passing_structures = len(

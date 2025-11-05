@@ -10,6 +10,7 @@ The adapter translates between:
 - MD simulation results → ProteinHypothesis objects
 """
 
+import dill as pickle
 import asyncio
 import logging
 from pathlib import Path
@@ -31,7 +32,7 @@ except ImportError:
     logging.warning("MDAgent not available. Install from https://github.com/msinclair-py/MDAgent")
 
 from ...core.base_agent import BaseAgent
-from ...data.protein_hypothesis import MDAnalysis, ProteinHypothesis
+from ...data.protein_hypothesis import SimAnalysis, ProteinHypothesis
 
 
 class MDAgentAdapter(BaseAgent):
@@ -545,12 +546,30 @@ class MDAgentAdapter(BaseAgent):
 
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
-                                 task_params: dict[str, Any]) -> MDAnalysis:
-        analysis = MDAnalysis(
+                                 task_params: dict[str, Any]) -> SimAnalysis:
+
+        #### Rewrite this according to how binder analysis adds to hypothesis
+        checkpoint_file = hypothesis.binder_analysis.checkpoint_file
+        checkpoint_data = pickle.load(open(checkpoint_file, 'rb'))
+        all_cycles = checkpoint_data['all_cycles']
+        passing_structures = [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
+        # unpack list of lists in passing_structures
+        passing_structures = [Path(item) for sublist in passing_structures for item in sublist]
+        sim_results = await self.run_md_simulation( 
+                               pdb_path=passing_structures,
+                               protein_name = "unknown",
+                            )
+                               # TODO:
+                               # if have weird systems (like rna/small molec/change md steps)
+                               #custom_build_kwargs: Optional[Dict[str, Any]] = None,
+                               #custom_sim_kwargs: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+       
+
+        analysis = SimAnalysis(
             protein_id='',
-            simulation_time_in_ns=task_params['simulation_time'],
-            rmsd=task_params['rmsd'],
-            rmsf=task_params['rmsf']
+            simulation_time_in_ns=sim_results['simulation_time'],
+            rmsd=sim_results['rmsd'],
+            rmsf=sim_results['rmsf']
         )
 
         analysis.confidence_score = self._calculate_confidence(analysis)
@@ -559,7 +578,7 @@ class MDAgentAdapter(BaseAgent):
         return analysis
 
     def _calculate_confidence(self,
-                              analysis: MDAnalysis) -> float:
+                              analysis: SimAnalysis) -> float:
         # TODO: compute this based on RMSD/RMSF threshholds
         return 0.75
 
