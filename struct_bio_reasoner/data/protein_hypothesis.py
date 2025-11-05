@@ -54,11 +54,11 @@ class BinderAnalysis:
     protein_id: str = ''
 
     # Binder analysis
-    n_rounds: int
-    total_sequences: int
-    passing_sequences: int
-    passing_structures: int
-    success_rate: float
+    n_rounds: int = 1
+    total_sequences: int = 10
+    passing_sequences: int = 0
+    passing_structures: int = 0
+    success_rate: float = False
     checkpoint_file: str = ''
     # Top binder features
 
@@ -75,7 +75,7 @@ class SimAnalysis:
     protein_id: str = ''
 
     # Simulation analysis
-    simulation_time_in_ns: int
+    simulation_time_in_ns: int = 1
     rmsd: dict = field(default_factory=dict)
     rmsf: dict = field(default_factory=dict)
 
@@ -342,8 +342,8 @@ class ProteinHypothesis(UnifiedHypothesis):
             "analysis_status": {
                 "structural": self.structural_analysis is not None,
                 "evolutionary": self.evolutionary_analysis is not None,
-                "energetic": self.energetic_analysis is not None
-                "computational_design": self.binder_analysis is not None
+                "energetic": self.energetic_analysis is not None,
+                "computational_design": self.binder_analysis is not None,
                 "molecular_dynamics": self.md_analysis is not None
             },
             "experimental_validations": len(self.experimental_validations),
