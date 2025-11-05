@@ -58,6 +58,12 @@ class BindCraftAgent(BaseAgent):
         pickle.dump(results, open(checkpoint_file, 'wb'))
         return checkpoint_file
 
+    async def generate_hypotheses(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """"""
+        pass
+
+    def get_capabilities(self) -> list[str]:
+        return self.capabilities
 
     async def generate_binder_hypothesis(self, 
                                          data: dict[str, Any]) -> Optional[ProteinHypothesis]:
