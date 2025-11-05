@@ -9,14 +9,18 @@ from datetime import datetime
 from bindcraft.core.folding import Chai, Boltz
 from bindcraft.core.inverse_folding import ProteinMPNN
 
-from ...data.protein_hypothesis import ProteinHypothesis
+from ...data.protein_hypothesis import BinderAnalysis, ProteinHypothesis
 from ...core.base_agent import BaseAgent
 
 class BindCraftAgent(BaseAgent):
     """"""
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, 
+                 agent_id: str,
+                 config: dict[str, Any]):
         """"""
         super().__init__(config)
+
+        self.agent_id = agent_id
 
         self.capabilities = [
             'binder_design',
@@ -44,6 +48,9 @@ class BindCraftAgent(BaseAgent):
         # NOTE: need to check initialize
         pass
 
+    def cleanup(self):
+        pass
+
     async def generate_binder_hypothesis(self, 
                                          data: dict[str, Any]) -> Optional[ProteinHypothesis]:
         """"""
@@ -66,23 +73,23 @@ class BindCraftAgent(BaseAgent):
         folds_dir.mkdir(exist_ok=True)
 
         # these need to be somehow passed into the call
-        target_sequence = self.bindcraft_config['target_sequence']
-        binder_sequence = self.bindcraft_config.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
-        device = self.bindcraft_config.get('device', 'cuda:0')
-        n_rounds = self.bindcraft_config.get('n_rounds', 3)
+        target_sequence = data['target_sequence']
+        binder_sequence = data.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
+        device = data.get('device', 'cuda:0')
+        n_rounds = data.get('n_rounds', 3)
 
-        if_kwargs = self.bindcraft_config.get('if_kwargs', {
-            'num_seqs': self.bindcraft_config.get('nseqs', 25),
+        if_kwargs = data.get('if_kwargs', {
+            'num_seqs': data.get('nseqs', 25),
             'batch_size': self.bindcraft_config.get('batch_size', 250),
             'max_retries': self.bindcraft_config.get('retries', 5),
-            'sampling_temp': self.bindcraft_config.get('temp', '0.1'),
+            'sampling_temp': data.get('temp', '0.1'),
             'model_name': self.bindcraft_config.get('mpnn_model', 'v_48_020'),
-            'model_weights': self.bindcraft_config.get('mpnn_weights', 'soluble_model_weights'),
+            'model_weights': data.get('mpnn_weights', 'soluble_model_weights'),
             'proteinmpnn_path': self.bindcraft_config.get('proteinmpnn_path', '/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN'),
             'device': device
         })
 
-        qc_kwargs = self.bindcraft_config.get('qc_kwargs', {
+        qc_kwargs = data.get('qc_kwargs', {
             'max_repeat': 4,
             'max_appearance_ratio': 0.33,
             'max_charge': 5,
@@ -185,3 +192,33 @@ class BindCraftAgent(BaseAgent):
 
         self.generated_hypotheses.append(hypothesis)
         return hypothesis
+
+    async def analyze_hypothesis(self,
+                                 hypothesis: ProteinHypothesis,
+                                 task_params: dict[str, Any]) -> BinderAnalysis:
+        self.RUN # WE LEFT OFF HERE
+        all_cycles = task_params['all_cycles']
+        passing_structures = len(
+            [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
+        )
+
+        analysis = BinderAnalysis(
+            protein_id='',
+            n_rounds = task_params['n_rounds'],
+            total_sequences = task_params['total_sequences_generated'],
+            passing_sequences = task_params['total_sequences_filtered'],
+            passing_structures = passing_structures
+            success_rate = passing_structures  / total_sequences if total_sequences > 0 else 0.0
+        )
+
+        analysis.confidence_score = self._calculate_confidence(analysis)
+        analysis.tools_used = self._get_tools_used()
+
+        return analysis
+
+    def _calculate_confidence(self,
+                              analysis: BinderAnalysis) -> float:
+        return 0.75
+
+    def _get_tools_used(self) -> list[str]:
+        return ['chai', 'proteinmpnn']

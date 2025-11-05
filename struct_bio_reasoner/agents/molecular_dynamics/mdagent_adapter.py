@@ -31,7 +31,7 @@ except ImportError:
     logging.warning("MDAgent not available. Install from https://github.com/msinclair-py/MDAgent")
 
 from ...core.base_agent import BaseAgent
-from ...data.protein_hypothesis import ProteinHypothesis
+from ...data.protein_hypothesis import MDAnalysis, ProteinHypothesis
 
 
 class MDAgentAdapter(BaseAgent):
@@ -48,7 +48,9 @@ class MDAgentAdapter(BaseAgent):
     - Integrates with StructBioReasoner's role-based orchestration
     """
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, 
+                 agent_id: str,
+                 config: Dict[str, Any]):
         """
         Initialize MDAgent adapter.
         
@@ -57,6 +59,7 @@ class MDAgentAdapter(BaseAgent):
         """
         super().__init__(config)
         
+        self.agent_id = agent_id
         self.agent_type = "md_simulation"
         self.specialization = "mdagent_backend"
         
@@ -540,3 +543,25 @@ class MDAgentAdapter(BaseAgent):
         except Exception as e:
             self.logger.error(f"MDAgent adapter cleanup failed: {e}")
 
+    async def analyze_hypothesis(self,
+                                 hypothesis: ProteinHypothesis,
+                                 task_params: dict[str, Any]) -> MDAnalysis:
+        analysis = MDAnalysis(
+            protein_id='',
+            simulation_time_in_ns=task_params['simulation_time'],
+            rmsd=task_params['rmsd'],
+            rmsf=task_params['rmsf']
+        )
+
+        analysis.confidence_score = self._calculate_confidence(analysis)
+        analysis.tools_used = self._get_tools_used()
+
+        return analysis
+
+    def _calculate_confidence(self,
+                              analysis: MDAnalysis) -> float:
+        # TODO: compute this based on RMSD/RMSF threshholds
+        return 0.75
+
+    def _get_tools_used(self) -> list[str]:
+        return ['openmm', 'mdanalysis']

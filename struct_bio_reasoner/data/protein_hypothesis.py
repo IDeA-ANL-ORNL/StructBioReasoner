@@ -48,6 +48,44 @@ class StructuralAnalysis:
 
 
 @dataclass
+class BinderAnalysis:
+    """"""
+    analysis_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    protein_id: str = ''
+
+    # Binder analysis
+    n_rounds: int
+    total_sequences: int
+    passing_sequences: int
+    passing_structures: int
+    success_rate: float
+
+    # Top binder features
+
+    # Analysis metadata
+    tools_used: list[str] = field(default_factory=list)
+    confidence_score: float = 0.0
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+
+
+@dataclass
+class MDAnalysis:
+    """"""
+    analysis_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    protein_id: str = ''
+
+    # Simulation analysis
+    simulation_time_in_ns: int
+    rmsd: list[float] = field(default_factory=list)
+    rmsf: list[float] = field(default_factory=list)
+
+    # Analysis metadata
+    tools_used: list[str] = field(default_factory=list)
+    confidence_score: float = 0.0
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+
+
+@dataclass
 class EvolutionaryAnalysis:
     """Evolutionary analysis results for a protein hypothesis."""
     analysis_id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -159,6 +197,8 @@ class ProteinHypothesis(UnifiedHypothesis):
         self.structural_analysis: Optional[StructuralAnalysis] = None
         self.evolutionary_analysis: Optional[EvolutionaryAnalysis] = None
         self.energetic_analysis: Optional[EnergeticAnalysis] = None
+        self.binder_analysis: Optional[BinderAnalysis] = None
+        self.md_analysis: Optional[MDAnalysis] = None
         
         # Experimental validation
         self.experimental_validations: List[ExperimentalValidation] = []
@@ -227,7 +267,25 @@ class ProteinHypothesis(UnifiedHypothesis):
         }
         
         return cls(**hypothesis_data)
+
+    def add_binder_analysis(self, analysis: BinderAnalysis):
+        """"""
+        self.binder_analysis = analysis
+        self.update_at = time.time()
+
+        # Update metadata
+        self.metadata['has_binder_analysis'] = True
+        self.metadata['binder_confidence'] = analysis.confidence_score
     
+    def add_md_analysis(self, analysis: BinderAnalysis):
+        """"""
+        self.md_analysis = analysis
+        self.update_at = time.time()
+
+        # Update metadata
+        self.metadata['has_md_analysis'] = True
+        self.metadata['md_confidence'] = analysis.confidence_score
+
     def add_structural_analysis(self, analysis: StructuralAnalysis):
         """Add structural analysis results."""
         self.structural_analysis = analysis
@@ -285,6 +343,8 @@ class ProteinHypothesis(UnifiedHypothesis):
                 "structural": self.structural_analysis is not None,
                 "evolutionary": self.evolutionary_analysis is not None,
                 "energetic": self.energetic_analysis is not None
+                "computational_design": self.binder_analysis is not None
+                "molecular_dynamics": self.md_analysis is not None
             },
             "experimental_validations": len(self.experimental_validations),
             "overall_confidence": self._calculate_overall_confidence()
@@ -300,6 +360,10 @@ class ProteinHypothesis(UnifiedHypothesis):
             confidences.append(self.evolutionary_analysis.confidence_score)
         if self.energetic_analysis:
             confidences.append(self.energetic_analysis.confidence_score)
+        if self.binder_analysis:
+            confidences.append(self.binder_analysis.confidence_score)
+        if self.md_analysis:
+            confidences.append(self.md_analysis.confidence_score)
         
         if confidences:
             return sum(confidences) / len(confidences)
