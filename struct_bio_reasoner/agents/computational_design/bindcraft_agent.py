@@ -233,11 +233,13 @@ class BindCraftAgent:
         passing_structures = len(
             [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
         )
+        
+        total_sequences = result['total_sequences_generated']
 
         analysis = BinderAnalysis(
             protein_id='',
             num_rounds = result['rounds_completed'],
-            total_sequences = result['total_sequences_generated'],
+            total_sequences = total_sequences,
             passing_sequences = result['total_sequences_filtered'],
             passing_structures = passing_structures,
             success_rate = passing_structures  / total_sequences if total_sequences > 0 else 0.0

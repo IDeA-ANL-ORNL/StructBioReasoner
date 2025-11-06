@@ -1,13 +1,6 @@
 # BinderDesignReasoner Configuration
 # Extends Jnana configuration for binder design applications
 
-# Jnana Integration Settings
-jnana:
-  config_path: "../Jnana/config/models.example.yaml"  # Path to Jnana configuration
-  enable_protognosis: true
-  enable_biomni: false  # Disabled for now
-  enable_wisteria_ui: true
-
 # Binder Design Specific Settings
 binder_design:
   # Default binder design settings
@@ -16,24 +9,6 @@ binder_design:
     include_sequence: true
     include_dynamics: true
     include_energetics: true
-
-  # Design parameters
-  design_parameters:
-    n_rounds: 3
-    num_seqs: 25
-    batch_size: 250
-    max_retries: 5
-    sampling_temp: 0.1
-    device: "cuda:0"
-
-  # Quality control parameters
-  quality_control:
-    max_repeat: 4
-    max_appearance_ratio: 0.33
-    max_charge: 5
-    max_charge_ratio: 0.5
-    max_hydrophobic_ratio: 0.8
-    min_diversity: 8
 
   # Validation thresholds
   validation:
@@ -105,7 +80,7 @@ tools:
   # OpenMM for molecular dynamics simulations
   openmm:
     enabled: true
-    platform: "CUDA"
+    platform: "OpenCL"
     precision: "mixed"
     output_dir: "openmm_outputs"
     force_field: "amber14-all.xml"
@@ -114,9 +89,9 @@ tools:
     pressure: 1.0
     timestep: 2.0
     friction: 1.0
-    production_steps: 5000000
-    equilibration_steps: 250000
-    trajectory_interval: 1000
+    production_steps: 5000
+    equilibration_steps: 2500
+    trajectory_interval: 100
     energy_interval: 100
 
 # Agent Configuration
@@ -133,24 +108,29 @@ agents:
     
     # BindCraft-specific settings
     bindcraft:
-      model_name: "v_48_020"
-      model_weights: "soluble_model_weights"
-      proteinmpnn_path: "/path/to/ProteinMPNN"  # Update with actual path
+      cwd: '/lus/flare/projects/FoundEpidem/msinclair/ideals/agent/structbioreasoner/data'
+      target_sequence: 'MMKMEGIALKKRLSWISVCLLVLVSAAGMLFSTAAKTETSSHKAHTEAQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGRTWREADINYTSGFRNSDRILYSSDWLIYKTTDHYQTFTKIR'
+      binder_sequence: 'MKKAVINGEQIRSISDLHQTLKKELALPEYYGENLDALWDCLTGWVEYPLVLEWRQFEQSKQLTENGAESVLQVFREAKAEGCDITIILS'
+      device: 'xpu'
+      num_rounds: 1
       fold_backend: "chai"  # Options: chai, alphafold
       inv_fold_backend: "proteinmpnn"
     
     # InverseFolding parameters
     inverse_folding:
-      num_seqs: 25
-      batch_size: 250
+      num_seq: 2
+      batch_size: 2
       max_retries: 5
-      sampling_temp: 0.1
+      sampling_temp: "0.1"
+      model_name: "v_48_020"
+      model_weights: "soluble_model_weights"
+      proteinmpnn_path: "/lus/flare/projects/FoundEpidem/msinclair/pkgs/ProteinMPNN"  # Update with actual path
     
     # Quality control
     quality_control:
       max_repeat: 4
       max_appearance_ratio: 0.33
-      max_charge: 5
+      max_charge: 9
       max_charge_ratio: 0.5
       max_hydrophobic_ratio: 0.8
       min_diversity: 8
