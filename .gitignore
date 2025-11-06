@@ -1,7 +1,7 @@
 # StructBioReasoner .gitignore
 
 # Environment and API Keys
-.env
+.env*
 .env.local
 .env.production
 .env.staging
@@ -244,3 +244,8 @@ ubiquitin_*_results_*.json
 *.itp
 structbio_venv
 pics
+
+# Misc testing things
+test/
+test.log
+test.err

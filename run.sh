@@ -2,7 +2,7 @@
 
 python binder_design_reasoner.py \
     --mode "matt" \
-    --goal "Design binders for target protein" \
+    --goal "Design miniprotein binders for target protein using a combination of AI folding algorithms and inverse folding" \
     --target "Slop" \
     --target-sequence "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF" \
     --binder-sequence "MSTGEELQK" \

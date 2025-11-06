@@ -19,7 +19,7 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from bindcraft.core.folding import Chai, Boltz
+from bindcraft.core.folding import Chai
 from bindcraft.core.inverse_folding import ProteinMPNN
 
 from jnana.core.model_manager import UnifiedModelManager
@@ -107,7 +107,7 @@ class BindCraftAgent:
         target_sequence = data['target_sequence']
         binder_sequence = data.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
         device = data.get('device', 'cuda:0')
-        n_rounds = data.get('n_rounds', 3)
+        num_rounds = data.get('num_rounds', 3)
 
         if_kwargs = data.get('if_kwargs', {
             'num_seq': data.get('num_seq', 25),
@@ -166,7 +166,7 @@ class BindCraftAgent:
             # Launch coordinator with handles to other agents
             coordinator = await manager.launch(
                 PeptideDesignCoordinator,
-                args=(forward_folder, inverse_folder, qc_agent, analyzer, if_kwargs['num_seq'], retries)
+                args=(forward_folder, inverse_folder, qc_agent, analyzer, if_kwargs['num_seq'], if_kwargs['max_retries'])
             )
 
 
@@ -177,7 +177,7 @@ class BindCraftAgent:
                 fasta_base_path=fasta_dir,
                 pdb_base_path=folds_dir,
                 remodel_indices=[],  # Interface indices to redesign
-                n_rounds=n_rounds
+                num_rounds=num_rounds
             )
 
             return results
@@ -236,7 +236,7 @@ class BindCraftAgent:
 
         analysis = BinderAnalysis(
             protein_id='',
-            n_rounds = result['n_rounds'],
+            num_rounds = result['rounds_completed'],
             total_sequences = result['total_sequences_generated'],
             passing_sequences = result['total_sequences_filtered'],
             passing_structures = passing_structures,

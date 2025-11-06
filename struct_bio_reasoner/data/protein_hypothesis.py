@@ -54,7 +54,7 @@ class BinderAnalysis:
     protein_id: str = ''
 
     # Binder analysis
-    n_rounds: int = 1
+    num_rounds: int = 1
     total_sequences: int = 10
     passing_sequences: int = 0
     passing_structures: int = 0

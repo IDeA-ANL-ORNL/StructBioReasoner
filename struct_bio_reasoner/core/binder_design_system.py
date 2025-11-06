@@ -28,7 +28,35 @@ from ..tools.biopython_utils import BioPythonUtils
 from ..utils.config_loader import load_binder_config
 from .knowledge_foundation import ProteinKnowledgeFoundation
 
+from dataclasses import dataclass, asdict, field
 
+@dataclass
+class BinderConfig:
+    cwd: Path=Path('/lus/flare/projects/FoundEpidem/msinclair/github/StructBioReasoner/data'),
+    target_sequence: str='MMKMEGIALKKRLSWISVCLLVLVSAAGMLFSTAAKTETSSHKAHTEAQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGRTWREADINYTSGFRNSDRILYSSDWLIYKTTDHYQTFTKIR',
+    binder_sequence: str='MKKAVINGEQIRSISDLHQTLKKELALPEYYGENLDALWDCLTGWVEYPLVLEWRQFEQSKQLTENGAESVLQVFREAKAEGCDITIILS',
+    device: str='xpu',
+    num_rounds: int=1,
+    if_kwargs: dict[str, Any]=field(default_factory=lambda: {
+        'num_seq': 10,
+        'batch_size': 10,
+        'max_retries': 5,
+        'sampling_temp': '0.1',
+        'model_name': 'v_48_020',
+        'model_weights': 'soluble_model_weights',
+        'proteinmpnn_path': Path('/lus/flare/projects/FoundEpidem/msinclair/pkgs/ProteinMPNN'),
+    })
+    qc_kwargs: dict[str, Any]=field(default_factory=lambda: {
+        'max_repeat': 4,
+        'max_appearance_ratio': 0.33,
+        'max_charge': 10,
+        'max_charge_ratio': 0.5,
+        'max_hydrophobic_ratio': 0.8,
+        'min_diversity': 8,
+        'bad_motifs': None,
+        'bad_n_termini': None
+    })
+    
 class BinderDesignSystem(JnanaSystem):
     """
     Main binder design system extending Jnana.
@@ -203,7 +231,18 @@ class BinderDesignSystem(JnanaSystem):
         # Initialize structural analysis agent
         if 'computational_design' in self.enable_agents:
             try:
-                design_config = agent_configs.get('computational_design', {})
+                design_config = self.binder_config.get("agents", {}).get("computational_design", asdict(BinderConfig()))
+
+                if 'bindcraft' in design_config:
+                    kwargs = design_config['bindcraft']
+                    if_kwargs = design_config['inverse_folding']
+                    qc_kwargs = design_config['quality_control']
+                    
+                    kwargs['if_kwargs'] = if_kwargs
+                    kwargs['qc_kwargs'] = qc_kwargs
+
+                    design_config = kwargs
+
                 self.design_agents['computational_design'] = BindCraftAgent(
                                                                 agent_id='binder_design',
                                                                 config=design_config,
@@ -277,12 +316,9 @@ class BinderDesignSystem(JnanaSystem):
             "computational_design": {}  # Empty dict for design config
         }
         
-        self.logger.info(f"Attemptin to generate single hypothesis")
         # Generate base hypothesis using Jnana
         base_hypothesis = await self.generate_single_hypothesis(strategy)
 
-        self.logger.info('We are where we think we are')
-        
         # Convert to protein-specific hypothesis
         protein_hypothesis = ProteinHypothesis.from_unified_hypothesis(
             base_hypothesis,
@@ -290,38 +326,17 @@ class BinderDesignSystem(JnanaSystem):
         )
         if "computational_design" in self.enable_agents:
             #I want to append design_config to the task_params
-            #design_config = self.binder_config.get("agents", {}).get("computational_design", {})
-            #For now design config is hardcoded
-            design_config = {
-                'cwd': Path('/lus/flare/projects/FoundEpidem/msinclair/github/StructBioReasoner/data'),
-                'target_sequence': 'MSTGEELQK',
-                'binder_sequence': 'MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF',
-                'device': 'xpu:0',
-                'n_rounds': 3,
-                'if_kwargs': {
-                    'num_seq': 25,
-                    'batch_size': 250,
-                    'max_retries': 5,
-                    'sampling_temp': '0.1',
-                    'model_name': 'v_48_020',
-                    'model_weights': 'soluble_model_weights',
-                    'proteinmpnn_path': Path('/lus/flare/projects/FoundEpidem/msinclair/pkgs/ProteinMPNN'),
-                },
-                'qc_kwargs': {
-                    'max_repeat': 4,
-                    'max_appearance_ratio': 0.33,
-                    'max_charge': 5,
-                    'max_charge_ratio': 0.5,
-                    'max_hydrophobic_ratio': 0.8,
-                    'min_diversity': 8,
-                    'bad_motifs': None,
-                    'bad_n_termini': None
-                }
-                #'fold_backend': 'chai',
-                #'inv_fold_backend': 'proteinmpnn'
-            }
+            design_config = self.binder_config.get("agents", {}).get("computational_design", asdict(BinderConfig()))
 
-            print(design_config)
+            if 'bindcraft' in design_config:
+                kwargs = design_config['bindcraft']
+                if_kwargs = design_config['inverse_folding']
+                qc_kwargs = design_config['quality_control']
+                
+                kwargs['if_kwargs'] = if_kwargs
+                kwargs['qc_kwargs'] = qc_kwargs
+
+                design_config = kwargs
 
             task_params['computational_design'].update(design_config)
             
@@ -335,36 +350,9 @@ class BinderDesignSystem(JnanaSystem):
                 protein_hypothesis, task_params
             )
             protein_hypothesis.add_md_analysis(md_analysis)
-        # Enhance with protein-specific analysis
-        #await self._enhance_protein_hypothesis(protein_hypothesis, task_params)
         
         return protein_hypothesis
     
-    async def _enhance_protein_hypothesis(self, 
-                                        hypothesis: ProteinHypothesis, 
-                                        task_params: Dict):
-        """Enhance hypothesis with protein-specific analysis."""
-        
-        # Binder analysis
-        if "computational_design" in self.design_agents:
-            try:
-                bindcraft_analysis = await self.design_agents["computational_design"].analyze_hypothesis(
-                    hypothesis, task_params
-                )
-                hypothesis.add_binder_analysis(bindcraft_analysis)
-            except Exception as e:
-                self.logger.warning(f"Binder analysis failed: {e}")
-        
-        # MD analysis
-        if "molecular_dynamics" in self.design_agents:
-            try:
-                md_analysis = await self.design_agents['molecular_dynamics'].analyze_hypothesis(
-                    hypothesis, task_params
-                )
-                hypothesis.add_md_analysis(md_analysis)
-            except Exception as e:
-                self.logger.warning(f"MD analysis failed: {e}")
-        
     def get_protein_system_status(self) -> Dict[str, Any]:
         """Get protein system status."""
         base_status = self.get_system_status()
