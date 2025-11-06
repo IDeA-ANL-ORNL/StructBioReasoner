@@ -54,7 +54,7 @@ async def run_interactive_mode(system: BinderDesignSystem, args):
     if args.goal:
         research_goal = args.goal
     else:
-        research_goal = input("Enter your binder design research goal: ")
+        research_goal = "" #input("Enter your binder design research goal: ")
 
     # Ensure research goal is a simple string (workaround for tuple assignment error)
     research_goal = str(research_goal).strip()
