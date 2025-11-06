@@ -200,7 +200,7 @@ Examples:
     parser.add_argument(
         "--strategies",
         nargs="+",
-        choices=["computational_design", "molecular_dynamics", "energetic_analysis"],
+        #choices=['research_expansion'],#["computational_design", "molecular_dynamics", "energetic_analysis"],
         help="Generation strategies to use"
     )
     

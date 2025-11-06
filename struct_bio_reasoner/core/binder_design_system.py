@@ -17,15 +17,12 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent.parent.parent / "Jnana"))
 
 from jnana.core.jnana_system import JnanaSystem
-from jnana.data.unified_hypothesis import UnifiedHypothesis
-from jnana.core.model_manager import UnifiedModelManager
 
 # Import protein-specific components
-from ..data.protein_hypothesis import ProteinHypothesis, MutationHypothesis
+from ..data.protein_hypothesis import ProteinHypothesis
 from ..agents.computational_design.bindcraft_agent import BindCraftAgent
 from ..agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
 from ..agents.energetic.energy_agent import EnergeticAnalysisAgent
-from ..agents.design.mutation_agent import MutationDesignAgent
 from ..tools.pymol_wrapper import PyMOLWrapper
 from ..tools.biopython_utils import BioPythonUtils
 from ..utils.config_loader import load_binder_config
@@ -65,6 +62,7 @@ class BinderDesignSystem(JnanaSystem):
         # Load protein-specific configuration
         self.binder_config = load_binder_config(config_path)
         
+        print('loaded binder config')
         # Determine Jnana config path
         if not jnana_config_path:
             jnana_config_path = self.binder_config.get("jnana", {}).get("config_path", 
@@ -209,7 +207,7 @@ class BinderDesignSystem(JnanaSystem):
                 self.design_agents['computational_design'] = BindCraftAgent(
                                                                 agent_id='binder_design',
                                                                 config=design_config,
-                                                                # NOTE: put this in the agent: model_manager=self.model_manager
+                                                                model_manager=self.model_manager
                                                                 )
                 self.logger.info("BindCraft agent initialized")
             except Exception as e:
@@ -288,7 +286,7 @@ class BinderDesignSystem(JnanaSystem):
             protein_id=protein_id,
             biological_context=biological_context # this goes into `protein_metadata`
         )
-        if "computational_design" in self.design_agents:
+        if "computational_design" in self.enable_agents:
             #I want to append design_config to the task_params
             #design_config = self.binder_config.get("agents", {}).get("computational_design", {})
             #For now design config is hardcoded
@@ -321,6 +319,8 @@ class BinderDesignSystem(JnanaSystem):
                 #'inv_fold_backend': 'proteinmpnn'
             }
 
+            print(design_config)
+
             task_params['computational_design'].update(design_config)
             
             bindcraft_analysis = await self.design_agents["computational_design"].analyze_hypothesis(
@@ -328,7 +328,7 @@ class BinderDesignSystem(JnanaSystem):
             )
             protein_hypothesis.add_binder_analysis(bindcraft_analysis)
 
-        if "molecular_dynamics" in self.design_agents:
+        if "molecular_dynamics" in self.enable_agents:
             md_analysis = await self.design_agents['molecular_dynamics'].analyze_hypothesis(
                 protein_hypothesis, task_params
             )

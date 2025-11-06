@@ -1,0 +1,136 @@
+agents:
+  evolution:
+    api_key: ${OPENAI_API_KEY}
+    max_tokens: 2048
+    model: gpt-4o
+    provider: openai
+    temperature: 0.7
+  generation:
+    api_key: ${OPENAI_API_KEY}
+    max_tokens: 3072
+    model: gpt-4o
+    provider: openai
+    temperature: 0.8
+  meta_review:
+    api_key: ${ANTHROPIC_API_KEY}
+    max_tokens: 4096
+    model: claude-3-5-sonnet-20241022
+    provider: anthropic
+    temperature: 0.6
+  proximity:
+    api_key: ${GEMINI_API_KEY}
+    max_tokens: 1024
+    model: gemini-1.5-pro
+    provider: gemini
+    temperature: 0.5
+  ranking:
+    api_key: ${GEMINI_API_KEY}
+    max_tokens: 1024
+    model: gemini-1.5-pro
+    provider: gemini
+    temperature: 0.4
+  reflection:
+    api_key: ${ANTHROPIC_API_KEY}
+    max_tokens: 2048
+    model: claude-3-5-sonnet-20241022
+    provider: anthropic
+    temperature: 0.6
+  supervisor:
+    api_key: ${ANTHROPIC_API_KEY}
+    max_tokens: 4096
+    model: claude-3-5-sonnet-20241022
+    provider: anthropic
+    temperature: 0.5
+biomni:
+  auto_verify_biomedical: true
+  biomedical_keywords:
+  - gene
+  - protein
+  - cell
+  - drug
+  - disease
+  - therapy
+  - genomics
+  - pharmaceutical
+  confidence_threshold: 0.6
+  data_path: ./data/biomni
+  drug_discovery_tools:
+  - admet_prediction
+  - molecular_docking
+  - compound_screening
+  enable_experimental_suggestions: true
+  enabled: false
+  genomics_tools:
+  - crispr_screen
+  - scrna_seq
+  - gwas_analysis
+  llm_model: claude-sonnet-4-20250514
+  max_execution_time: 300
+  protein_tools:
+  - structure_prediction
+  - interaction_analysis
+  - folding_simulation
+default:
+  api_key: ${OPENAI_API_KEY}
+  max_tokens: 2048
+  model: gpt-4o
+  provider: openai
+  temperature: 0.7
+interactive:
+  alternative:
+    api_key: ${ANTHROPIC_API_KEY}
+    max_tokens: 2048
+    model: claude-3-5-sonnet-20241022
+    provider: anthropic
+    temperature: 0.7
+  primary:
+    api_key: ${OPENAI_API_KEY}
+    max_tokens: 2048
+    model: gpt-4o
+    provider: openai
+    temperature: 0.7
+local:
+  llm_studio:
+    api_key: ${LLM_STUDIO_API_KEY}
+    base_url: http://localhost:3000
+    max_tokens: 2048
+    model: default
+    provider: llm_studio
+    temperature: 0.7
+  ollama:
+    base_url: http://localhost:11434
+    max_tokens: 2048
+    model: llama3
+    provider: ollama
+    temperature: 0.7
+performance:
+  max_concurrent_requests: 10
+  rate_limit_delay: 1.0
+  request_timeout: 60
+  retry_attempts: 3
+tasks:
+  hypothesis_generation:
+    max_tokens: 3072
+    model: gpt-4o
+    provider: openai
+    temperature: 0.8
+  hypothesis_refinement:
+    max_tokens: 2048
+    model: claude-3-5-sonnet-20241022
+    provider: anthropic
+    temperature: 0.6
+  scientific_evaluation:
+    max_tokens: 1024
+    model: gemini-1.5-pro
+    provider: gemini
+    temperature: 0.4
+  tournament_ranking:
+    max_tokens: 1024
+    model: gemini-1.5-pro
+    provider: gemini
+    temperature: 0.3
+ui:
+  auto_save_interval: 300
+  default_mode: interactive
+  enable_real_time_updates: true
+  max_hypothesis_display: 100

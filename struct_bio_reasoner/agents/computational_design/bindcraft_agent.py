@@ -9,18 +9,22 @@ from datetime import datetime
 from bindcraft.core.folding import Chai, Boltz
 from bindcraft.core.inverse_folding import ProteinMPNN
 
+from jnana.core.model_manager import UnifiedModelManager
+
 from ...data.protein_hypothesis import BinderAnalysis, ProteinHypothesis
 from ...core.base_agent import BaseAgent
 
-class BindCraftAgent(BaseAgent):
+class BindCraftAgent:
     """"""
     def __init__(self, 
                  agent_id: str,
-                 config: dict[str, Any]):
+                 config: dict[str, Any],
+                 model_manager: UnifiedModelManager):
         """"""
-        super().__init__(config)
-
         self.agent_id = agent_id
+        self.config = config
+        self.model_manager = model_manager
+        self.logger = logging.getLogger(__name__)
 
         self.capabilities = [
             'binder_design',
