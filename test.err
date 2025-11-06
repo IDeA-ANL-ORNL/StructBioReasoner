@@ -27,471 +27,263 @@ export DISABLE_PANDERA_IMPORT_WARNING=True
 ```
 
   warnings.warn(_future_warning, FutureWarning)
-2025-11-06 17:40:57,392 - root - WARNING - Jnana config path does not exist: ../Jnana/config/models.yaml
-2025-11-06 17:40:57,392 - root - WARNING - Jnana config path does not exist: ../Jnana/config/models.yaml
-2025-11-06 17:40:57,396 - root - INFO - Binder configuration loaded from config/test_binder_config.yaml
-2025-11-06 17:40:57,396 - root - INFO - Binder configuration loaded from config/test_binder_config.yaml
-2025-11-06 17:40:57,416 - struct_bio_reasoner.core.binder_design_system - INFO - Modified Jnana configuration to disable Biomni
-2025-11-06 17:40:57,416 - struct_bio_reasoner.core.binder_design_system - INFO - Modified Jnana configuration to disable Biomni
-2025-11-06 17:40:57,424 - jnana.core.jnana_system - INFO - ProtoGnosis adapter initialized
-2025-11-06 17:40:57,424 - jnana.core.jnana_system - INFO - ProtoGnosis adapter initialized
-2025-11-06 17:40:57,424 - jnana.core.jnana_system - INFO - Biomni integration disabled in configuration
-2025-11-06 17:40:57,424 - jnana.core.jnana_system - INFO - Biomni integration disabled in configuration
-2025-11-06 17:40:57,424 - jnana.core.jnana_system - INFO - Jnana system initialized
-2025-11-06 17:40:57,424 - jnana.core.jnana_system - INFO - Jnana system initialized
-2025-11-06 17:40:57,424 - jnana.core.jnana_system - INFO - BinderDesignSystem initialized
-2025-11-06 17:40:57,424 - jnana.core.jnana_system - INFO - BinderDesignSystem initialized
-2025-11-06 17:40:57,424 - jnana.core.event_manager - INFO - Event manager started
-2025-11-06 17:40:57,424 - jnana.core.event_manager - INFO - Event manager started
-2025-11-06 17:40:57,424 - jnana.protognosis.utils.jnana_adapter - INFO - Initializing ProtoGnosis with Jnana configuration...
-2025-11-06 17:40:57,424 - jnana.protognosis.utils.jnana_adapter - INFO - Initializing ProtoGnosis with Jnana configuration...
-2025-11-06 17:40:57,424 - jnana.protognosis.utils.jnana_adapter - WARNING - Error converting model config, using defaults: 'UnifiedModelManager' object has no attribute 'get_default_config'
-2025-11-06 17:40:57,424 - jnana.protognosis.utils.jnana_adapter - WARNING - Error converting model config, using defaults: 'UnifiedModelManager' object has no attribute 'get_default_config'
-2025-11-06 17:40:57,424 - CoScientist - INFO - Created LLM configuration with default provider: openai
-2025-11-06 17:40:57,424 - CoScientist - INFO - Created LLM configuration with default provider: openai
-2025-11-06 17:40:57,425 - root - INFO - Loaded memory from data/jnana.db with 18 hypotheses
-2025-11-06 17:40:57,425 - root - INFO - Loaded memory from data/jnana.db with 18 hypotheses
-2025-11-06 17:40:57,425 - CoScientist - INFO - Created context memory with persistence
-2025-11-06 17:40:57,425 - CoScientist - INFO - Created context memory with persistence
-2025-11-06 17:40:57,441 - CoScientist - INFO - Created new LLM instance: openai (gpt-4o)
-2025-11-06 17:40:57,441 - CoScientist - INFO - Created new LLM instance: openai (gpt-4o)
-2025-11-06 17:40:57,441 - SupervisorAgent - INFO - Registered agent generation-0 of type generation
-2025-11-06 17:40:57,441 - SupervisorAgent - INFO - Registered agent generation-0 of type generation
-2025-11-06 17:40:57,451 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,451 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,452 - CoScientist - INFO - Initialized state for agent generation-0 (generation)
-2025-11-06 17:40:57,452 - CoScientist - INFO - Initialized state for agent generation-0 (generation)
-2025-11-06 17:40:57,452 - SupervisorAgent - INFO - Registered agent generation-1 of type generation
-2025-11-06 17:40:57,452 - SupervisorAgent - INFO - Registered agent generation-1 of type generation
-2025-11-06 17:40:57,468 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,468 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,468 - CoScientist - INFO - Initialized state for agent generation-1 (generation)
-2025-11-06 17:40:57,468 - CoScientist - INFO - Initialized state for agent generation-1 (generation)
-2025-11-06 17:40:57,468 - SupervisorAgent - INFO - Registered agent generation-2 of type generation
-2025-11-06 17:40:57,468 - SupervisorAgent - INFO - Registered agent generation-2 of type generation
-2025-11-06 17:40:57,481 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,481 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,481 - CoScientist - INFO - Initialized state for agent generation-2 (generation)
-2025-11-06 17:40:57,481 - CoScientist - INFO - Initialized state for agent generation-2 (generation)
-2025-11-06 17:40:57,481 - SupervisorAgent - INFO - Registered agent generation-3 of type generation
-2025-11-06 17:40:57,481 - SupervisorAgent - INFO - Registered agent generation-3 of type generation
-2025-11-06 17:40:57,493 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,493 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,493 - CoScientist - INFO - Initialized state for agent generation-3 (generation)
-2025-11-06 17:40:57,493 - CoScientist - INFO - Initialized state for agent generation-3 (generation)
-2025-11-06 17:40:57,493 - SupervisorAgent - INFO - Registered agent generation-4 of type generation
-2025-11-06 17:40:57,493 - SupervisorAgent - INFO - Registered agent generation-4 of type generation
-2025-11-06 17:40:57,512 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,512 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,512 - CoScientist - INFO - Initialized state for agent generation-4 (generation)
-2025-11-06 17:40:57,512 - CoScientist - INFO - Initialized state for agent generation-4 (generation)
-2025-11-06 17:40:57,512 - SupervisorAgent - INFO - Registered agent reflection-0 of type reflection
-2025-11-06 17:40:57,512 - SupervisorAgent - INFO - Registered agent reflection-0 of type reflection
-2025-11-06 17:40:57,530 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,530 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,530 - CoScientist - INFO - Initialized state for agent reflection-0 (reflection)
-2025-11-06 17:40:57,530 - CoScientist - INFO - Initialized state for agent reflection-0 (reflection)
-2025-11-06 17:40:57,530 - SupervisorAgent - INFO - Registered agent reflection-1 of type reflection
-2025-11-06 17:40:57,530 - SupervisorAgent - INFO - Registered agent reflection-1 of type reflection
-2025-11-06 17:40:57,554 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,554 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,554 - CoScientist - INFO - Initialized state for agent reflection-1 (reflection)
-2025-11-06 17:40:57,554 - CoScientist - INFO - Initialized state for agent reflection-1 (reflection)
-2025-11-06 17:40:57,554 - SupervisorAgent - INFO - Registered agent ranking-0 of type ranking
-2025-11-06 17:40:57,554 - SupervisorAgent - INFO - Registered agent ranking-0 of type ranking
-2025-11-06 17:40:57,575 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,575 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,575 - CoScientist - INFO - Initialized state for agent ranking-0 (ranking)
-2025-11-06 17:40:57,575 - CoScientist - INFO - Initialized state for agent ranking-0 (ranking)
-2025-11-06 17:40:57,575 - SupervisorAgent - INFO - Registered agent evolution-0 of type evolution
-2025-11-06 17:40:57,575 - SupervisorAgent - INFO - Registered agent evolution-0 of type evolution
-2025-11-06 17:40:57,600 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,600 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,600 - CoScientist - INFO - Initialized state for agent evolution-0 (evolution)
-2025-11-06 17:40:57,600 - CoScientist - INFO - Initialized state for agent evolution-0 (evolution)
-2025-11-06 17:40:57,600 - SupervisorAgent - INFO - Registered agent proximity-0 of type proximity
-2025-11-06 17:40:57,600 - SupervisorAgent - INFO - Registered agent proximity-0 of type proximity
-2025-11-06 17:40:57,618 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,618 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,618 - CoScientist - INFO - Initialized state for agent proximity-0 (proximity)
-2025-11-06 17:40:57,618 - CoScientist - INFO - Initialized state for agent proximity-0 (proximity)
-2025-11-06 17:40:57,618 - SupervisorAgent - INFO - Registered agent meta-review-0 of type meta-review
-2025-11-06 17:40:57,618 - SupervisorAgent - INFO - Registered agent meta-review-0 of type meta-review
-2025-11-06 17:40:57,634 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,634 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:57,634 - CoScientist - INFO - Initialized state for agent meta-review-0 (meta-review)
-2025-11-06 17:40:57,634 - CoScientist - INFO - Initialized state for agent meta-review-0 (meta-review)
-2025-11-06 17:40:57,634 - CoScientist - INFO - Created and registered all specialized agents
-2025-11-06 17:40:57,634 - CoScientist - INFO - Created and registered all specialized agents
-2025-11-06 17:40:57,634 - CoScientist - INFO - Co-Scientist system initialized and ready
-2025-11-06 17:40:57,634 - CoScientist - INFO - Co-Scientist system initialized and ready
-2025-11-06 17:40:57,634 - Worker-0 - INFO - Worker 0 started
-2025-11-06 17:40:57,634 - Worker-0 - INFO - Worker 0 started
-2025-11-06 17:40:57,635 - Worker-1 - INFO - Worker 1 started
-2025-11-06 17:40:57,635 - Worker-1 - INFO - Worker 1 started
-2025-11-06 17:40:57,635 - Worker-2 - INFO - Worker 2 started
-2025-11-06 17:40:57,635 - Worker-2 - INFO - Worker 2 started
-2025-11-06 17:40:57,635 - Worker-3 - INFO - Worker 3 started
-2025-11-06 17:40:57,635 - Worker-3 - INFO - Worker 3 started
-2025-11-06 17:40:57,635 - SupervisorAgent - INFO - Supervisor started with 4 workers
-2025-11-06 17:40:57,635 - SupervisorAgent - INFO - Supervisor started with 4 workers
-2025-11-06 17:40:57,636 - CoScientist - INFO - Co-Scientist system started
-2025-11-06 17:40:57,636 - CoScientist - INFO - Co-Scientist system started
-2025-11-06 17:40:57,636 - jnana.protognosis.utils.jnana_adapter - INFO - ProtoGnosis initialized and started successfully
-2025-11-06 17:40:57,636 - jnana.protognosis.utils.jnana_adapter - INFO - ProtoGnosis initialized and started successfully
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - Jnana system started
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - Jnana system started
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - Initializing protein agents...
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - Initializing protein agents...
-2025-11-06 17:40:57,636 - struct_bio_reasoner.agents.computational_design.bindcraft_agent - INFO - BindCraft agent using: chai,{'num_seqs': 25, 'batch_size': 250, 'max_retries': 5, 'sampling_temp': '0.1'}
-2025-11-06 17:40:57,636 - struct_bio_reasoner.agents.computational_design.bindcraft_agent - INFO - BindCraft agent using: chai,{'num_seqs': 25, 'batch_size': 250, 'max_retries': 5, 'sampling_temp': '0.1'}
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - BindCraft agent initialized
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - BindCraft agent initialized
-2025-11-06 17:40:57,636 - MDAgentAdapter - INFO - Base agent mdagentadapter_b3040f2f initialized
-2025-11-06 17:40:57,636 - MDAgentAdapter - INFO - Base agent mdagentadapter_b3040f2f initialized
-2025-11-06 17:40:57,636 - MDAgentAdapter - INFO - MDAgentAdapter initialized with implicit solvent
-2025-11-06 17:40:57,636 - MDAgentAdapter - INFO - MDAgentAdapter initialized with implicit solvent
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - MD agent initialized
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - MD agent initialized
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - Initialized 2 protein agents
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - Initialized 2 protein agents
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - Initializing protein knowledge foundation...
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - Initializing protein knowledge foundation...
-2025-11-06 17:40:57,636 - struct_bio_reasoner.core.knowledge_foundation - INFO - Initializing protein knowledge foundation...
-2025-11-06 17:40:57,636 - struct_bio_reasoner.core.knowledge_foundation - INFO - Initializing protein knowledge foundation...
-2025-11-06 17:40:57,636 - struct_bio_reasoner.core.knowledge_foundation - INFO - Database manager initialization - placeholder
-2025-11-06 17:40:57,636 - struct_bio_reasoner.core.knowledge_foundation - INFO - Database manager initialization - placeholder
-2025-11-06 17:40:57,636 - struct_bio_reasoner.core.knowledge_foundation - INFO - Literature processor initialization - placeholder
-2025-11-06 17:40:57,636 - struct_bio_reasoner.core.knowledge_foundation - INFO - Literature processor initialization - placeholder
-2025-11-06 17:40:57,636 - struct_bio_reasoner.core.knowledge_foundation - INFO - Protein knowledge foundation initialized successfully
-2025-11-06 17:40:57,636 - struct_bio_reasoner.core.knowledge_foundation - INFO - Protein knowledge foundation initialized successfully
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - Protein knowledge foundation initialized
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - Protein knowledge foundation initialized
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - BinderDesignSystem started successfully
-2025-11-06 17:40:57,636 - jnana.core.jnana_system - INFO - BinderDesignSystem started successfully
-2025-11-06 17:40:57,646 - jnana.core.session_manager - INFO - Created new session: 8ed25894-f3e3-4064-aaa7-80307e6817ec
-2025-11-06 17:40:57,646 - jnana.core.session_manager - INFO - Created new session: 8ed25894-f3e3-4064-aaa7-80307e6817ec
-2025-11-06 17:40:57,647 - jnana.core.jnana_system - INFO - Research goal set: Design binders for target protein...
-2025-11-06 17:40:57,647 - jnana.core.jnana_system - INFO - Research goal set: Design binders for target protein...
-2025-11-06 17:40:57,647 - jnana.core.jnana_system - INFO - Generating 3 hypotheses with ProtoGnosis...
-2025-11-06 17:40:57,647 - jnana.core.jnana_system - INFO - Generating 3 hypotheses with ProtoGnosis...
-2025-11-06 17:40:57,647 - jnana.protognosis.utils.jnana_adapter - INFO - Generating 3 hypotheses for: Design binders for target protein...
-2025-11-06 17:40:57,647 - jnana.protognosis.utils.jnana_adapter - INFO - Generating 3 hypotheses for: Design binders for target protein...
-2025-11-06 17:40:57,647 - CoScientist - INFO - Setting research goal: Design binders for target protein...
-2025-11-06 17:40:57,647 - CoScientist - INFO - Setting research goal: Design binders for target protein...
-2025-11-06 17:40:57,647 - SupervisorAgent - INFO - Parsing research goal: Design binders for target protein...
-2025-11-06 17:40:57,647 - SupervisorAgent - INFO - Parsing research goal: Design binders for target protein...
-2025-11-06 17:40:59,351 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2025-11-06 17:40:59,351 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2025-11-06 17:40:59,495 - SupervisorAgent - ERROR - Error parsing research goal: 'tuple' object does not support item assignment
-2025-11-06 17:40:59,495 - SupervisorAgent - ERROR - Error parsing research goal: 'tuple' object does not support item assignment
-2025-11-06 17:40:59,518 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,518 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,518 - CoScientist - INFO - Research goal set and parsed
-2025-11-06 17:40:59,518 - CoScientist - INFO - Research goal set and parsed
-2025-11-06 17:40:59,518 - CoScientist - INFO - Scheduling generation of 3 hypotheses
-2025-11-06 17:40:59,518 - CoScientist - INFO - Scheduling generation of 3 hypotheses
-2025-11-06 17:40:59,518 - SupervisorAgent - INFO - Added task 43edb40c-f5cb-4e66-b42f-f9a3612ced5f of type generate_hypothesis to queue
-2025-11-06 17:40:59,518 - SupervisorAgent - INFO - Added task 43edb40c-f5cb-4e66-b42f-f9a3612ced5f of type generate_hypothesis to queue
-2025-11-06 17:40:59,518 - SupervisorAgent - INFO - Added task d379a108-af3d-46d3-9c05-c6af1c77fdfb of type generate_hypothesis to queue
-2025-11-06 17:40:59,518 - SupervisorAgent - INFO - Added task d379a108-af3d-46d3-9c05-c6af1c77fdfb of type generate_hypothesis to queue
-2025-11-06 17:40:59,518 - SupervisorAgent - INFO - Added task 92f50376-d390-41d8-99c4-26fb14699a4c of type generate_hypothesis to queue
-2025-11-06 17:40:59,518 - SupervisorAgent - INFO - Added task 92f50376-d390-41d8-99c4-26fb14699a4c of type generate_hypothesis to queue
-2025-11-06 17:40:59,518 - Worker-0 - INFO - Processing task 43edb40c-f5cb-4e66-b42f-f9a3612ced5f of type generate_hypothesis
-2025-11-06 17:40:59,518 - Worker-0 - INFO - Processing task 43edb40c-f5cb-4e66-b42f-f9a3612ced5f of type generate_hypothesis
-2025-11-06 17:40:59,519 - Worker-2 - INFO - Processing task d379a108-af3d-46d3-9c05-c6af1c77fdfb of type generate_hypothesis
-2025-11-06 17:40:59,519 - Worker-2 - INFO - Processing task d379a108-af3d-46d3-9c05-c6af1c77fdfb of type generate_hypothesis
-2025-11-06 17:40:59,519 - Worker-1 - INFO - Processing task 92f50376-d390-41d8-99c4-26fb14699a4c of type generate_hypothesis
-2025-11-06 17:40:59,519 - Worker-1 - INFO - Processing task 92f50376-d390-41d8-99c4-26fb14699a4c of type generate_hypothesis
-2025-11-06 17:40:59,519 - Worker-0 - INFO - 🔥 CALLING agent.execute_task for generation-0
-2025-11-06 17:40:59,519 - Worker-0 - INFO - 🔥 CALLING agent.execute_task for generation-0
-2025-11-06 17:40:59,519 - Worker-2 - INFO - 🔥 CALLING agent.execute_task for generation-2
-2025-11-06 17:40:59,519 - Worker-2 - INFO - 🔥 CALLING agent.execute_task for generation-2
-2025-11-06 17:40:59,519 - Worker-1 - INFO - 🔥 CALLING agent.execute_task for generation-1
-2025-11-06 17:40:59,519 - Worker-1 - INFO - 🔥 CALLING agent.execute_task for generation-1
-2025-11-06 17:40:59,520 - Agent-generation-generation-0 - INFO - Generating hypothesis for task 43edb40c-f5cb-4e66-b42f-f9a3612ced5f
-2025-11-06 17:40:59,520 - Agent-generation-generation-0 - INFO - Generating hypothesis for task 43edb40c-f5cb-4e66-b42f-f9a3612ced5f
-2025-11-06 17:40:59,520 - Agent-generation-generation-2 - INFO - Generating hypothesis for task d379a108-af3d-46d3-9c05-c6af1c77fdfb
-2025-11-06 17:40:59,520 - Agent-generation-generation-2 - INFO - Generating hypothesis for task d379a108-af3d-46d3-9c05-c6af1c77fdfb
-2025-11-06 17:40:59,520 - Agent-generation-generation-1 - INFO - Generating hypothesis for task 92f50376-d390-41d8-99c4-26fb14699a4c
-2025-11-06 17:40:59,520 - Agent-generation-generation-1 - INFO - Generating hypothesis for task 92f50376-d390-41d8-99c4-26fb14699a4c
-2025-11-06 17:40:59,520 - Worker-2 - ERROR - Task d379a108-af3d-46d3-9c05-c6af1c77fdfb failed: Unknown generation strategy: computational_design
-2025-11-06 17:40:59,520 - Worker-2 - ERROR - Task d379a108-af3d-46d3-9c05-c6af1c77fdfb failed: Unknown generation strategy: computational_design
-2025-11-06 17:40:59,520 - Worker-0 - ERROR - Task 43edb40c-f5cb-4e66-b42f-f9a3612ced5f failed: Unknown generation strategy: computational_design
-2025-11-06 17:40:59,520 - Worker-0 - ERROR - Task 43edb40c-f5cb-4e66-b42f-f9a3612ced5f failed: Unknown generation strategy: computational_design
-2025-11-06 17:40:59,520 - Worker-1 - ERROR - Task 92f50376-d390-41d8-99c4-26fb14699a4c failed: Unknown generation strategy: computational_design
-2025-11-06 17:40:59,520 - Worker-1 - ERROR - Task 92f50376-d390-41d8-99c4-26fb14699a4c failed: Unknown generation strategy: computational_design
-2025-11-06 17:40:59,532 - Worker-2 - ERROR - Full traceback: Traceback (most recent call last):
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/core/agent_core.py", line 776, in worker_function
-    result = asyncio.run(agent.execute_task(task))
-  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/asyncio/runners.py", line 44, in run
-    return loop.run_until_complete(main)
-  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
-    return future.result()
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/agents/specialized_agents.py", line 55, in execute_task
-    return await self._generate_hypothesis(task)
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/agents/specialized_agents.py", line 92, in _generate_hypothesis
-    raise ValueError(f"Unknown generation strategy: {strategy}")
-ValueError: Unknown generation strategy: computational_design
-
-2025-11-06 17:40:59,532 - Worker-2 - ERROR - Full traceback: Traceback (most recent call last):
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/core/agent_core.py", line 776, in worker_function
-    result = asyncio.run(agent.execute_task(task))
-  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/asyncio/runners.py", line 44, in run
-    return loop.run_until_complete(main)
-  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
-    return future.result()
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/agents/specialized_agents.py", line 55, in execute_task
-    return await self._generate_hypothesis(task)
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/agents/specialized_agents.py", line 92, in _generate_hypothesis
-    raise ValueError(f"Unknown generation strategy: {strategy}")
-ValueError: Unknown generation strategy: computational_design
-
-2025-11-06 17:40:59,534 - Worker-1 - ERROR - Full traceback: Traceback (most recent call last):
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/core/agent_core.py", line 776, in worker_function
-    result = asyncio.run(agent.execute_task(task))
-  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/asyncio/runners.py", line 44, in run
-    return loop.run_until_complete(main)
-  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
-    return future.result()
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/agents/specialized_agents.py", line 55, in execute_task
-    return await self._generate_hypothesis(task)
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/agents/specialized_agents.py", line 92, in _generate_hypothesis
-    raise ValueError(f"Unknown generation strategy: {strategy}")
-ValueError: Unknown generation strategy: computational_design
-
-2025-11-06 17:40:59,534 - Worker-1 - ERROR - Full traceback: Traceback (most recent call last):
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/core/agent_core.py", line 776, in worker_function
-    result = asyncio.run(agent.execute_task(task))
-  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/asyncio/runners.py", line 44, in run
-    return loop.run_until_complete(main)
-  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
-    return future.result()
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/agents/specialized_agents.py", line 55, in execute_task
-    return await self._generate_hypothesis(task)
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/agents/specialized_agents.py", line 92, in _generate_hypothesis
-    raise ValueError(f"Unknown generation strategy: {strategy}")
-ValueError: Unknown generation strategy: computational_design
-
-2025-11-06 17:40:59,535 - Worker-0 - ERROR - Full traceback: Traceback (most recent call last):
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/core/agent_core.py", line 776, in worker_function
-    result = asyncio.run(agent.execute_task(task))
-  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/asyncio/runners.py", line 44, in run
-    return loop.run_until_complete(main)
-  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
-    return future.result()
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/agents/specialized_agents.py", line 55, in execute_task
-    return await self._generate_hypothesis(task)
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/agents/specialized_agents.py", line 92, in _generate_hypothesis
-    raise ValueError(f"Unknown generation strategy: {strategy}")
-ValueError: Unknown generation strategy: computational_design
-
-2025-11-06 17:40:59,535 - Worker-0 - ERROR - Full traceback: Traceback (most recent call last):
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/core/agent_core.py", line 776, in worker_function
-    result = asyncio.run(agent.execute_task(task))
-  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/asyncio/runners.py", line 44, in run
-    return loop.run_until_complete(main)
-  File "/opt/aurora/25.190.0/frameworks/aurora_frameworks-2025.2.0/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
-    return future.result()
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/agents/specialized_agents.py", line 55, in execute_task
-    return await self._generate_hypothesis(task)
-  File "/lus/flare/projects/FoundEpidem/msinclair/github/Jnana/jnana/protognosis/agents/specialized_agents.py", line 92, in _generate_hypothesis
-    raise ValueError(f"Unknown generation strategy: {strategy}")
-ValueError: Unknown generation strategy: computational_design
-
-2025-11-06 17:40:59,536 - SupervisorAgent - INFO - All tasks completed
-2025-11-06 17:40:59,536 - SupervisorAgent - INFO - All tasks completed
-2025-11-06 17:40:59,536 - jnana.protognosis.utils.jnana_adapter - INFO - Successfully generated and converted 18 hypotheses
-2025-11-06 17:40:59,536 - jnana.protognosis.utils.jnana_adapter - INFO - Successfully generated and converted 18 hypotheses
-2025-11-06 17:40:59,536 - jnana.core.jnana_system - INFO - Running tournament with 5 matches...
-2025-11-06 17:40:59,536 - jnana.core.jnana_system - INFO - Running tournament with 5 matches...
-2025-11-06 17:40:59,536 - jnana.protognosis.utils.jnana_adapter - INFO - Running tournament with 5 matches on 18 hypotheses
-2025-11-06 17:40:59,536 - jnana.protognosis.utils.jnana_adapter - INFO - Running tournament with 5 matches on 18 hypotheses
-2025-11-06 17:40:59,553 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,553 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,570 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,570 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,582 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,582 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,597 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,597 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,609 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,609 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,620 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,620 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,639 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,639 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,650 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,650 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,661 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,661 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,670 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,670 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,989 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:40:59,989 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,004 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,004 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,015 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,015 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,027 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,027 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,039 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,039 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,051 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,051 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,062 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,062 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,073 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,073 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:00,073 - CoScientist - INFO - Scheduling 5 tournament matches
-2025-11-06 17:41:00,073 - CoScientist - INFO - Scheduling 5 tournament matches
-2025-11-06 17:41:00,073 - SupervisorAgent - INFO - Added task 5f28f646-45d4-4749-8e90-cf858238c9d9 of type tournament_match to queue
-2025-11-06 17:41:00,073 - SupervisorAgent - INFO - Added task 5f28f646-45d4-4749-8e90-cf858238c9d9 of type tournament_match to queue
-2025-11-06 17:41:00,073 - Worker-2 - INFO - Processing task 5f28f646-45d4-4749-8e90-cf858238c9d9 of type tournament_match
-2025-11-06 17:41:00,073 - Worker-2 - INFO - Processing task 5f28f646-45d4-4749-8e90-cf858238c9d9 of type tournament_match
-2025-11-06 17:41:00,073 - SupervisorAgent - INFO - Added task a49f7c07-a1fd-47e0-a6e7-3874cf9dd591 of type tournament_match to queue
-2025-11-06 17:41:00,073 - SupervisorAgent - INFO - Added task a49f7c07-a1fd-47e0-a6e7-3874cf9dd591 of type tournament_match to queue
-2025-11-06 17:41:00,073 - Worker-1 - INFO - Processing task a49f7c07-a1fd-47e0-a6e7-3874cf9dd591 of type tournament_match
-2025-11-06 17:41:00,073 - Worker-1 - INFO - Processing task a49f7c07-a1fd-47e0-a6e7-3874cf9dd591 of type tournament_match
-2025-11-06 17:41:00,073 - Worker-2 - INFO - 🔥 CALLING agent.execute_task for ranking-0
-2025-11-06 17:41:00,073 - Worker-2 - INFO - 🔥 CALLING agent.execute_task for ranking-0
-2025-11-06 17:41:00,073 - SupervisorAgent - INFO - Added task ad444222-db31-4537-ba4f-aa2cf9ff9d6b of type tournament_match to queue
-2025-11-06 17:41:00,073 - SupervisorAgent - INFO - Added task ad444222-db31-4537-ba4f-aa2cf9ff9d6b of type tournament_match to queue
-2025-11-06 17:41:00,073 - Worker-0 - INFO - Processing task ad444222-db31-4537-ba4f-aa2cf9ff9d6b of type tournament_match
-2025-11-06 17:41:00,073 - Worker-0 - INFO - Processing task ad444222-db31-4537-ba4f-aa2cf9ff9d6b of type tournament_match
-2025-11-06 17:41:00,073 - Worker-1 - INFO - 🔥 CALLING agent.execute_task for ranking-0
-2025-11-06 17:41:00,073 - Worker-1 - INFO - 🔥 CALLING agent.execute_task for ranking-0
-2025-11-06 17:41:00,074 - SupervisorAgent - INFO - Added task abd68e48-dfbe-4723-b95e-67bb5b3fff60 of type tournament_match to queue
-2025-11-06 17:41:00,074 - SupervisorAgent - INFO - Added task abd68e48-dfbe-4723-b95e-67bb5b3fff60 of type tournament_match to queue
-2025-11-06 17:41:00,074 - Worker-3 - INFO - Processing task abd68e48-dfbe-4723-b95e-67bb5b3fff60 of type tournament_match
-2025-11-06 17:41:00,074 - Worker-3 - INFO - Processing task abd68e48-dfbe-4723-b95e-67bb5b3fff60 of type tournament_match
-2025-11-06 17:41:00,074 - Agent-ranking-ranking-0 - INFO - Conducting tournament match for task 5f28f646-45d4-4749-8e90-cf858238c9d9
-2025-11-06 17:41:00,074 - Agent-ranking-ranking-0 - INFO - Conducting tournament match for task 5f28f646-45d4-4749-8e90-cf858238c9d9
-2025-11-06 17:41:00,074 - Worker-0 - INFO - 🔥 CALLING agent.execute_task for ranking-0
-2025-11-06 17:41:00,074 - Worker-0 - INFO - 🔥 CALLING agent.execute_task for ranking-0
-2025-11-06 17:41:00,074 - SupervisorAgent - INFO - Added task bf242087-27f7-43d5-a347-b26ccec385d6 of type tournament_match to queue
-2025-11-06 17:41:00,074 - SupervisorAgent - INFO - Added task bf242087-27f7-43d5-a347-b26ccec385d6 of type tournament_match to queue
-2025-11-06 17:41:00,074 - Worker-3 - INFO - 🔥 CALLING agent.execute_task for ranking-0
-2025-11-06 17:41:00,074 - Worker-3 - INFO - 🔥 CALLING agent.execute_task for ranking-0
-2025-11-06 17:41:00,074 - Agent-ranking-ranking-0 - INFO - Conducting tournament match for task a49f7c07-a1fd-47e0-a6e7-3874cf9dd591
-2025-11-06 17:41:00,074 - Agent-ranking-ranking-0 - INFO - Conducting tournament match for task a49f7c07-a1fd-47e0-a6e7-3874cf9dd591
-2025-11-06 17:41:00,076 - Agent-ranking-ranking-0 - INFO - Conducting tournament match for task ad444222-db31-4537-ba4f-aa2cf9ff9d6b
-2025-11-06 17:41:00,076 - Agent-ranking-ranking-0 - INFO - Conducting tournament match for task ad444222-db31-4537-ba4f-aa2cf9ff9d6b
-2025-11-06 17:41:00,076 - SupervisorAgent - INFO - Added task 32295a00-a329-4cb2-99cf-a1b6b4cd8011 of type update_rankings to queue
-2025-11-06 17:41:00,076 - SupervisorAgent - INFO - Added task 32295a00-a329-4cb2-99cf-a1b6b4cd8011 of type update_rankings to queue
-2025-11-06 17:41:00,076 - Agent-ranking-ranking-0 - INFO - Conducting tournament match for task abd68e48-dfbe-4723-b95e-67bb5b3fff60
-2025-11-06 17:41:00,076 - Agent-ranking-ranking-0 - INFO - Conducting tournament match for task abd68e48-dfbe-4723-b95e-67bb5b3fff60
-2025-11-06 17:41:06,571 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2025-11-06 17:41:06,571 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2025-11-06 17:41:06,597 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:06,597 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:06,608 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:06,608 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:06,628 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:06,628 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:06,629 - Worker-1 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
-2025-11-06 17:41:06,629 - Worker-1 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
-2025-11-06 17:41:06,629 - Worker-1 - INFO - Task a49f7c07-a1fd-47e0-a6e7-3874cf9dd591 completed
-2025-11-06 17:41:06,629 - Worker-1 - INFO - Task a49f7c07-a1fd-47e0-a6e7-3874cf9dd591 completed
-2025-11-06 17:41:06,629 - Worker-1 - INFO - Processing task bf242087-27f7-43d5-a347-b26ccec385d6 of type tournament_match
-2025-11-06 17:41:06,629 - Worker-1 - INFO - Processing task bf242087-27f7-43d5-a347-b26ccec385d6 of type tournament_match
-2025-11-06 17:41:06,629 - Worker-1 - INFO - 🔥 CALLING agent.execute_task for ranking-0
-2025-11-06 17:41:06,629 - Worker-1 - INFO - 🔥 CALLING agent.execute_task for ranking-0
-2025-11-06 17:41:06,629 - Agent-ranking-ranking-0 - INFO - Conducting tournament match for task bf242087-27f7-43d5-a347-b26ccec385d6
-2025-11-06 17:41:06,629 - Agent-ranking-ranking-0 - INFO - Conducting tournament match for task bf242087-27f7-43d5-a347-b26ccec385d6
-2025-11-06 17:41:07,167 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2025-11-06 17:41:07,167 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2025-11-06 17:41:07,197 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:07,197 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:07,214 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:07,214 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:07,240 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:07,240 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:07,241 - Worker-2 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
-2025-11-06 17:41:07,241 - Worker-2 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
-2025-11-06 17:41:07,241 - Worker-2 - INFO - Task 5f28f646-45d4-4749-8e90-cf858238c9d9 completed
-2025-11-06 17:41:07,241 - Worker-2 - INFO - Task 5f28f646-45d4-4749-8e90-cf858238c9d9 completed
-2025-11-06 17:41:07,241 - Worker-2 - INFO - Processing task 32295a00-a329-4cb2-99cf-a1b6b4cd8011 of type update_rankings
-2025-11-06 17:41:07,241 - Worker-2 - INFO - Processing task 32295a00-a329-4cb2-99cf-a1b6b4cd8011 of type update_rankings
-2025-11-06 17:41:07,241 - Worker-2 - INFO - 🔥 CALLING agent.execute_task for ranking-0
-2025-11-06 17:41:07,241 - Worker-2 - INFO - 🔥 CALLING agent.execute_task for ranking-0
-2025-11-06 17:41:07,241 - Agent-ranking-ranking-0 - INFO - Updating rankings for task 32295a00-a329-4cb2-99cf-a1b6b4cd8011
-2025-11-06 17:41:07,241 - Agent-ranking-ranking-0 - INFO - Updating rankings for task 32295a00-a329-4cb2-99cf-a1b6b4cd8011
-2025-11-06 17:41:07,261 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:07,261 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:07,261 - Worker-2 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
-2025-11-06 17:41:07,261 - Worker-2 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
-2025-11-06 17:41:07,261 - Worker-2 - INFO - Task 32295a00-a329-4cb2-99cf-a1b6b4cd8011 completed
-2025-11-06 17:41:07,261 - Worker-2 - INFO - Task 32295a00-a329-4cb2-99cf-a1b6b4cd8011 completed
-2025-11-06 17:41:11,029 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2025-11-06 17:41:11,029 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2025-11-06 17:41:11,061 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:11,061 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:11,074 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:11,074 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:11,087 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:11,087 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:11,087 - Worker-3 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
-2025-11-06 17:41:11,087 - Worker-3 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
-2025-11-06 17:41:11,087 - Worker-3 - INFO - Task abd68e48-dfbe-4723-b95e-67bb5b3fff60 completed
-2025-11-06 17:41:11,087 - Worker-3 - INFO - Task abd68e48-dfbe-4723-b95e-67bb5b3fff60 completed
-2025-11-06 17:41:12,020 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2025-11-06 17:41:12,020 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2025-11-06 17:41:12,145 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:12,145 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:12,182 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:12,182 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:12,205 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:12,205 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:12,231 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:12,231 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:12,293 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:12,293 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:12,294 - Worker-0 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
-2025-11-06 17:41:12,294 - Worker-0 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
-2025-11-06 17:41:12,294 - Worker-0 - INFO - Task ad444222-db31-4537-ba4f-aa2cf9ff9d6b completed
-2025-11-06 17:41:12,294 - Worker-0 - INFO - Task ad444222-db31-4537-ba4f-aa2cf9ff9d6b completed
-2025-11-06 17:41:16,625 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2025-11-06 17:41:16,625 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2025-11-06 17:41:16,827 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:16,827 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:16,843 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:16,843 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:16,855 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:16,855 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:16,872 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:16,872 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:16,885 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:16,885 - root - INFO - Saved memory to data/jnana.db
-2025-11-06 17:41:16,885 - Worker-1 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
-2025-11-06 17:41:16,885 - Worker-1 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
-2025-11-06 17:41:16,885 - Worker-1 - INFO - Task bf242087-27f7-43d5-a347-b26ccec385d6 completed
-2025-11-06 17:41:16,885 - Worker-1 - INFO - Task bf242087-27f7-43d5-a347-b26ccec385d6 completed
-2025-11-06 17:41:16,885 - SupervisorAgent - INFO - All tasks completed
-2025-11-06 17:41:16,885 - SupervisorAgent - INFO - All tasks completed
-2025-11-06 17:41:16,886 - jnana.protognosis.utils.jnana_adapter - INFO - Tournament completed successfully
-2025-11-06 17:41:16,886 - jnana.protognosis.utils.jnana_adapter - INFO - Tournament completed successfully
-2025-11-06 17:41:16,915 - jnana.core.session_manager - INFO - Saved session to: test
-2025-11-06 17:41:16,915 - jnana.core.session_manager - INFO - Saved session to: test
-2025-11-06 17:41:16,915 - jnana.core.event_manager - INFO - Event manager stopped
-2025-11-06 17:41:16,915 - jnana.core.event_manager - INFO - Event manager stopped
-2025-11-06 17:41:16,915 - jnana.protognosis.utils.jnana_adapter - INFO - Shutting down ProtoGnosis system...
-2025-11-06 17:41:16,915 - jnana.protognosis.utils.jnana_adapter - INFO - Shutting down ProtoGnosis system...
-2025-11-06 17:41:17,088 - Worker-3 - INFO - Worker 3 stopped
-2025-11-06 17:41:17,088 - Worker-3 - INFO - Worker 3 stopped
-2025-11-06 17:41:17,263 - Worker-2 - INFO - Worker 2 stopped
-2025-11-06 17:41:17,263 - Worker-2 - INFO - Worker 2 stopped
-2025-11-06 17:41:17,295 - Worker-0 - INFO - Worker 0 stopped
-2025-11-06 17:41:17,295 - Worker-0 - INFO - Worker 0 stopped
-2025-11-06 17:41:17,886 - Worker-1 - INFO - Worker 1 stopped
-2025-11-06 17:41:17,886 - Worker-1 - INFO - Worker 1 stopped
-2025-11-06 17:41:17,896 - SupervisorAgent - INFO - Supervisor stopped
-2025-11-06 17:41:17,896 - SupervisorAgent - INFO - Supervisor stopped
-2025-11-06 17:41:17,896 - CoScientist - INFO - Co-Scientist system stopped
-2025-11-06 17:41:17,896 - CoScientist - INFO - Co-Scientist system stopped
-2025-11-06 17:41:17,896 - jnana.protognosis.utils.jnana_adapter - INFO - ProtoGnosis system stopped successfully
-2025-11-06 17:41:17,896 - jnana.protognosis.utils.jnana_adapter - INFO - ProtoGnosis system stopped successfully
-2025-11-06 17:41:17,896 - jnana.core.jnana_system - INFO - Jnana system stopped
-2025-11-06 17:41:17,896 - jnana.core.jnana_system - INFO - Jnana system stopped
-2025-11-06 17:41:17,896 - jnana.core.jnana_system - INFO - BinderDesignSystem stopped
-2025-11-06 17:41:17,896 - jnana.core.jnana_system - INFO - BinderDesignSystem stopped
+2025-11-06 18:39:51,907 - root - WARNING - Jnana config path does not exist: ../Jnana/config/models.yaml
+2025-11-06 18:39:51,907 - root - WARNING - Jnana config path does not exist: ../Jnana/config/models.yaml
+2025-11-06 18:39:51,910 - root - INFO - Binder configuration loaded from config/test_binder_config.yaml
+2025-11-06 18:39:51,910 - root - INFO - Binder configuration loaded from config/test_binder_config.yaml
+2025-11-06 18:39:51,930 - struct_bio_reasoner.core.binder_design_system - INFO - Modified Jnana configuration to disable Biomni
+2025-11-06 18:39:51,930 - struct_bio_reasoner.core.binder_design_system - INFO - Modified Jnana configuration to disable Biomni
+2025-11-06 18:39:51,937 - jnana.core.jnana_system - INFO - ProtoGnosis adapter initialized
+2025-11-06 18:39:51,937 - jnana.core.jnana_system - INFO - ProtoGnosis adapter initialized
+2025-11-06 18:39:51,937 - jnana.core.jnana_system - INFO - Biomni integration disabled in configuration
+2025-11-06 18:39:51,937 - jnana.core.jnana_system - INFO - Biomni integration disabled in configuration
+2025-11-06 18:39:51,937 - jnana.core.jnana_system - INFO - Jnana system initialized
+2025-11-06 18:39:51,937 - jnana.core.jnana_system - INFO - Jnana system initialized
+2025-11-06 18:39:51,937 - jnana.core.jnana_system - INFO - BinderDesignSystem initialized
+2025-11-06 18:39:51,937 - jnana.core.jnana_system - INFO - BinderDesignSystem initialized
+2025-11-06 18:39:51,937 - jnana.core.event_manager - INFO - Event manager started
+2025-11-06 18:39:51,937 - jnana.core.event_manager - INFO - Event manager started
+2025-11-06 18:39:51,937 - jnana.protognosis.utils.jnana_adapter - INFO - Initializing ProtoGnosis with Jnana configuration...
+2025-11-06 18:39:51,937 - jnana.protognosis.utils.jnana_adapter - INFO - Initializing ProtoGnosis with Jnana configuration...
+2025-11-06 18:39:51,937 - jnana.protognosis.utils.jnana_adapter - WARNING - Error converting model config, using defaults: 'UnifiedModelManager' object has no attribute 'get_default_config'
+2025-11-06 18:39:51,937 - jnana.protognosis.utils.jnana_adapter - WARNING - Error converting model config, using defaults: 'UnifiedModelManager' object has no attribute 'get_default_config'
+2025-11-06 18:39:51,937 - CoScientist - INFO - Created LLM configuration with default provider: openai
+2025-11-06 18:39:51,937 - CoScientist - INFO - Created LLM configuration with default provider: openai
+2025-11-06 18:39:51,939 - root - INFO - Loaded memory from data/jnana.db with 34 hypotheses
+2025-11-06 18:39:51,939 - root - INFO - Loaded memory from data/jnana.db with 34 hypotheses
+2025-11-06 18:39:51,939 - CoScientist - INFO - Created context memory with persistence
+2025-11-06 18:39:51,939 - CoScientist - INFO - Created context memory with persistence
+2025-11-06 18:39:51,956 - CoScientist - INFO - Created new LLM instance: openai (gpt-4o)
+2025-11-06 18:39:51,956 - CoScientist - INFO - Created new LLM instance: openai (gpt-4o)
+2025-11-06 18:39:51,956 - SupervisorAgent - INFO - Registered agent generation-0 of type generation
+2025-11-06 18:39:51,956 - SupervisorAgent - INFO - Registered agent generation-0 of type generation
+2025-11-06 18:39:51,969 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:51,969 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:51,969 - CoScientist - INFO - Initialized state for agent generation-0 (generation)
+2025-11-06 18:39:51,969 - CoScientist - INFO - Initialized state for agent generation-0 (generation)
+2025-11-06 18:39:51,969 - SupervisorAgent - INFO - Registered agent generation-1 of type generation
+2025-11-06 18:39:51,969 - SupervisorAgent - INFO - Registered agent generation-1 of type generation
+2025-11-06 18:39:51,982 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:51,982 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:51,982 - CoScientist - INFO - Initialized state for agent generation-1 (generation)
+2025-11-06 18:39:51,982 - CoScientist - INFO - Initialized state for agent generation-1 (generation)
+2025-11-06 18:39:51,982 - SupervisorAgent - INFO - Registered agent generation-2 of type generation
+2025-11-06 18:39:51,982 - SupervisorAgent - INFO - Registered agent generation-2 of type generation
+2025-11-06 18:39:51,995 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:51,995 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:51,995 - CoScientist - INFO - Initialized state for agent generation-2 (generation)
+2025-11-06 18:39:51,995 - CoScientist - INFO - Initialized state for agent generation-2 (generation)
+2025-11-06 18:39:51,995 - SupervisorAgent - INFO - Registered agent generation-3 of type generation
+2025-11-06 18:39:51,995 - SupervisorAgent - INFO - Registered agent generation-3 of type generation
+2025-11-06 18:39:52,009 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,009 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,009 - CoScientist - INFO - Initialized state for agent generation-3 (generation)
+2025-11-06 18:39:52,009 - CoScientist - INFO - Initialized state for agent generation-3 (generation)
+2025-11-06 18:39:52,009 - SupervisorAgent - INFO - Registered agent generation-4 of type generation
+2025-11-06 18:39:52,009 - SupervisorAgent - INFO - Registered agent generation-4 of type generation
+2025-11-06 18:39:52,022 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,022 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,022 - CoScientist - INFO - Initialized state for agent generation-4 (generation)
+2025-11-06 18:39:52,022 - CoScientist - INFO - Initialized state for agent generation-4 (generation)
+2025-11-06 18:39:52,022 - SupervisorAgent - INFO - Registered agent reflection-0 of type reflection
+2025-11-06 18:39:52,022 - SupervisorAgent - INFO - Registered agent reflection-0 of type reflection
+2025-11-06 18:39:52,035 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,035 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,035 - CoScientist - INFO - Initialized state for agent reflection-0 (reflection)
+2025-11-06 18:39:52,035 - CoScientist - INFO - Initialized state for agent reflection-0 (reflection)
+2025-11-06 18:39:52,035 - SupervisorAgent - INFO - Registered agent reflection-1 of type reflection
+2025-11-06 18:39:52,035 - SupervisorAgent - INFO - Registered agent reflection-1 of type reflection
+2025-11-06 18:39:52,048 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,048 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,048 - CoScientist - INFO - Initialized state for agent reflection-1 (reflection)
+2025-11-06 18:39:52,048 - CoScientist - INFO - Initialized state for agent reflection-1 (reflection)
+2025-11-06 18:39:52,048 - SupervisorAgent - INFO - Registered agent ranking-0 of type ranking
+2025-11-06 18:39:52,048 - SupervisorAgent - INFO - Registered agent ranking-0 of type ranking
+2025-11-06 18:39:52,061 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,061 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,061 - CoScientist - INFO - Initialized state for agent ranking-0 (ranking)
+2025-11-06 18:39:52,061 - CoScientist - INFO - Initialized state for agent ranking-0 (ranking)
+2025-11-06 18:39:52,061 - SupervisorAgent - INFO - Registered agent evolution-0 of type evolution
+2025-11-06 18:39:52,061 - SupervisorAgent - INFO - Registered agent evolution-0 of type evolution
+2025-11-06 18:39:52,086 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,086 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,086 - CoScientist - INFO - Initialized state for agent evolution-0 (evolution)
+2025-11-06 18:39:52,086 - CoScientist - INFO - Initialized state for agent evolution-0 (evolution)
+2025-11-06 18:39:52,086 - SupervisorAgent - INFO - Registered agent proximity-0 of type proximity
+2025-11-06 18:39:52,086 - SupervisorAgent - INFO - Registered agent proximity-0 of type proximity
+2025-11-06 18:39:52,108 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,108 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,108 - CoScientist - INFO - Initialized state for agent proximity-0 (proximity)
+2025-11-06 18:39:52,108 - CoScientist - INFO - Initialized state for agent proximity-0 (proximity)
+2025-11-06 18:39:52,108 - SupervisorAgent - INFO - Registered agent meta-review-0 of type meta-review
+2025-11-06 18:39:52,108 - SupervisorAgent - INFO - Registered agent meta-review-0 of type meta-review
+2025-11-06 18:39:52,124 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,124 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:52,124 - CoScientist - INFO - Initialized state for agent meta-review-0 (meta-review)
+2025-11-06 18:39:52,124 - CoScientist - INFO - Initialized state for agent meta-review-0 (meta-review)
+2025-11-06 18:39:52,124 - CoScientist - INFO - Created and registered all specialized agents
+2025-11-06 18:39:52,124 - CoScientist - INFO - Created and registered all specialized agents
+2025-11-06 18:39:52,125 - CoScientist - INFO - Co-Scientist system initialized and ready
+2025-11-06 18:39:52,125 - CoScientist - INFO - Co-Scientist system initialized and ready
+2025-11-06 18:39:52,125 - Worker-0 - INFO - Worker 0 started
+2025-11-06 18:39:52,125 - Worker-0 - INFO - Worker 0 started
+2025-11-06 18:39:52,125 - Worker-1 - INFO - Worker 1 started
+2025-11-06 18:39:52,125 - Worker-1 - INFO - Worker 1 started
+2025-11-06 18:39:52,125 - Worker-2 - INFO - Worker 2 started
+2025-11-06 18:39:52,125 - Worker-2 - INFO - Worker 2 started
+2025-11-06 18:39:52,126 - Worker-3 - INFO - Worker 3 started
+2025-11-06 18:39:52,126 - Worker-3 - INFO - Worker 3 started
+2025-11-06 18:39:52,126 - SupervisorAgent - INFO - Supervisor started with 4 workers
+2025-11-06 18:39:52,126 - SupervisorAgent - INFO - Supervisor started with 4 workers
+2025-11-06 18:39:52,126 - CoScientist - INFO - Co-Scientist system started
+2025-11-06 18:39:52,126 - CoScientist - INFO - Co-Scientist system started
+2025-11-06 18:39:52,126 - jnana.protognosis.utils.jnana_adapter - INFO - ProtoGnosis initialized and started successfully
+2025-11-06 18:39:52,126 - jnana.protognosis.utils.jnana_adapter - INFO - ProtoGnosis initialized and started successfully
+2025-11-06 18:39:52,126 - jnana.core.jnana_system - INFO - Jnana system started
+2025-11-06 18:39:52,126 - jnana.core.jnana_system - INFO - Jnana system started
+2025-11-06 18:39:52,126 - jnana.core.jnana_system - INFO - Initializing protein agents...
+2025-11-06 18:39:52,126 - jnana.core.jnana_system - INFO - Initializing protein agents...
+2025-11-06 18:39:52,126 - struct_bio_reasoner.agents.computational_design.bindcraft_agent - INFO - BindCraft agent using: chai,{'num_seq': 25, 'batch_size': 250, 'max_retries': 5, 'sampling_temp': '0.1'}
+2025-11-06 18:39:52,126 - struct_bio_reasoner.agents.computational_design.bindcraft_agent - INFO - BindCraft agent using: chai,{'num_seq': 25, 'batch_size': 250, 'max_retries': 5, 'sampling_temp': '0.1'}
+2025-11-06 18:39:52,126 - jnana.core.jnana_system - INFO - BindCraft agent initialized
+2025-11-06 18:39:52,126 - jnana.core.jnana_system - INFO - BindCraft agent initialized
+2025-11-06 18:39:52,126 - MDAgentAdapter - INFO - Base agent mdagentadapter_c8f067a2 initialized
+2025-11-06 18:39:52,126 - MDAgentAdapter - INFO - Base agent mdagentadapter_c8f067a2 initialized
+2025-11-06 18:39:52,126 - MDAgentAdapter - INFO - MDAgentAdapter initialized with implicit solvent
+2025-11-06 18:39:52,126 - MDAgentAdapter - INFO - MDAgentAdapter initialized with implicit solvent
+2025-11-06 18:39:52,126 - jnana.core.jnana_system - INFO - MD agent initialized
+2025-11-06 18:39:52,126 - jnana.core.jnana_system - INFO - MD agent initialized
+2025-11-06 18:39:52,126 - jnana.core.jnana_system - INFO - Initialized 2 protein agents
+2025-11-06 18:39:52,126 - jnana.core.jnana_system - INFO - Initialized 2 protein agents
+2025-11-06 18:39:52,126 - jnana.core.jnana_system - INFO - Initializing protein knowledge foundation...
+2025-11-06 18:39:52,126 - jnana.core.jnana_system - INFO - Initializing protein knowledge foundation...
+2025-11-06 18:39:52,126 - struct_bio_reasoner.core.knowledge_foundation - INFO - Initializing protein knowledge foundation...
+2025-11-06 18:39:52,126 - struct_bio_reasoner.core.knowledge_foundation - INFO - Initializing protein knowledge foundation...
+2025-11-06 18:39:52,126 - struct_bio_reasoner.core.knowledge_foundation - INFO - Database manager initialization - placeholder
+2025-11-06 18:39:52,126 - struct_bio_reasoner.core.knowledge_foundation - INFO - Database manager initialization - placeholder
+2025-11-06 18:39:52,126 - struct_bio_reasoner.core.knowledge_foundation - INFO - Literature processor initialization - placeholder
+2025-11-06 18:39:52,126 - struct_bio_reasoner.core.knowledge_foundation - INFO - Literature processor initialization - placeholder
+2025-11-06 18:39:52,127 - struct_bio_reasoner.core.knowledge_foundation - INFO - Protein knowledge foundation initialized successfully
+2025-11-06 18:39:52,127 - struct_bio_reasoner.core.knowledge_foundation - INFO - Protein knowledge foundation initialized successfully
+2025-11-06 18:39:52,127 - jnana.core.jnana_system - INFO - Protein knowledge foundation initialized
+2025-11-06 18:39:52,127 - jnana.core.jnana_system - INFO - Protein knowledge foundation initialized
+2025-11-06 18:39:52,127 - jnana.core.jnana_system - INFO - BinderDesignSystem started successfully
+2025-11-06 18:39:52,127 - jnana.core.jnana_system - INFO - BinderDesignSystem started successfully
+2025-11-06 18:39:52,143 - jnana.core.session_manager - INFO - Created new session: d700b758-b750-43c7-9678-e6cbffa7a7f3
+2025-11-06 18:39:52,143 - jnana.core.session_manager - INFO - Created new session: d700b758-b750-43c7-9678-e6cbffa7a7f3
+2025-11-06 18:39:52,143 - jnana.core.jnana_system - INFO - Research goal set: Design binders for target protein...
+2025-11-06 18:39:52,143 - jnana.core.jnana_system - INFO - Research goal set: Design binders for target protein...
+2025-11-06 18:39:52,143 - jnana.core.jnana_system - INFO - Generating protein hypothesis with strategy: research_expansion
+2025-11-06 18:39:52,143 - jnana.core.jnana_system - INFO - Generating protein hypothesis with strategy: research_expansion
+2025-11-06 18:39:52,143 - jnana.core.jnana_system - INFO - Attemptin to generate single hypothesis
+2025-11-06 18:39:52,143 - jnana.core.jnana_system - INFO - Attemptin to generate single hypothesis
+2025-11-06 18:39:52,143 - jnana.core.jnana_system - INFO - Generating single hypothesis with strategy: research_expansion
+2025-11-06 18:39:52,143 - jnana.core.jnana_system - INFO - Generating single hypothesis with strategy: research_expansion
+2025-11-06 18:39:52,143 - jnana.protognosis.utils.jnana_adapter - INFO - Generating 1 hypotheses for: Design binders for target protein...
+2025-11-06 18:39:52,143 - jnana.protognosis.utils.jnana_adapter - INFO - Generating 1 hypotheses for: Design binders for target protein...
+2025-11-06 18:39:52,143 - CoScientist - INFO - Setting research goal: Design binders for target protein...
+2025-11-06 18:39:52,143 - CoScientist - INFO - Setting research goal: Design binders for target protein...
+2025-11-06 18:39:52,143 - SupervisorAgent - INFO - Parsing research goal: Design binders for target protein...
+2025-11-06 18:39:52,143 - SupervisorAgent - INFO - Parsing research goal: Design binders for target protein...
+2025-11-06 18:39:57,065 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-06 18:39:57,065 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-06 18:39:57,114 - SupervisorAgent - ERROR - Error parsing research goal: 'tuple' object does not support item assignment
+2025-11-06 18:39:57,114 - SupervisorAgent - ERROR - Error parsing research goal: 'tuple' object does not support item assignment
+2025-11-06 18:39:57,137 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:57,137 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:39:57,137 - CoScientist - INFO - Research goal set and parsed
+2025-11-06 18:39:57,137 - CoScientist - INFO - Research goal set and parsed
+2025-11-06 18:39:57,137 - CoScientist - INFO - Scheduling generation of 1 hypotheses
+2025-11-06 18:39:57,137 - CoScientist - INFO - Scheduling generation of 1 hypotheses
+2025-11-06 18:39:57,138 - SupervisorAgent - INFO - Added task b75f9ae5-7f68-4507-aebe-62b46fea5895 of type generate_hypothesis to queue
+2025-11-06 18:39:57,138 - SupervisorAgent - INFO - Added task b75f9ae5-7f68-4507-aebe-62b46fea5895 of type generate_hypothesis to queue
+2025-11-06 18:39:57,138 - Worker-1 - INFO - Processing task b75f9ae5-7f68-4507-aebe-62b46fea5895 of type generate_hypothesis
+2025-11-06 18:39:57,138 - Worker-1 - INFO - Processing task b75f9ae5-7f68-4507-aebe-62b46fea5895 of type generate_hypothesis
+2025-11-06 18:39:57,138 - Worker-1 - INFO - 🔥 CALLING agent.execute_task for generation-1
+2025-11-06 18:39:57,138 - Worker-1 - INFO - 🔥 CALLING agent.execute_task for generation-1
+2025-11-06 18:39:57,138 - Agent-generation-generation-1 - INFO - Generating hypothesis for task b75f9ae5-7f68-4507-aebe-62b46fea5895
+2025-11-06 18:39:57,138 - Agent-generation-generation-1 - INFO - Generating hypothesis for task b75f9ae5-7f68-4507-aebe-62b46fea5895
+2025-11-06 18:40:07,548 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-06 18:40:07,548 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-06 18:40:07,660 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:40:07,660 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:40:07,660 - Agent-generation-generation-1 - INFO - Updating agent state for generation-1
+2025-11-06 18:40:07,660 - Agent-generation-generation-1 - INFO - Updating agent state for generation-1
+2025-11-06 18:40:07,660 - Agent-generation-generation-1 - INFO - Current agent state: {'agent_id': 'generation-1', 'agent_type': 'generation', 'created_at': 1762454391.969627, 'last_activity': 1762454391.969627, 'total_tasks_completed': 0, 'status': 'active', 'hypotheses_generated': 0, 'strategies_used': [], 'last_strategy': None}
+2025-11-06 18:40:07,660 - Agent-generation-generation-1 - INFO - Current agent state: {'agent_id': 'generation-1', 'agent_type': 'generation', 'created_at': 1762454391.969627, 'last_activity': 1762454391.969627, 'total_tasks_completed': 0, 'status': 'active', 'hypotheses_generated': 0, 'strategies_used': [], 'last_strategy': None}
+2025-11-06 18:40:07,660 - Agent-generation-generation-1 - INFO - Updated agent state: {'agent_id': 'generation-1', 'agent_type': 'generation', 'created_at': 1762454391.969627, 'last_activity': 1762454407.6608577, 'total_tasks_completed': 1, 'status': 'active', 'hypotheses_generated': 1, 'strategies_used': [], 'last_strategy': 'research_expansion', 'last_hypothesis_id': '73682720-e444-4446-8589-0609513b4fb6'}
+2025-11-06 18:40:07,660 - Agent-generation-generation-1 - INFO - Updated agent state: {'agent_id': 'generation-1', 'agent_type': 'generation', 'created_at': 1762454391.969627, 'last_activity': 1762454407.6608577, 'total_tasks_completed': 1, 'status': 'active', 'hypotheses_generated': 1, 'strategies_used': [], 'last_strategy': 'research_expansion', 'last_hypothesis_id': '73682720-e444-4446-8589-0609513b4fb6'}
+2025-11-06 18:40:07,683 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:40:07,683 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:40:07,683 - Agent-generation-generation-1 - INFO - Agent state saved for generation-1
+2025-11-06 18:40:07,683 - Agent-generation-generation-1 - INFO - Agent state saved for generation-1
+2025-11-06 18:40:07,683 - Agent-generation-generation-1 - INFO - Creating dataset for task b75f9ae5-7f68-4507-aebe-62b46fea5895
+2025-11-06 18:40:07,683 - Agent-generation-generation-1 - INFO - Creating dataset for task b75f9ae5-7f68-4507-aebe-62b46fea5895
+2025-11-06 18:40:07,699 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:40:07,699 - root - INFO - Saved memory to data/jnana.db
+2025-11-06 18:40:07,700 - Agent-generation-generation-1 - INFO - Dataset created and saved for task b75f9ae5-7f68-4507-aebe-62b46fea5895
+2025-11-06 18:40:07,700 - Agent-generation-generation-1 - INFO - Dataset created and saved for task b75f9ae5-7f68-4507-aebe-62b46fea5895
+2025-11-06 18:40:07,700 - Worker-1 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
+2025-11-06 18:40:07,700 - Worker-1 - INFO - 🔥 EXECUTE_TASK RETURNED: <class 'dict'>
+2025-11-06 18:40:07,700 - Worker-1 - INFO - Task b75f9ae5-7f68-4507-aebe-62b46fea5895 completed
+2025-11-06 18:40:07,700 - Worker-1 - INFO - Task b75f9ae5-7f68-4507-aebe-62b46fea5895 completed
+2025-11-06 18:40:07,700 - SupervisorAgent - INFO - All tasks completed
+2025-11-06 18:40:07,700 - SupervisorAgent - INFO - All tasks completed
+2025-11-06 18:40:07,701 - jnana.protognosis.utils.jnana_adapter - INFO - Successfully generated and converted 35 hypotheses
+2025-11-06 18:40:07,701 - jnana.protognosis.utils.jnana_adapter - INFO - Successfully generated and converted 35 hypotheses
+2025-11-06 18:40:07,701 - jnana.core.jnana_system - INFO - Successfully generated hypothesis: This hypothesis posits that quantum dot (QD)-conjugated peptides can be designed to enhance both the...
+2025-11-06 18:40:07,701 - jnana.core.jnana_system - INFO - Successfully generated hypothesis: This hypothesis posits that quantum dot (QD)-conjugated peptides can be designed to enhance both the...
+2025-11-06 18:40:07,701 - jnana.core.jnana_system - INFO - We are where we think we are
+2025-11-06 18:40:07,701 - jnana.core.jnana_system - INFO - We are where we think we are
+2025-11-06 18:40:07,702 - academy.exchange.local - INFO - Registered UserId<90590654> in exchange
+2025-11-06 18:40:07,702 - academy.exchange.local - INFO - Registered UserId<90590654> in exchange
+2025-11-06 18:40:07,702 - academy.manager - INFO - Initialized manager (UserId<90590654>)
+2025-11-06 18:40:07,702 - academy.manager - INFO - Initialized manager (UserId<90590654>)
+2025-11-06 18:40:07,702 - academy.exchange.client - INFO - Registered AgentId<e6e3ab41> in exchange
+2025-11-06 18:40:07,702 - academy.exchange.client - INFO - Registered AgentId<e6e3ab41> in exchange
+2025-11-06 18:40:07,703 - academy.manager - INFO - Launched agent (AgentId<e6e3ab41>; <class 'bindcraft.core.agentic.ForwardFoldingAgent'>)
+2025-11-06 18:40:07,703 - academy.manager - INFO - Launched agent (AgentId<e6e3ab41>; <class 'bindcraft.core.agentic.ForwardFoldingAgent'>)
+2025-11-06 18:40:07,703 - academy.exchange.client - INFO - Registered AgentId<ec3dea6a> in exchange
+2025-11-06 18:40:07,703 - academy.exchange.client - INFO - Registered AgentId<ec3dea6a> in exchange
+2025-11-06 18:40:07,703 - academy.manager - INFO - Launched agent (AgentId<ec3dea6a>; <class 'bindcraft.core.agentic.InverseFoldingAgent'>)
+2025-11-06 18:40:07,703 - academy.manager - INFO - Launched agent (AgentId<ec3dea6a>; <class 'bindcraft.core.agentic.InverseFoldingAgent'>)
+2025-11-06 18:40:07,703 - academy.exchange.client - INFO - Registered AgentId<8cb14180> in exchange
+2025-11-06 18:40:07,703 - academy.exchange.client - INFO - Registered AgentId<8cb14180> in exchange
+2025-11-06 18:40:07,703 - academy.manager - INFO - Launched agent (AgentId<8cb14180>; <class 'bindcraft.core.agentic.QualityControlAgent'>)
+2025-11-06 18:40:07,703 - academy.manager - INFO - Launched agent (AgentId<8cb14180>; <class 'bindcraft.core.agentic.QualityControlAgent'>)
+2025-11-06 18:40:07,703 - academy.exchange.client - INFO - Registered AgentId<765179d6> in exchange
+2025-11-06 18:40:07,703 - academy.exchange.client - INFO - Registered AgentId<765179d6> in exchange
+2025-11-06 18:40:07,703 - academy.manager - INFO - Launched agent (AgentId<765179d6>; <class 'bindcraft.core.agentic.AnalysisAgent'>)
+2025-11-06 18:40:07,703 - academy.manager - INFO - Launched agent (AgentId<765179d6>; <class 'bindcraft.core.agentic.AnalysisAgent'>)
+2025-11-06 18:40:07,704 - academy.runtime - INFO - Running agent (AgentId<e6e3ab41>; Agent<ForwardFoldingAgent>)
+2025-11-06 18:40:07,704 - academy.runtime - INFO - Running agent (AgentId<e6e3ab41>; Agent<ForwardFoldingAgent>)
+2025-11-06 18:40:07,705 - academy.runtime - INFO - Running agent (AgentId<8cb14180>; Agent<QualityControlAgent>)
+2025-11-06 18:40:07,705 - academy.runtime - INFO - Running agent (AgentId<8cb14180>; Agent<QualityControlAgent>)
+2025-11-06 18:40:07,705 - academy.runtime - INFO - Running agent (AgentId<ec3dea6a>; Agent<InverseFoldingAgent>)
+2025-11-06 18:40:07,705 - academy.runtime - INFO - Running agent (AgentId<ec3dea6a>; Agent<InverseFoldingAgent>)
+2025-11-06 18:40:07,706 - academy.runtime - INFO - Running agent (AgentId<765179d6>; Agent<AnalysisAgent>)
+2025-11-06 18:40:07,706 - academy.runtime - INFO - Running agent (AgentId<765179d6>; Agent<AnalysisAgent>)
+2025-11-06 18:40:07,706 - academy.exchange.client - INFO - Closed exchange client for AgentId<e6e3ab41>
+2025-11-06 18:40:07,706 - academy.exchange.client - INFO - Closed exchange client for AgentId<e6e3ab41>
+2025-11-06 18:40:07,706 - academy.exchange.client - INFO - Closed exchange client for AgentId<8cb14180>
+2025-11-06 18:40:07,706 - academy.exchange.client - INFO - Closed exchange client for AgentId<8cb14180>
+2025-11-06 18:40:07,707 - academy.exchange.client - INFO - Closed exchange client for AgentId<ec3dea6a>
+2025-11-06 18:40:07,707 - academy.exchange.client - INFO - Closed exchange client for AgentId<ec3dea6a>
+2025-11-06 18:40:07,707 - academy.exchange.client - INFO - Closed exchange client for AgentId<765179d6>
+2025-11-06 18:40:07,707 - academy.exchange.client - INFO - Closed exchange client for AgentId<765179d6>
+2025-11-06 18:40:07,707 - academy.runtime - INFO - Shutdown agent (AgentId<e6e3ab41>; Agent<ForwardFoldingAgent>)
+2025-11-06 18:40:07,707 - academy.runtime - INFO - Shutdown agent (AgentId<e6e3ab41>; Agent<ForwardFoldingAgent>)
+2025-11-06 18:40:07,707 - academy.runtime - INFO - Shutdown agent (AgentId<8cb14180>; Agent<QualityControlAgent>)
+2025-11-06 18:40:07,707 - academy.runtime - INFO - Shutdown agent (AgentId<8cb14180>; Agent<QualityControlAgent>)
+2025-11-06 18:40:07,707 - academy.runtime - INFO - Shutdown agent (AgentId<ec3dea6a>; Agent<InverseFoldingAgent>)
+2025-11-06 18:40:07,707 - academy.runtime - INFO - Shutdown agent (AgentId<ec3dea6a>; Agent<InverseFoldingAgent>)
+2025-11-06 18:40:07,707 - academy.runtime - INFO - Shutdown agent (AgentId<765179d6>; Agent<AnalysisAgent>)
+2025-11-06 18:40:07,707 - academy.runtime - INFO - Shutdown agent (AgentId<765179d6>; Agent<AnalysisAgent>)
+2025-11-06 18:40:07,708 - academy.exchange.client - INFO - Terminated mailbox for UserId<90590654>
+2025-11-06 18:40:07,708 - academy.exchange.client - INFO - Terminated mailbox for UserId<90590654>
+2025-11-06 18:40:07,709 - academy.exchange.client - INFO - Closed exchange client for UserId<90590654>
+2025-11-06 18:40:07,709 - academy.exchange.client - INFO - Closed exchange client for UserId<90590654>
+2025-11-06 18:40:07,709 - academy.manager - INFO - Closed manager (UserId<90590654>)
+2025-11-06 18:40:07,709 - academy.manager - INFO - Closed manager (UserId<90590654>)
+2025-11-06 18:40:07,709 - root - ERROR - Error running BinderDesignReasoner: name 'nseqs' is not defined
+2025-11-06 18:40:07,709 - root - ERROR - Error running BinderDesignReasoner: name 'nseqs' is not defined

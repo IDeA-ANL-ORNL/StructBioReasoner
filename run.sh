@@ -1,7 +1,7 @@
 #!/bin/bash
 
 python binder_design_reasoner.py \
-    --mode "batch" \
+    --mode "matt" \
     --goal "Design binders for target protein" \
     --target "Slop" \
     --target-sequence "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF" \

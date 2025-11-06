@@ -277,13 +277,15 @@ class BinderDesignSystem(JnanaSystem):
             "computational_design": {}  # Empty dict for design config
         }
         
+        self.logger.info(f"Attemptin to generate single hypothesis")
         # Generate base hypothesis using Jnana
         base_hypothesis = await self.generate_single_hypothesis(strategy)
+
+        self.logger.info('We are where we think we are')
         
         # Convert to protein-specific hypothesis
         protein_hypothesis = ProteinHypothesis.from_unified_hypothesis(
             base_hypothesis,
-            protein_id=protein_id,
             biological_context=biological_context # this goes into `protein_metadata`
         )
         if "computational_design" in self.enable_agents:
@@ -291,19 +293,19 @@ class BinderDesignSystem(JnanaSystem):
             #design_config = self.binder_config.get("agents", {}).get("computational_design", {})
             #For now design config is hardcoded
             design_config = {
-                'cwd': '/eagle/FoundEpidem/avasan/Work/StructBioReasoner/data',
+                'cwd': Path('/lus/flare/projects/FoundEpidem/msinclair/github/StructBioReasoner/data'),
                 'target_sequence': 'MSTGEELQK',
                 'binder_sequence': 'MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF',
-                'device': 'cuda:0',
+                'device': 'xpu:0',
                 'n_rounds': 3,
                 'if_kwargs': {
-                    'num_seqs': 25,
+                    'num_seq': 25,
                     'batch_size': 250,
                     'max_retries': 5,
                     'sampling_temp': '0.1',
                     'model_name': 'v_48_020',
                     'model_weights': 'soluble_model_weights',
-                    'proteinmpnn_path': '/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN',
+                    'proteinmpnn_path': Path('/lus/flare/projects/FoundEpidem/msinclair/pkgs/ProteinMPNN'),
                 },
                 'qc_kwargs': {
                     'max_repeat': 4,
@@ -324,7 +326,7 @@ class BinderDesignSystem(JnanaSystem):
             task_params['computational_design'].update(design_config)
             
             bindcraft_analysis = await self.design_agents["computational_design"].analyze_hypothesis(
-                protein_hypothesis, task_params
+                protein_hypothesis, design_config
             )
             protein_hypothesis.add_binder_analysis(bindcraft_analysis)
 

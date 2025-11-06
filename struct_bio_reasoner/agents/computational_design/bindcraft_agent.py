@@ -1,9 +1,22 @@
+from academy.exchange import LocalExchangeFactory
+from academy.manager import Manager
+from bindcraft.core.agentic import (ForwardFoldingAgent, 
+                                    InverseFoldingAgent,
+                                    QualityControlAgent,
+                                    AnalysisAgent,
+                                    PeptideDesignCoordinator)
+from bindcraft.core.folding import Folding
+from bindcraft.core.inverse_folding import InverseFolding
+from bindcraft.analysis.energy import SimpleEnergy
+from bindcraft.util.quality_control import SequenceQualityControl
+from concurrent.futures import ThreadPoolExecutor
 import dill as pickle
 import asyncio
 import logging
 import uuid
 import numpy as np
 import os
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from bindcraft.core.folding import Chai, Boltz
@@ -82,7 +95,7 @@ class BindCraftAgent:
                                           data: dict[str, Any]) -> Optional[ProteinHypothesis]:
         """"""
         # prepare output paths
-        cwd = data.get('cwd', os.getcwd())
+        cwd = Path(data.get('cwd', os.getcwd()))
         cwd.mkdir(exist_ok=True)
 
         fasta_dir = cwd / "fastas"
@@ -97,7 +110,7 @@ class BindCraftAgent:
         n_rounds = data.get('n_rounds', 3)
 
         if_kwargs = data.get('if_kwargs', {
-            'num_seqs': data.get('nseqs', 25),
+            'num_seq': data.get('num_seq', 25),
             'batch_size': data.get('batch_size', 250),
             'max_retries': data.get('retries', 5),
             'sampling_temp': data.get('temp', '0.1'),
@@ -153,7 +166,7 @@ class BindCraftAgent:
             # Launch coordinator with handles to other agents
             coordinator = await manager.launch(
                 PeptideDesignCoordinator,
-                args=(forward_folder, inverse_folder, qc_agent, analyzer, nseqs, retries)
+                args=(forward_folder, inverse_folder, qc_agent, analyzer, if_kwargs['num_seq'], retries)
             )
 
 
@@ -214,7 +227,7 @@ class BindCraftAgent:
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> BinderAnalysis:
-        result = await self._generate_binder_hypothesis(task_params) # WE LEFT OFF HERE
+        result = await self._generate_binder_hypothesis(task_params)
         # Write result to file
         all_cycles = result['all_cycles']
         passing_structures = len(

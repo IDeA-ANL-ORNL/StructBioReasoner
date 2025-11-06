@@ -45,6 +45,24 @@ def setup_logging(level: str = "INFO", log_file: Optional[str] = None):
         root_logger.addHandler(file_handler)
 
 
+async def run_matt_mode(system, args):
+    # Set research goal
+    if args.goal:
+        research_goal = args.goal
+    else:
+        research_goal = "" #input("Enter your binder design research goal: ")
+
+    # Ensure research goal is a simple string (workaround for tuple assignment error)
+    research_goal = str(research_goal).strip()
+
+    print('Setting research goal')
+    session_id = await system.set_research_goal(research_goal)
+    print(f"Session created: {session_id}")
+    
+    print('Generating protein hypothesis')
+    # Run interactive mode
+    await system.generate_protein_hypothesis(research_goal, strategy=args.strategies[0])
+
 async def run_interactive_mode(system: BinderDesignSystem, args):
     """Run the system in interactive mode."""
     print("🧬 Starting BinderDesignReasoner in Interactive Mode")
@@ -157,7 +175,7 @@ Examples:
     # Mode selection
     parser.add_argument(
         "--mode", 
-        choices=["interactive", "batch", "hybrid", "status"],
+        choices=["interactive", "batch", "hybrid", "status", "matt"],
         default="interactive",
         help="Operation mode (default: interactive)"
     )
@@ -333,7 +351,7 @@ Examples:
     
     try:
         # Initialize the binder design system
-        print("Initializing BinderDesignReasoner...")
+        print("Initializing BinderDesignSystem...")
         
         system = BinderDesignSystem(
             config_path=args.config,
@@ -344,15 +362,19 @@ Examples:
             literature_processing=not args.no_literature,
             output_path=args.output
         )
+
+        print('Starting system')
         
         # Start the system
         await system.start()
+        print('Started system')
 
         # Check system status
         status = system.get_protein_system_status()
         if not status["computational_design"]["protein_system_ready"]:
             print("Warning: Binder design system not fully ready - some functionality may be limited")
         
+        print('Running matt mode')
         # Run in selected mode
         if args.mode == "interactive":
             await run_interactive_mode(system, args)
@@ -360,6 +382,8 @@ Examples:
             await run_batch_mode(system, args)
         elif args.mode == "hybrid":
             await run_hybrid_mode(system, args)
+        else:
+            await run_matt_mode(system, args)
         
         # Stop the system
         await system.stop()

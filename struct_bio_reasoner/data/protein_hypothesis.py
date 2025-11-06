@@ -4,7 +4,7 @@ Protein-specific hypothesis data models.
 This module extends Jnana's UnifiedHypothesis with protein engineering
 specific fields and methods.
 """
-
+import inspect
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -176,7 +176,9 @@ class ProteinHypothesis(UnifiedHypothesis):
     
     def __init__(self, **kwargs):
         """Initialize protein hypothesis."""
-        super().__init__(**kwargs)
+        uh_keys = set(inspect.signature(UnifiedHypothesis.__init__).parameters)
+        uh_kwargs = {k: kwargs[k] for k in kwargs if k in uh_keys}
+        super().__init__(**uh_kwargs)
         
         # Protein-specific fields
         self.protein_id: str = kwargs.get("protein_id", "")

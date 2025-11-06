@@ -13,7 +13,7 @@ binder_design:
   # Design parameters
   design_parameters:
     n_rounds: 3
-    num_seqs: 25
+    num_seq: 25
     batch_size: 250
     max_retries: 5
     sampling_temp: "0.1"
@@ -134,7 +134,7 @@ agents:
     
     # InverseFolding parameters
     inverse_folding:
-      num_seqs: 25
+      num_seq: 25
       batch_size: 250
       max_retries: 5
       sampling_temp: "0.1"
