@@ -12,6 +12,10 @@ from .protein_utils import (
     validate_protein_sequence,
     get_sequence_info
 )
+from .parsl_settings import (
+    AuroraSettings,
+    PolarisSettings
+)
 
 __all__ = [
     "load_protein_config",

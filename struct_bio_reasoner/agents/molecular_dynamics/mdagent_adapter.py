@@ -13,6 +13,7 @@ The adapter translates between:
 import dill as pickle
 import asyncio
 import logging
+from ...utils import AuroraSettings
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
@@ -79,6 +80,9 @@ class MDAgentAdapter(BaseAgent):
         self.builder_handle = None
         self.simulator_handle = None
         self.coordinator_handle = None
+
+        # Load parsl kwargs
+        self.parsl_config = self.config.get('parsl', {})
         
         # State tracking
         self.active_simulations = {}
@@ -111,7 +115,7 @@ class MDAgentAdapter(BaseAgent):
             # The agents are defined in agents.py at the root of MDAgent repo
             try:
                 # Try importing from mdagent package (if installed as package)
-                from MDAgent.agents import Builder, MDSimulator, MDCoordinator
+                from MDAgent.agents_no_FE import Builder, MDSimulator, MDCoordinator
             except ImportError:
                 try:
                     # Try importing from agents module (if MDAgent is in PYTHONPATH)
@@ -136,9 +140,11 @@ class MDAgentAdapter(BaseAgent):
             # Launch MDAgent components
             self.builder_handle = await self.manager.launch(Builder)
             self.simulator_handle = await self.manager.launch(MDSimulator)
+            self.parsl_settings = AuroraSettings(**self.parsl_config).config_factory(Path.cwd() / "simulations")
+
             self.coordinator_handle = await self.manager.launch(
                 MDCoordinator,
-                args=(self.builder_handle, self.simulator_handle)
+                args=(self.builder_handle, self.simulator_handle, self.parsl_config)
             )
 
             self.initialized = True
@@ -262,7 +268,7 @@ class MDAgentAdapter(BaseAgent):
             
             results = await self.coordinator_handle.deploy_md(
                 path=sim_path,
-                initial_pdb=pdb_path,
+                initial_pdb=pdb_path.resolve(),
                 build_kwargs=build_kwargs,
                 sim_kwargs=sim_kwargs,
             )
