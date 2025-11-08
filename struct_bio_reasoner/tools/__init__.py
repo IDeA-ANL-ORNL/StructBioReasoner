@@ -9,6 +9,7 @@ This package contains various tools and wrappers for protein analysis:
 - Rosetta wrapper for computational protein design
 - AlphaFold wrapper for structure prediction
 - ESM wrapper for protein language model analysis
+- MUSCLE wrapper for generating multiple sequence alignment
 """
 
 from .pymol_wrapper import PyMOLWrapper
@@ -18,6 +19,7 @@ from .rfdiffusion_wrapper import RFDiffusionWrapper
 from .rosetta_wrapper import RosettaWrapper
 from .alphafold_wrapper import AlphaFoldWrapper
 from .esm_wrapper import ESMWrapper
+from .muscle_wrapper import MUSCLEWrapper
 
 __all__ = [
     "PyMOLWrapper",
@@ -27,4 +29,5 @@ __all__ = [
     "RosettaWrapper",
     "AlphaFoldWrapper",
     "ESMWrapper"
+    "MUSCLEWrapper"
 ]
