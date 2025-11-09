@@ -200,8 +200,7 @@ class BindCraftAgent:
 
         Recommended strategies:
         1. Perform molecular dynamics (MD) simulation
-        2. Compute free energy by MM-PBSA
-        """
+        2. Compute free energy by MM-PBSA"""
 
         hypothesis = ProteinHypothesis(
             title='BindCraft based binder design',

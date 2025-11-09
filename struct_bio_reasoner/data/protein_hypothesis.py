@@ -21,6 +21,56 @@ from .mutation_model import Mutation, MutationSet, MutationEffect
 
 
 @dataclass
+class BinderHypothesisData:
+    """Data structure for binder design hypotheses
+    """
+    hypothesis_text: str
+    target_name: str
+    target_sequence: str
+    proposed_peptides: List[Dict[str, Any]] # Each has seq, source, rationale, peptide_id
+    literature_references: List[str]
+    binding_affinity_goal: Optional[str] = None
+    clinical_context: Optional[str] = None
+    # Binder type information
+    binder_type: str = "peptide"  # "peptide", "antibody", "nanobody", etc.
+    # Metadata
+    generated_by: str = "coscientist"  # Which agent generated this
+    generation_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            'hypothesis_text': self.hypothesis_text,
+            'target_name': self.target_name,
+            'target_sequence': self.target_sequence,
+            'proposed_peptides': self.proposed_peptides,
+            'literature_references': self.literature_references,
+            'binding_affinity_goal': self.binding_affinity_goal,
+            'clinical_context': self.clinical_context,
+            'binder_type': self.binder_type,
+            'generated_by': self.generated_by,
+            'generation_timestamp': self.generation_timestamp
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'BinderHypothesisData':
+        """Create from dictionary (e.g., from CoScientist JSON response)."""
+        return cls(
+            hypothesis_text=data.get('hypothesis_text', ''),
+            target_name=data.get('target_name', ''),
+            target_sequence=data.get('target_sequence', ''),
+            proposed_peptides=data.get('proposed_peptides', []),
+            literature_references=data.get('literature_references', []),
+            binding_affinity_goal=data.get('binding_affinity_goal'),
+            clinical_context=data.get('clinical_context'),
+            binder_type=data.get('binder_type', 'peptide'),
+            generated_by=data.get('generated_by', 'coscientist'),
+            generation_timestamp=data.get('generation_timestamp', datetime.now().isoformat())
+        )
+
+
+
+@dataclass
 class StructuralAnalysis:
     """Structural analysis results for a protein hypothesis."""
     analysis_id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -201,10 +251,11 @@ class ProteinHypothesis(UnifiedHypothesis):
         self.energetic_analysis: Optional[EnergeticAnalysis] = None
         self.binder_analysis: Optional[BinderAnalysis] = None
         self.md_analysis: Optional[SimAnalysis] = None
+        self.binder_data: Optional[BinderHypothesisData] = kwargs.get("binder_data")
         
         # Experimental validation
         self.experimental_validations: List[ExperimentalValidation] = []
-        
+
         # Protein-specific metadata
         self.protein_metadata = kwargs.get("protein_metadata", {})
         
@@ -265,10 +316,60 @@ class ProteinHypothesis(UnifiedHypothesis):
             # Protein-specific fields
             "protein_id": protein_id,
             "protein_name": protein_name,
-            "protein_metadata": biological_context or {}
+            "protein_metadata": biological_context or {},
+            # ADD THIS: Check if this is a binder hypothesis
+            "binder_data": cls._extract_binder_data(unified_hypothesis, biological_context)
         }
 
         return cls(**hypothesis_data)
+
+    @classmethod
+    def _extract_binder_data(cls, 
+                            unified_hypothesis: UnifiedHypothesis,
+                            biological_context: Optional[Dict] = None) -> Optional[BinderHypothesisData]:
+        """
+        Extract binder-specific data from a unified hypothesis.
+
+        This checks multiple sources:
+        1. biological_context dict (if explicitly provided)
+        2. unified_hypothesis.metadata (if CoScientist stored it there)
+        3. unified_hypothesis.content (if it's structured JSON)
+
+        Args:
+            unified_hypothesis: The base hypothesis
+            biological_context: Optional context dict
+
+        Returns:
+            BinderHypothesisData if binder data found, None otherwise
+        """
+        binder_data = None
+
+        # Method 1: Check biological_context for explicit binder data
+        if biological_context and 'binder_data' in biological_context:
+            binder_data = BinderHypothesisData.from_dict(biological_context['binder_data'])
+
+        # Method 2: Check if biological_context itself IS the binder data
+        elif biological_context and 'target_sequence' in biological_context:
+            # biological_context contains binder fields directly
+            binder_data = BinderHypothesisData.from_dict(biological_context)
+
+        # Method 3: Check unified_hypothesis.metadata
+        elif unified_hypothesis.metadata and 'binder_data' in unified_hypothesis.metadata:
+            binder_data = BinderHypothesisData.from_dict(unified_hypothesis.metadata['binder_data'])
+
+        # Method 4: Try to parse from content if it's JSON
+        elif unified_hypothesis.content:
+            try:
+                import json
+                # Check if content is JSON with binder data
+                content_data = json.loads(unified_hypothesis.content)
+                if 'target_sequence' in content_data and 'proposed_peptides' in content_data:
+                    binder_data = BinderHypothesisData.from_dict(content_data)
+            except (json.JSONDecodeError, TypeError):
+                # Content is not JSON or doesn't contain binder data
+                pass
+            
+        return binder_data
 
     def add_binder_analysis(self, analysis: BinderAnalysis):
         """"""
@@ -371,6 +472,34 @@ class ProteinHypothesis(UnifiedHypothesis):
             return sum(confidences) / len(confidences)
         return 0.0
 
+    def has_binder_data(self) -> bool:
+        """Check if this hypothesis contains binder-specific data."""
+        return self.binder_data is not None
+
+    def get_target_sequence(self) -> Optional[str]:
+        """Get the target sequence from binder data."""
+        if self.binder_data:
+            return self.binder_data.target_sequence
+        return None
+    
+    def get_proposed_peptides(self) -> List[Dict[str, Any]]:
+        """Get the proposed peptides from binder data."""
+        if self.binder_data:
+            return self.binder_data.proposed_peptides
+        return []
+    
+    def add_binder_data(self, binder_data: Union[BinderHypothesisData, Dict[str, Any]]):
+        """
+        Add or update binder-specific data.
+        
+        Args:
+            binder_data: Either a BinderHypothesisData object or dict
+        """
+        if isinstance(binder_data, dict):
+            self.binder_data = BinderHypothesisData.from_dict(binder_data)
+        else:
+            self.binder_data = binder_data
+        self.updated_at = time.time()
 
 class MutationHypothesis(ProteinHypothesis):
     """
