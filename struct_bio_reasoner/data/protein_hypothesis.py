@@ -113,10 +113,108 @@ class BinderAnalysis:
     # Top binder features
 
     # Analysis metadata
+    optimized_hypotheses: list[dict] = field(default_factory=list)
+    passing_hypotheses: list[dict] = field(default_factory=list)
+    sequences_per_round: list[int] = field(default_factory=list)
+    passing_per_round: list[int] = field(default_factory=list)
+    parameters_used: dict = field(default_factory=dict)
     tools_used: list[str] = field(default_factory=list)
     confidence_score: float = 0.0
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert BinderAnalysis to dictionary for serialization.
+        
+        Returns:
+            Dictionary representation of the analysis
+        """
+        return {
+            'analysis_id': self.analysis_id,
+            'protein_id': self.protein_id,
+            'num_rounds': self.num_rounds,
+            'total_sequences': self.total_sequences,
+            'passing_sequences': self.passing_sequences,
+            'passing_structures': self.passing_structures,
+            'success_rate': self.success_rate,
+            'checkpoint_file': self.checkpoint_file,
+            'optimized_hypotheses': self.optimized_hypotheses,
+            'passing_hypotheses': self.passing_hypotheses,
+            'sequences_per_round': self.sequences_per_round,
+            'passing_per_round': self.passing_per_round,
+            'parameters_used': self.parameters_used,
+            'tools_used': self.tools_used,
+            'confidence_score': self.confidence_score,
+            'timestamp': self.timestamp
+        }
+    def get_best_candidates(self, n: int = 10, metric: str = 'plddt') -> List[Dict[str, Any]]:
+        """
+        Get the top N best candidates from passing hypotheses.
+        
+        Args:
+            n: Number of top candidates to return
+            metric: Metric to rank by. Options:
+                - 'plddt': AlphaFold confidence score (higher is better)
+                - 'clash_score': Structural clash score (lower is better)
+                - 'binding_score': Predicted binding score (higher is better)
+                - 'net_charge': Net charge (closer to 0 is better)
+                
+        Returns:
+            List of top N candidate dicts sorted by the specified metric
+        """
+        if not self.passing_hypotheses:
+            return []
+        
+        # Create a copy to avoid modifying original
+        candidates = self.passing_hypotheses.copy()
+        
+        # Sort based on metric
+        if metric == 'plddt':
+            # Higher pLDDT is better
+            candidates.sort(
+                key=lambda x: x.get('metrics', {}).get('plddt', 0),
+                reverse=True
+            )
+        elif metric == 'clash_score':
+            # Lower clash score is better
+            candidates.sort(
+                key=lambda x: x.get('metrics', {}).get('clash_score', float('inf')),
+                reverse=False
+            )
+        elif metric == 'binding_score':
+            # Higher binding score is better (more negative binding energy)
+            candidates.sort(
+                key=lambda x: x.get('metrics', {}).get('binding_score', 0),
+                reverse=True
+            )
+        elif metric == 'net_charge':
+            # Closer to 0 is better
+            candidates.sort(
+                key=lambda x: abs(x.get('metrics', {}).get('net_charge', 0)),
+                reverse=False
+            )
+        else:
+            # Default: use pLDDT
+            candidates.sort(
+                key=lambda x: x.get('metrics', {}).get('plddt', 0),
+                reverse=True
+            )
+        
+        # Return top N
+        return candidates[:n] 
 
+    def get_passing_sequences(self) -> List[str]:
+        """
+        Extract just the sequences from passing hypotheses.
+        
+        Returns:
+            List of amino acid sequences that passed all filters
+        """
+        sequences = []
+        for hypothesis in self.passing_hypotheses:
+            seq = hypothesis.get('sequence')
+            if seq:
+                sequences.append(seq)
+        return sequences
 
 @dataclass
 class SimAnalysis:
@@ -500,6 +598,79 @@ class ProteinHypothesis(UnifiedHypothesis):
         else:
             self.binder_data = binder_data
         self.updated_at = time.time()
+    
+    # Parent-child tracking methods
+    def add_child_hypothesis(self, child_hypothesis_id: str):
+        """
+        Add a child hypothesis ID to track lineage.
+        
+        Args:
+            child_hypothesis_id: ID of the child hypothesis
+        """
+        if child_hypothesis_id not in self.children_ids:
+            self.children_ids.append(child_hypothesis_id)
+            self.updated_at = time.time()
+    
+    def set_parent_hypothesis(self, parent_hypothesis_id: str):
+        """
+        Set the parent hypothesis ID.
+        
+        Args:
+            parent_hypothesis_id: ID of the parent hypothesis
+        """
+        self.parent_id = parent_hypothesis_id
+        self.updated_at = time.time()
+    
+    def get_lineage_depth(self) -> int:
+        """
+        Get the depth of this hypothesis in the lineage tree.
+        
+        Returns:
+            Depth (0 for root, 1 for first generation, etc.)
+        """
+        if self.parent_id is None:
+            return 0
+        # If we have a parent, we're at least depth 1
+        # Note: To get exact depth, you'd need to traverse up the tree
+        # This is a simplified version
+        return 1
+    
+    def is_root_hypothesis(self) -> bool:
+        """
+        Check if this is a root hypothesis (no parent).
+        
+        Returns:
+            True if this is a root hypothesis
+        """
+        return self.parent_id is None
+    
+    def has_children(self) -> bool:
+        """
+        Check if this hypothesis has child hypotheses.
+        
+        Returns:
+            True if this hypothesis has children
+        """
+        return len(self.children_ids) > 0
+    
+    def get_lineage_info(self) -> Dict[str, Any]:
+        """
+        Get complete lineage information for this hypothesis.
+        
+        Returns:
+            Dictionary with lineage information
+        """
+        return {
+            'hypothesis_id': self.hypothesis_id,
+            'parent_id': self.parent_id,
+            'children_ids': self.children_ids,
+            'is_root': self.is_root_hypothesis(),
+            'has_children': self.has_children(),
+            'num_children': len(self.children_ids),
+            'generation': self.get_lineage_depth(),
+            'hypothesis_type': self.hypothesis_type
+        }
+
 
 class MutationHypothesis(ProteinHypothesis):
     """
