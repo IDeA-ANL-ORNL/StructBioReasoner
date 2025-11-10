@@ -416,19 +416,32 @@ class BinderDesignSystem(JnanaSystem):
 
         # STEP 2: Set research_plan_config in GenerationAgent's memory
         # This ensures the LLM receives the target sequence in its prompt
-        if hasattr(self, 'agents') and 'generation' in self.agents:
-            generation_agent = self.agents['generation']
-            if hasattr(generation_agent, 'memory') and generation_agent.memory:
-                # Update the research_plan_config with binder design information
-                research_plan_config = {
-                    'target_sequence': target_sequence,
-                    'binder_sequence': binder_sequence,
-                    'task_type': 'binder_design'
-                }
-                generation_agent.memory.metadata['research_plan_config'] = research_plan_config
-                self.logger.info(f"Set research_plan_config with target sequence ({len(target_sequence)} residues)")
+        if hasattr(self, 'protognosis_adapter') and self.protognosis_adapter:
+            if hasattr(self.protognosis_adapter, 'coscientist') and self.protognosis_adapter.coscientist:
+                coscientist = self.protognosis_adapter.coscientist
+                if hasattr(coscientist, 'agents') and 'generation' in coscientist.agents:
+                    # Get the first generation agent (there may be multiple)
+                    generation_agents = [agent for agent_id, agent in coscientist.agents.items()
+                                       if agent_id.startswith('generation')]
+                    if generation_agents:
+                        # Set research_plan_config in ALL generation agents' memory
+                        research_plan_config = {
+                            'target_sequence': target_sequence,
+                            'binder_sequence': binder_sequence,
+                            'task_type': 'binder_design'
+                        }
+                        for gen_agent in generation_agents:
+                            if hasattr(gen_agent, 'memory') and gen_agent.memory:
+                                gen_agent.memory.metadata['research_plan_config'] = research_plan_config
+                        self.logger.info(f"Set research_plan_config in {len(generation_agents)} generation agents with target sequence ({len(target_sequence)} residues)")
+                    else:
+                        self.logger.warning("No generation agents found in CoScientist")
+                else:
+                    self.logger.warning("CoScientist does not have agents attribute")
+            else:
+                self.logger.warning("ProtoGnosis adapter does not have coscientist")
         else:
-            self.logger.warning("Could not access generation agent to set research_plan_config")
+            self.logger.warning("Could not access protognosis_adapter to set research_plan_config")
 
         # Create protein-specific task parameters
         task_params = {

@@ -422,7 +422,7 @@ class ProteinHypothesis(UnifiedHypothesis):
         return cls(**hypothesis_data)
 
     @classmethod
-    def _extract_binder_data(cls, 
+    def _extract_binder_data(cls,
                             unified_hypothesis: UnifiedHypothesis,
                             biological_context: Optional[Dict] = None) -> Optional[BinderHypothesisData]:
         """
@@ -440,19 +440,30 @@ class ProteinHypothesis(UnifiedHypothesis):
         Returns:
             BinderHypothesisData if binder data found, None otherwise
         """
+        import logging
+        logger = logging.getLogger(__name__)
+
         binder_data = None
+
+        # DEBUG: Log what we're checking
+        logger.info(f"_extract_binder_data: Checking for binder_data...")
+        logger.info(f"  - biological_context keys: {list(biological_context.keys()) if biological_context else 'None'}")
+        logger.info(f"  - unified_hypothesis.metadata keys: {list(unified_hypothesis.metadata.keys()) if unified_hypothesis.metadata else 'None'}")
 
         # Method 1: Check biological_context for explicit binder data
         if biological_context and 'binder_data' in biological_context:
+            logger.info("  ✓ Found binder_data in biological_context")
             binder_data = BinderHypothesisData.from_dict(biological_context['binder_data'])
 
         # Method 2: Check if biological_context itself IS the binder data
         elif biological_context and 'target_sequence' in biological_context:
+            logger.info("  ✓ Found target_sequence in biological_context (treating as binder_data)")
             # biological_context contains binder fields directly
             binder_data = BinderHypothesisData.from_dict(biological_context)
 
         # Method 3: Check unified_hypothesis.metadata
         elif unified_hypothesis.metadata and 'binder_data' in unified_hypothesis.metadata:
+            logger.info("  ✓ Found binder_data in unified_hypothesis.metadata")
             binder_data = BinderHypothesisData.from_dict(unified_hypothesis.metadata['binder_data'])
 
         # Method 4: Try to parse from content if it's JSON
@@ -462,11 +473,15 @@ class ProteinHypothesis(UnifiedHypothesis):
                 # Check if content is JSON with binder data
                 content_data = json.loads(unified_hypothesis.content)
                 if 'target_sequence' in content_data and 'proposed_peptides' in content_data:
+                    logger.info("  ✓ Found binder_data in unified_hypothesis.content (JSON)")
                     binder_data = BinderHypothesisData.from_dict(content_data)
             except (json.JSONDecodeError, TypeError):
                 # Content is not JSON or doesn't contain binder data
                 pass
-            
+
+        if not binder_data:
+            logger.warning("  ❌ No binder_data found in any location!")
+
         return binder_data
 
     def add_binder_analysis(self, analysis: BinderAnalysis):

@@ -105,9 +105,12 @@ class BindCraftAgent:
 
         # these need to be somehow passed into the call
         target_sequence = data['target_sequence']
-        print(f"{target_sequence=}")
+        print(f"\n{'='*80}")
+        print(f"BindCraft _generate_binder_hypothesis - SEQUENCES BEING USED:")
+        print(f"  target_sequence: {target_sequence[:50]}... ({len(target_sequence)} residues)")
         binder_sequence = data.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
-        print(f"{binder_sequence=}")
+        print(f"  binder_sequence: {binder_sequence[:50]}... ({len(binder_sequence)} residues)")
+        print(f"{'='*80}\n")
         device = data.get('device', 'cuda:0')
         num_rounds = data.get('num_rounds', 3)
 
