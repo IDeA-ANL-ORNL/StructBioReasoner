@@ -324,6 +324,7 @@ class BinderDesignSystem(JnanaSystem):
             base_hypothesis,
             biological_context=biological_context # this goes into `protein_metadata`
         )
+
         if "computational_design" in self.enable_agents:
             #I want to append design_config to the task_params
             design_config = self.binder_config.get("agents", {}).get("computational_design", asdict(BinderConfig()))
@@ -346,6 +347,7 @@ class BinderDesignSystem(JnanaSystem):
             protein_hypothesis.add_binder_analysis(bindcraft_analysis)
 
         if "molecular_dynamics" in self.enable_agents:
+            self.logger.info('we should be here')
             md_analysis = await self.design_agents['molecular_dynamics'].analyze_hypothesis(
                 protein_hypothesis, task_params
             )

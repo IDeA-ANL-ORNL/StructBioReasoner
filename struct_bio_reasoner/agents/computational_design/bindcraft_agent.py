@@ -1,10 +1,10 @@
 from academy.exchange import LocalExchangeFactory
 from academy.manager import Manager
-from bindcraft.core.agentic import (ForwardFoldingAgent, 
-                                    InverseFoldingAgent,
-                                    QualityControlAgent,
-                                    AnalysisAgent,
-                                    PeptideDesignCoordinator)
+from bindcraft.core.agentic_parsl import (ForwardFoldingAgent, 
+                                          InverseFoldingAgent,
+                                          QualityControlAgent,
+                                          AnalysisAgent,
+                                          PeptideDesignCoordinator)
 from bindcraft.core.folding import Folding
 from bindcraft.core.inverse_folding import InverseFolding
 from bindcraft.analysis.energy import SimpleEnergy
@@ -48,6 +48,8 @@ class BindCraftAgent:
         self.fold_backend = config.get('folding', 'chai')
         self.inv_fold_backend = config.get('inverse_folding', 'proteinmpnn')
 
+        self.parsl_config = self.config.get('parsl', {})
+
         self.logger.info(f'BindCraft agent using: {self.fold_backend},{self.inv_fold_backend}')
 
         # NOTE: look at bindcraft for this
@@ -57,16 +59,54 @@ class BindCraftAgent:
         #    raise AttributeError('`target_sequence` not defined in config!')
 
     async def initialize(self):
-        """"""
-        # NOTE: check if model is available somehow
-        pass
+        """
+        Initialize BindCraft components.
 
-    def is_ready(self) -> bool:
-        # NOTE: need to check initialize
-        pass
+        Returns:
+            True if initialization successful, False otherwise
+        """
+        try:
+            from bindcraft.core.agentic_parsl import (ForwardFoldingAgent, 
+                                                      InverseFoldingAgent,
+                                                      QualityControlAgent,
+                                                      AnalysisAgent,
+                                                      PeptideDesignCoordinator)
+            from parsl import Config
+            from ...utils.parsl_settings import AuroraSettings, LocalSettings
+            self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
+        except ImportError as e:
+            self.logger.error(f'Cannot import BindCraft components: {e}')
+            self.logger.info('Make sure BindCraft is installed and in PYTHONPATH')
+            self.logger.info('Install from: https://github.com/msinclair-py/bindcraft/tree/agent_acad')
+            self.initialized = False
+            return False
 
-    def cleanup(self):
-        pass
+        self.logger.info(f'Successfully imported BindCraft components.')
+        self.initialized = True
+        return True
+
+    async def is_ready(self) -> bool:
+        if not hasattr(self, 'initialized'):
+            await self.initialize()
+        return self.initialized
+
+    async def cleanup(self):
+        try:
+            if self.manager:
+                try:
+                    await self.manager.__aexit__(None, None, None)
+                    self.logger.info('Academy manager context exited successfully')
+                except Exception as e:
+                    self.logger.warning(f'Error exiting manager context: {e}')
+                finally:
+                    self.manager = None
+
+            await super().cleanup()
+
+            self.logger.info('BindCraft agent cleanup completed')
+
+        except Exception as e:
+            self.logger.error(f'BindCraft agent cleanup failed: {e}')
 
     def write_checkpoint(self, results: dict[str, Any]):
         #Use timestemp tom get unique name
@@ -85,7 +125,7 @@ class BindCraftAgent:
     async def generate_binder_hypothesis(self, 
                                          data: dict[str, Any]) -> Optional[ProteinHypothesis]:
         """"""
-        if not self.is_ready():
+        if not await self.is_ready():
             self.logger.error('BindCraft agent not ready')
             return None
 
@@ -148,7 +188,7 @@ class BindCraftAgent:
             # Launch individual agents
             forward_folder = await manager.launch(
                 ForwardFoldingAgent,
-                args=(chai,)
+                args=(chai, self.parsl_settings)
             )
             inverse_folder = await manager.launch(
                 InverseFoldingAgent,
@@ -226,7 +266,7 @@ class BindCraftAgent:
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> BinderAnalysis:
-        result = await self._generate_binder_hypothesis(task_params)
+        result = await self.generate_binder_hypothesis(task_params)
         # Write result to file
         all_cycles = result['all_cycles']
         passing_structures = len(

@@ -36,20 +36,20 @@ class BaseComputeSettings(ABC, BaseSettings):
         """
 
 class LocalSettings(BaseComputeSettings):
-    available_accelerators: Union[int, Sequence[str]] = 4
+    available_accelerators: Union[int, Sequence[str]] = [f'{i}' for i in range(12)]
     retries: int = 1
     label: str = 'htex'
     worker_port_range: Tuple[int, int] = (10000, 20000)
 
-    def config_factory(self) -> Config:
+    def config_factory(self, run_dir: PathLike) -> Config:
         return Config(
             run_dir=str(run_dir),
             retries=self.retries,
             executors=[
                 HighThroughputExecutor(
-                    address="127.0.0.1",
                     label=self.label,
                     cpu_affinity="block",
+                    worker_debug=True,
                     available_accelerators=self.available_accelerators,
                     worker_port_range=self.worker_port_range,
                     provider=LocalProvider(init_blocks=1, max_blocks=1)
