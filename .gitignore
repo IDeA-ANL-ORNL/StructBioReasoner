@@ -249,3 +249,9 @@ pics
 test/
 test.log
 test.err
+ANSWER_TO_YOUR_QUESTION.md
+API_KEY_OPTIONS.md
+example_full_pipeline.py
+INTEGRATION_TEST_GUIDE.md
+README_TESTING.md
+TESTING_SUMMARY.md
