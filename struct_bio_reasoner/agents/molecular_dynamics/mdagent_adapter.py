@@ -144,7 +144,7 @@ class MDAgentAdapter:
             # Launch MDAgent components
             self.builder_handle = await self.manager.launch(Builder)
             self.simulator_handle = await self.manager.launch(MDSimulator)
-            self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
+            self.parsl_settings = AuroraSettings(**self.parsl_config).config_factory(Path.cwd())
 
             self.logger.info('launching coordinator')
             self.coordinator_handle = await self.manager.launch(
@@ -163,9 +163,12 @@ class MDAgentAdapter:
             if self.manager:
                 try:
                     await self.manager.__aexit__(None, None, None)
-                except:
-                    pass
-                self.manager = None
+                    self.logger.info('Academy manager context exited successfully')
+                except Exception as e:
+                    self.logger.warning(f'Error exiting manager context: {e}')
+                finally: 
+                    self.manager = None
+
             return False
     
     async def generate_hypotheses(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -294,6 +297,9 @@ class MDAgentAdapter:
             
             # Analyze results and create structured output
             analysis = await self._analyze_mdagent_results(sim_id, results)
+            
+            # Clean up agent/parsl
+            self.cleanup()
             
             self.logger.info(f"MDAgent simulation completed: {sim_id}")
             return analysis
@@ -552,9 +558,6 @@ class MDAgentAdapter:
                     self.builder_handle = None
                     self.simulator_handle = None
                     self.coordinator_handle = None
-
-            # Call parent cleanup
-            await super().cleanup()
 
             self.logger.info("MDAgent adapter cleanup completed")
 

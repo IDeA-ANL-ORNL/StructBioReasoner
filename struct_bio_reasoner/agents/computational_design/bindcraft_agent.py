@@ -77,7 +77,7 @@ class BindCraftAgent:
                                                       AnalysisAgent,
                                                       PeptideDesignCoordinator)
             from parsl import Config
-            from ...utils.parsl_settings import AuroraSettings, LocalSettings
+            from ...utils.parsl_settings import LocalSettings
             self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
         except ImportError as e:
             self.logger.error(f'Cannot import BindCraft components: {e}')
@@ -195,13 +195,9 @@ class BindCraftAgent:
         self.logger.info('Launching bindcraft handles')
 
         # Launch individual agents
-        self.forward_folder = await self.manager.launch(
-            ForwardFoldingAgent,
-            args=(chai, self.parsl_settings)
-        )
-        self.inverse_folder = await self.manager.launch(
-            InverseFoldingAgent,
-            args=(proteinmpnn,)
+        self.fold_agent = await self.manager.launch(
+            FoldingAgent,
+            args=(chai, proteinmpnn, self.parsl_settings)
         )
         self.qc_agent = await self.manager.launch(
             QualityControlAgent,
@@ -215,8 +211,7 @@ class BindCraftAgent:
         # Launch coordinator with handles to other agents
         self.coordinator = await self.manager.launch(
             PeptideDesignCoordinator,
-            args=(self.forward_folder, 
-                  self.inverse_folder, 
+            args=(self.fold_agent, 
                   self.qc_agent, 
                   self.analyzer_agent, 
                   if_kwargs['num_seq'], 
