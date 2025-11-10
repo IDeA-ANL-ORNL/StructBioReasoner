@@ -105,7 +105,9 @@ class BindCraftAgent:
 
         # these need to be somehow passed into the call
         target_sequence = data['target_sequence']
+        print(f"{target_sequence=}")
         binder_sequence = data.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
+        print(f"{binder_sequence=}")
         device = data.get('device', 'cuda:0')
         num_rounds = data.get('num_rounds', 3)
 
@@ -177,7 +179,7 @@ class BindCraftAgent:
                 fasta_base_path=fasta_dir,
                 pdb_base_path=folds_dir,
                 remodel_indices=[],  # Interface indices to redesign
-                num_rounds=num_rounds
+                n_rounds=num_rounds
             )
 
             return results

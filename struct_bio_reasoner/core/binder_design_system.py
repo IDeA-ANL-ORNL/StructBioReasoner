@@ -119,6 +119,7 @@ class BinderDesignSystem(JnanaSystem):
         # System state
         self.design_system_ready = False
         
+        self.start()
         self.logger.info("BinderDesignSystem initialized")
 
     def _prepare_jnana_config(self, jnana_config_path: str):

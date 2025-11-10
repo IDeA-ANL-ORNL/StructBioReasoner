@@ -56,6 +56,7 @@ async def full_binder_design_pipeline():
     
     system = BinderDesignSystem(
         config_path="config/binder_config.yaml",
+        jnana_config_path="config/test_jnana_config.yaml",
         enable_agents=['computational_design', 'molecular_dynamics']
     )
     
@@ -68,7 +69,7 @@ async def full_binder_design_pipeline():
     print("\n[STEP 2] Setting research goal...")
     
     research_goal = """
-    Design peptide binders for SARS-CoV-2 spike protein receptor binding domain (RBD) 
+    Design affibody peptide binders of length 68 amino acids for SARS-CoV-2 spike protein receptor binding domain (RBD) 
     to optimize binding affinity and stability. Target sequence: 
     NITNLCPFGEVFNATRFASVYAWNRKRISNCVADYSVLYNSASFSTFKCYGVSPTKLNDLCFTNVYADSFVIRGDEVRQIAPGQTGKIADYNYKLPDDFTGCVIAWNSNNLDSKVGGNYNYLYRLFRKSNLKPFERDISTEIYQAGSTPCNGVEGFNCYFPLQSYGFQPTNGVGYQPYRVVVLSFELLHAPATVCGPKKSTNLVKNKCVNF
     
@@ -96,20 +97,20 @@ async def full_binder_design_pipeline():
     
     initial_hypothesis = await system.generate_protein_hypothesis(
         research_goal=research_goal,
-        strategy="coscientist_binder_design"  # New strategy for binder design
+        strategy="binder_gen"#"coscientist_binder_design"  # New strategy for binder design
     )
     
     print(f"✓ Initial hypothesis generated: {initial_hypothesis.hypothesis_id}")
     print(f"  - Title: {initial_hypothesis.title}")
-    
+    print(initial_hypothesis.binder_data)
     # Verify binder data
-    if initial_hypothesis.has_binder_data():
-        binder_data = initial_hypothesis.get_binder_data()
-        print(f"  - Target: {binder_data.target_name}")
-        print(f"  - Proposed peptides: {len(binder_data.proposed_peptides)}")
-    else:
-        print("  ❌ No binder data found!")
-        return None
+    #if initial_hypothesis.has_binder_data():
+    binder_data = initial_hypothesis.binder_data
+    print(f"  - Target: {binder_data.target_name}")
+    print(f"  - Proposed peptides: {len(binder_data.proposed_peptides)}")
+    #else:
+    #    print("  ❌ No binder data found!")
+    #    return None
     
     # =========================================================================
     # STEP 4: Iterative Optimization Loop
@@ -162,6 +163,9 @@ async def full_binder_design_pipeline():
         # Get binder data for BindCraft
         binder_data = current_hypothesis.get_binder_data()
         
+        print("Information about binder")
+        print(binder_data.target_sequence)
+        print(binder_data.proposed_peptides[0]["sequence"])
         # Prepare BindCraft config
         bindcraft_config = {
             "target_sequence": binder_data.target_sequence,

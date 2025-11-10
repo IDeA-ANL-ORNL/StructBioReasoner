@@ -586,6 +586,20 @@ class ProteinHypothesis(UnifiedHypothesis):
             return self.binder_data.proposed_peptides
         return []
     
+    def get_binder_data(self, binder_data: Union[BinderHypothesisData, Dict[str, Any]]):
+        """
+        Add or update binder-specific data.
+        
+        Args:
+            binder_data: Either a BinderHypothesisData object or dict
+        """
+        if isinstance(binder_data, dict):
+            self.binder_data = BinderHypothesisData.from_dict(binder_data)
+        else:
+            self.binder_data = binder_data
+        self.updated_at = time.time()
+        return self.binder_data
+
     def add_binder_data(self, binder_data: Union[BinderHypothesisData, Dict[str, Any]]):
         """
         Add or update binder-specific data.

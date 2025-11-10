@@ -108,9 +108,9 @@ agents:
     
     # BindCraft-specific settings
     bindcraft:
-      cwd: '/lus/flare/projects/FoundEpidem/msinclair/ideals/agent/structbioreasoner/data'
+      cwd: '/flare/FoundEpidem/avasan/IDEAL/Agentics/StructBioReasoner/data'
       target_sequence: 'MMKMEGIALKKRLSWISVCLLVLVSAAGMLFSTAAKTETSSHKAHTEAQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGRTWREADINYTSGFRNSDRILYSSDWLIYKTTDHYQTFTKIR'
-      binder_sequence: 'MKKAVINGEQIRSISDLHQTLKKELALPEYYGENLDALWDCLTGWVEYPLVLEWRQFEQSKQLTENGAESVLQVFREAKAEGCDITIILS'
+      binder_sequence: '' #'MKKAVINGEQIRSISDLHQTLKKELALPEYYGENLDALWDCLTGWVEYPLVLEWRQFEQSKQLTENGAESVLQVFREAKAEGCDITIILS'
       device: 'xpu'
       num_rounds: 1
       fold_backend: "chai"  # Options: chai, alphafold
