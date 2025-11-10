@@ -241,6 +241,8 @@ structbio_venv
 pics
 
 # Misc testing things
-data/fastas
-data/folds
+data/fastas/
+data/folds/
 data/jnana.db
+data/fastas/trial_0/fixed_design.jsonl
+data/fastas/trial_0/parsed_design.jsonl
