@@ -241,3 +241,6 @@ structbio_venv
 pics
 
 # Misc testing things
+data/fastas
+data/folds
+data/jnana.db
