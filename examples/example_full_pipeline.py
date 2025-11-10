@@ -161,15 +161,27 @@ async def full_binder_design_pipeline():
         print(f"    - simulation_time: {parameters['simulation_time']} ns")
         
         # Get binder data for BindCraft
-        binder_data = current_hypothesis.get_binder_data()
-        
-        print("Information about binder")
-        print(binder_data.target_sequence)
-        print(binder_data.proposed_peptides[0]["sequence"])
+        # NOTE: Use direct attribute access instead of get_binder_data()
+        if not current_hypothesis.has_binder_data():
+            print("  ❌ No binder data found in hypothesis!")
+            break
+
+        binder_data = current_hypothesis.binder_data
+
+        print("\n📊 Binder Information:")
+        print(f"  - Target sequence: {binder_data.target_sequence[:50]}... ({len(binder_data.target_sequence)} residues)")
+        print(f"  - Proposed peptides: {len(binder_data.proposed_peptides)}")
+        if binder_data.proposed_peptides:
+            print(f"  - First peptide: {binder_data.proposed_peptides[0]['sequence'][:50]}...")
+
         # Prepare BindCraft config
+        # NOTE: The BindCraft agent will automatically extract sequences from hypothesis.binder_data
+        # We can also pass them explicitly in the config (they will override if present)
         bindcraft_config = {
+            # These will be extracted from hypothesis.binder_data by BindCraft agent
+            # but we include them here for clarity and as fallback
             "target_sequence": binder_data.target_sequence,
-            "binder_sequence": binder_data.proposed_peptides[0]["sequence"],
+            "binder_sequence": binder_data.proposed_peptides[0]["sequence"] if binder_data.proposed_peptides else None,
             "num_rounds": 3,
             "num_seqs": parameters["num_seqs"],
             "sampling_temp": parameters["sampling_temp"],

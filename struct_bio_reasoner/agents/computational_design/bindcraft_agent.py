@@ -228,6 +228,40 @@ class BindCraftAgent:
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> BinderAnalysis:
+        """
+        Analyze hypothesis and run BindCraft design.
+
+        Extracts target_sequence and binder_sequence from hypothesis.binder_data
+        if available, otherwise falls back to task_params.
+        """
+        # STEP 1: Extract sequences from hypothesis binder_data if available
+        if hypothesis.has_binder_data() and hypothesis.binder_data:
+            binder_data = hypothesis.binder_data  # Direct attribute access
+
+            # Override task_params with sequences from hypothesis
+            if binder_data.target_sequence and binder_data.target_sequence != "UNKNOWN":
+                task_params['target_sequence'] = binder_data.target_sequence
+                self.logger.info(f"Using target sequence from hypothesis: {binder_data.target_sequence[:50]}...")
+
+            # Get binder sequence from proposed peptides if available
+            if binder_data.proposed_peptides and len(binder_data.proposed_peptides) > 0:
+                # Use the first proposed peptide as the initial binder sequence
+                first_peptide = binder_data.proposed_peptides[0]
+                if isinstance(first_peptide, dict) and 'sequence' in first_peptide:
+                    task_params['binder_sequence'] = first_peptide['sequence']
+                    self.logger.info(f"Using binder sequence from hypothesis: {first_peptide['sequence'][:50]}...")
+                elif hasattr(first_peptide, 'sequence'):
+                    task_params['binder_sequence'] = first_peptide.sequence
+                    self.logger.info(f"Using binder sequence from hypothesis: {first_peptide.sequence[:50]}...")
+
+        # STEP 2: Verify required sequences are present
+        if 'target_sequence' not in task_params:
+            raise ValueError("target_sequence not found in hypothesis binder_data or task_params")
+
+        if 'binder_sequence' not in task_params:
+            self.logger.warning("binder_sequence not found in hypothesis, using default")
+
+        # STEP 3: Run BindCraft with extracted sequences
         result = await self._generate_binder_hypothesis(task_params)
         # Write result to file
         all_cycles = result['all_cycles']
