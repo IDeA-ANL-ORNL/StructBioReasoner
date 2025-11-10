@@ -49,6 +49,11 @@ class BindCraftAgent:
         self.inv_fold_backend = config.get('inverse_folding', 'proteinmpnn')
 
         self.parsl_config = self.config.get('parsl', {})
+        self.manager = None
+        self.forward_folder = None
+        self.inverse_folder = None
+        self.qc_agent = None
+        self.analyzer_agent = None
 
         self.logger.info(f'BindCraft agent using: {self.fold_backend},{self.inv_fold_backend}')
 
@@ -83,6 +88,7 @@ class BindCraftAgent:
 
         self.logger.info(f'Successfully imported BindCraft components.')
         self.initialized = True
+        
         return True
 
     async def is_ready(self) -> bool:
@@ -100,8 +106,6 @@ class BindCraftAgent:
                     self.logger.warning(f'Error exiting manager context: {e}')
                 finally:
                     self.manager = None
-
-            await super().cleanup()
 
             self.logger.info('BindCraft agent cleanup completed')
 
@@ -181,46 +185,57 @@ class BindCraftAgent:
 
         proteinmpnn = ProteinMPNN(**if_kwargs)
 
-        async with await Manager.from_exchange_factory(
+        self.manager = await Manager.from_exchange_factory(
             factory=LocalExchangeFactory(),
             executors=ThreadPoolExecutor(),
-        ) as manager:
-            # Launch individual agents
-            forward_folder = await manager.launch(
-                ForwardFoldingAgent,
-                args=(chai, self.parsl_settings)
-            )
-            inverse_folder = await manager.launch(
-                InverseFoldingAgent,
-                args=(proteinmpnn,)
-            )
-            qc_agent = await manager.launch(
-                QualityControlAgent,
-                args=(SequenceQualityControl(**qc_kwargs),)
-            )
-            analyzer = await manager.launch(
-                AnalysisAgent,
-                args=(SimpleEnergy(),)
-            )
+        )
 
-            # Launch coordinator with handles to other agents
-            coordinator = await manager.launch(
-                PeptideDesignCoordinator,
-                args=(forward_folder, inverse_folder, qc_agent, analyzer, if_kwargs['num_seq'], if_kwargs['max_retries'])
-            )
+        await self.manager.__aenter__()
 
+        self.logger.info('Launching bindcraft handles')
 
-            # Run the workflow
-            results = await coordinator.run_full_workflow(
-                target_sequence=target_sequence,
-                binder_sequence=binder_sequence,
-                fasta_base_path=fasta_dir,
-                pdb_base_path=folds_dir,
-                remodel_indices=[],  # Interface indices to redesign
-                num_rounds=num_rounds
-            )
+        # Launch individual agents
+        self.forward_folder = await self.manager.launch(
+            ForwardFoldingAgent,
+            args=(chai, self.parsl_settings)
+        )
+        self.inverse_folder = await self.manager.launch(
+            InverseFoldingAgent,
+            args=(proteinmpnn,)
+        )
+        self.qc_agent = await self.manager.launch(
+            QualityControlAgent,
+            args=(SequenceQualityControl(**qc_kwargs),)
+        )
+        self.analyzer_agent = await self.manager.launch(
+            AnalysisAgent,
+            args=(SimpleEnergy(),)
+        )
 
-            return results
+        # Launch coordinator with handles to other agents
+        self.coordinator = await self.manager.launch(
+            PeptideDesignCoordinator,
+            args=(self.forward_folder, 
+                  self.inverse_folder, 
+                  self.qc_agent, 
+                  self.analyzer_agent, 
+                  if_kwargs['num_seq'], 
+                  if_kwargs['max_retries'])
+        )
+
+        # Run the workflow
+        results = await self.coordinator.run_full_workflow(
+            target_sequence=target_sequence,
+            binder_sequence=binder_sequence,
+            fasta_base_path=fasta_dir,
+            pdb_base_path=folds_dir,
+            remodel_indices=[],  # Interface indices to redesign
+            num_rounds=num_rounds
+        )
+
+        await self.cleanup()
+
+        return results
 
     async def _create_binder_hypothesis(self,
                                         results: dict[str, Any]) -> ProteinHypothesis:
