@@ -119,7 +119,7 @@ class BinderDesignSystem(JnanaSystem):
         # System state
         self.design_system_ready = False
         
-        self.start()
+        #self.start()
         self.logger.info("BinderDesignSystem initialized")
 
     def _prepare_jnana_config(self, jnana_config_path: str):
@@ -457,14 +457,33 @@ class BinderDesignSystem(JnanaSystem):
                 kwargs = design_config['bindcraft']
                 if_kwargs = design_config['inverse_folding']
                 qc_kwargs = design_config['quality_control']
-                
+
                 kwargs['if_kwargs'] = if_kwargs
                 kwargs['qc_kwargs'] = qc_kwargs
 
                 design_config = kwargs
 
+            # CRITICAL FIX: Extract sequences from the hypothesis and add to design_config
+            # This ensures BindCraft uses the LLM-generated sequences, not config defaults
+            if protein_hypothesis.has_binder_data() and protein_hypothesis.binder_data:
+                binder_data = protein_hypothesis.binder_data
+
+                # Override design_config with sequences from hypothesis
+                if binder_data.target_sequence and binder_data.target_sequence != "UNKNOWN":
+                    design_config['target_sequence'] = binder_data.target_sequence
+                    self.logger.info(f"Adding target sequence from hypothesis to design_config: {binder_data.target_sequence[:50]}...")
+
+                # Get binder sequence from proposed peptides
+                if binder_data.proposed_peptides and len(binder_data.proposed_peptides) > 0:
+                    first_peptide = binder_data.proposed_peptides[0]
+                    if isinstance(first_peptide, dict) and 'sequence' in first_peptide:
+                        design_config['binder_sequence'] = first_peptide['sequence']
+                        self.logger.info(f"Adding binder sequence from hypothesis to design_config: {first_peptide['sequence'][:50]}...")
+            else:
+                self.logger.warning("Hypothesis does not have binder_data! Using config defaults for sequences.")
+
             task_params['computational_design'].update(design_config)
-            
+
             bindcraft_analysis = await self.design_agents["computational_design"].analyze_hypothesis(
                 protein_hypothesis, design_config
             )
