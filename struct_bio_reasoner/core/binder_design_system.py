@@ -482,13 +482,13 @@ class BinderDesignSystem(JnanaSystem):
                 binder_data = protein_hypothesis.binder_data
 
                 # Override design_config with sequences from hypothesis
-                if binder_data.target_sequence and binder_data.target_sequence != "UNKNOWN":
+                if binder_data['target_sequence'] and binder_data['target_sequence'] != "UNKNOWN":
                     design_config['target_sequence'] = binder_data.target_sequence
                     self.logger.info(f"Adding target sequence from hypothesis to design_config: {binder_data.target_sequence[:50]}...")
 
                 # Get binder sequence from proposed peptides
-                if binder_data.proposed_peptides and len(binder_data.proposed_peptides) > 0:
-                    first_peptide = binder_data.proposed_peptides[0]
+                if binder_data['proposed_peptides'] and len(binder_data['proposed_peptides']) > 0:
+                    first_peptide = binder_data['proposed_peptides'][0]
                     if isinstance(first_peptide, dict) and 'sequence' in first_peptide:
                         design_config['binder_sequence'] = first_peptide['sequence']
                         self.logger.info(f"Adding binder sequence from hypothesis to design_config: {first_peptide['sequence'][:50]}...")

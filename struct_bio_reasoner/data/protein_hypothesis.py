@@ -380,6 +380,7 @@ class ProteinHypothesis(UnifiedHypothesis):
             ProteinHypothesis instance
         """
         # Extract all fields from unified hypothesis
+        print(unified_hypothesis)
         hypothesis_data = {
             "hypothesis_id": unified_hypothesis.hypothesis_id,
             "title": unified_hypothesis.title,
@@ -416,9 +417,8 @@ class ProteinHypothesis(UnifiedHypothesis):
             "protein_name": protein_name,
             "protein_metadata": biological_context or {},
             # ADD THIS: Check if this is a binder hypothesis
-            "binder_data": unified_hypothesis.metadata["binder_data"] #cls._extract_binder_data(unified_hypothesis, biological_context)
+            "binder_data": unified_hypothesis.metadata['protognosis_metadata']['binder_data'] #[unified_hypothesis['hypotheses'][i]['metadata']['binder_data'] for i in range(len(unified_hypothesis['hypotheses']))]#.metadata["binder_data"] #cls._extract_binder_data(unified_hypothesis, biological_context)
         }
-
         return cls(**hypothesis_data)
 
     @classmethod

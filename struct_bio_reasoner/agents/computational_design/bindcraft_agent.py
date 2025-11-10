@@ -244,14 +244,14 @@ class BindCraftAgent:
             binder_data = hypothesis.binder_data  # Direct attribute access
 
             # Override task_params with sequences from hypothesis
-            if binder_data.target_sequence and binder_data.target_sequence != "UNKNOWN":
+            if binder_data['target_sequence'] and binder_data['target_sequence'] != "UNKNOWN":
                 task_params['target_sequence'] = binder_data.target_sequence
                 self.logger.info(f"Using target sequence from hypothesis: {binder_data.target_sequence[:50]}...")
 
             # Get binder sequence from proposed peptides if available
-            if binder_data.proposed_peptides and len(binder_data.proposed_peptides) > 0:
+            if binder_data['proposed_peptides'] and len(binder_data['proposed_peptides']) > 0:
                 # Use the first proposed peptide as the initial binder sequence
-                first_peptide = binder_data.proposed_peptides[0]
+                first_peptide = binder_data['proposed_peptides'][0]
                 if isinstance(first_peptide, dict) and 'sequence' in first_peptide:
                     task_params['binder_sequence'] = first_peptide['sequence']
                     self.logger.info(f"Using binder sequence from hypothesis: {first_peptide['sequence'][:50]}...")
