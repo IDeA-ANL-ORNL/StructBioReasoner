@@ -416,7 +416,7 @@ class ProteinHypothesis(UnifiedHypothesis):
             "protein_name": protein_name,
             "protein_metadata": biological_context or {},
             # ADD THIS: Check if this is a binder hypothesis
-            "binder_data": cls._extract_binder_data(unified_hypothesis, biological_context)
+            "binder_data": unified_hypothesis.metadata["binder_data"] #cls._extract_binder_data(unified_hypothesis, biological_context)
         }
 
         return cls(**hypothesis_data)

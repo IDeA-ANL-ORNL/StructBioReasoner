@@ -237,6 +237,8 @@ class BindCraftAgent:
         Extracts target_sequence and binder_sequence from hypothesis.binder_data
         if available, otherwise falls back to task_params.
         """
+        print(hypothesis)
+        print(hypothesis.binder_data)
         # STEP 1: Extract sequences from hypothesis binder_data if available
         if hypothesis.has_binder_data() and hypothesis.binder_data:
             binder_data = hypothesis.binder_data  # Direct attribute access
