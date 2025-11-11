@@ -293,14 +293,15 @@ class BinderDesignSystem(JnanaSystem):
                 if hasattr(self, 'protognosis_adapter') and self.protognosis_adapter:
                     if hasattr(self.protognosis_adapter, 'coscientist'):
                         coscientist = self.protognosis_adapter.coscientist
-                        if hasattr(coscientist, 'agents'):
+                        # Agents are stored in supervisor.agents, not coscientist.agents
+                        if hasattr(coscientist, 'supervisor') and hasattr(coscientist.supervisor, 'agents'):
                             # Inject into all generation agents
-                            for agent_id, agent in coscientist.agents.items():
+                            for agent_id, agent in coscientist.supervisor.agents.items():
                                 if agent_id.startswith('generation'):
                                     agent.tool_registry = self.tool_registry
                                     self.logger.info(f"  - Injected tool registry into {agent_id}")
 
-                            self.logger.info("✓ Tool registry injected into CoScientist agents")
+                            self.logger.info("✓ Tool registry injected into CoScientist generation agents")
             else:
                 self.logger.info("BindCraft agent not available, skipping tool registration")
 
