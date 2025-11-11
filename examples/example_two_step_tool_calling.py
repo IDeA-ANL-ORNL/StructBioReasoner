@@ -45,16 +45,22 @@ async def main():
         config_path="config/binder_config.yaml",
         jnana_config_path="../Jnana/config/config.yaml"
     )
-    await system.initialize()
+    await system.start()
     print("✓ System initialized\n")
     
     # Define research goal
     research_goal = """
-    Design a peptide binder for SARS-CoV-2 spike protein receptor binding domain (RBD).
-    The binder should have high affinity and specificity for the RBD to potentially
-    block ACE2 interaction.
+    Design affibody peptide binders of length 68 amino acids for SARS-CoV-2 spike protein receptor binding domain (RBD) 
+    to optimize binding affinity and stability. Target sequence: 
+    NITNLCPFGEVFNATRFASVYAWNRKRISNCVADYSVLYNSASFSTFKCYGVSPTKLNDLCFTNVYADSFVIRGDEVRQIAPGQTGKIADYNYKLPDDFTGCVIAWNSNNLDSKVGGNYNYLYRLFRKSNLKPFERDISTEIYQAGSTPCNGVEGFNCYFPLQSYGFQPTNGVGYQPYRVVVLSFELLHAPATVCGPKKSTNLVKNKCVNF
+    
+    Goals:
+    - Binding affinity < 10 nM
+    - Stable complex in MD simulation (RMSD < 3 Å)
+    - High success rate (>5% of generated sequences)
     """
     
+    system.set_research_goal(research_goal)
     print("🎯 Research Goal:")
     print(research_goal)
     print()
