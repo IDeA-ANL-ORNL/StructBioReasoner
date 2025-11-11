@@ -1,15 +1,32 @@
 # Tool Calling Implementation Summary
 
+## ⚠️ IMPORTANT: Current Status
+
+**The tool calling feature is PARTIALLY IMPLEMENTED.** The infrastructure is in place, but **actual LLM function calling does not work yet** due to OpenAI API limitations.
+
+**See `readmes/TOOL_CALLING_CURRENT_STATUS.md` for full details.**
+
+**Recommendation**: Use explicit BindCraft calls (as in `example_full_pipeline.py`). This works perfectly!
+
+---
+
 ## What Was Implemented
 
-BindCraft computational design has been integrated as an **LLM-callable tool** in Jnana, allowing the LLM to decide when and how to use computational design during hypothesis generation.
+BindCraft computational design infrastructure has been integrated as a foundation for future LLM-callable tools in Jnana.
 
-### ✅ Key Features
+### ✅ What Works
 
-1. **Optional Tool Usage**: LLM can choose to call BindCraft or not
-2. **Backward Compatible**: Existing pipeline (`example_full_pipeline.py`) works unchanged
-3. **Hybrid Approach**: Tool calling and explicit calls can be used together
-4. **Extensible**: Easy to add more tools (MD simulation, AlphaFold, etc.)
+1. **Tool Registry**: Tools can be registered and managed
+2. **Tool Schemas**: BindCraft tool schema is properly defined
+3. **Tool Injection**: Tool registry is injected into GenerationAgents
+4. **Backward Compatible**: Existing pipeline (`example_full_pipeline.py`) works unchanged
+5. **Explicit Calls**: You can explicitly call BindCraft after hypothesis generation
+
+### ❌ What Doesn't Work
+
+1. **LLM Function Calling**: LLM cannot actually call tools during hypothesis generation
+   - **Reason**: OpenAI API doesn't support both `tools` and `response_format: json_object` simultaneously
+   - **Impact**: LLM generates hypotheses with literature/homology/de-novo sources, not "computational:bindcraft"
 
 ---
 
