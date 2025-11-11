@@ -174,10 +174,11 @@ class BinderDesignSystem(JnanaSystem):
         """Start the protein engineering system."""
         # Start base Jnana system
         await super().start()
-        
+
         # Initialize design-specific components
         #await self._initialize_design_tools()
         await self._initialize_design_agents()
+        await self._initialize_tool_registry()  # NEW: Initialize tool registry
         await self._initialize_knowledge_foundation()
 
         self.design_system_ready = True
@@ -266,7 +267,48 @@ class BinderDesignSystem(JnanaSystem):
                 self.logger.warning(f"Failed to initialize MD agent: {e}")
         
         self.logger.info(f"Initialized {len(self.design_agents)} protein agents")
-    
+
+    async def _initialize_tool_registry(self):
+        """
+        Initialize tool registry and register BindCraft tool.
+
+        This makes BindCraft available as a tool that LLM agents can call
+        during hypothesis generation.
+        """
+        try:
+            from jnana.tools import ToolRegistry, BindCraftTool
+
+            # Create tool registry
+            self.tool_registry = ToolRegistry()
+            self.logger.info("Tool registry created")
+
+            # Register BindCraft tool if agent is available
+            if 'computational_design' in self.design_agents:
+                bindcraft_agent = self.design_agents['computational_design']
+                bindcraft_tool = BindCraftTool(bindcraft_agent)
+                self.tool_registry.register_tool(bindcraft_tool)
+                self.logger.info("✓ BindCraft tool registered for LLM use")
+
+                # Inject tool registry into ProtoGnosis agents
+                if hasattr(self, 'protognosis_adapter') and self.protognosis_adapter:
+                    if hasattr(self.protognosis_adapter, 'coscientist'):
+                        coscientist = self.protognosis_adapter.coscientist
+                        if hasattr(coscientist, 'agents'):
+                            # Inject into all generation agents
+                            for agent_id, agent in coscientist.agents.items():
+                                if agent_id.startswith('generation'):
+                                    agent.tool_registry = self.tool_registry
+                                    self.logger.info(f"  - Injected tool registry into {agent_id}")
+
+                            self.logger.info("✓ Tool registry injected into CoScientist agents")
+            else:
+                self.logger.info("BindCraft agent not available, skipping tool registration")
+
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize tool registry: {e}")
+            import traceback
+            traceback.print_exc()
+
     async def _initialize_knowledge_foundation(self):
         """Initialize protein knowledge foundation."""
         if not (self.knowledge_graph_enabled or self.literature_processing_enabled):
