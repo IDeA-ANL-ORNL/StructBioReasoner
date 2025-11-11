@@ -541,10 +541,11 @@ class BinderDesignSystem(JnanaSystem):
             task_params['computational_design'].update(design_config)
 
             print("Running BINDDDDCRAFFFFFTTTTTT DIREEECCCTTTLLLY")
-            bindcraft_analysis = await self.design_agents["computational_design"].analyze_hypothesis(
-                protein_hypothesis, design_config
-            )
-            protein_hypothesis.add_binder_analysis(bindcraft_analysis)
+            if False:
+                bindcraft_analysis = await self.design_agents["computational_design"].analyze_hypothesis(
+                    protein_hypothesis, design_config
+                )
+                protein_hypothesis.add_binder_analysis(bindcraft_analysis)
 
         if False:
             if "molecular_dynamics" in self.enable_agents:
