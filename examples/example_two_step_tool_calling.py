@@ -59,11 +59,15 @@ async def main():
     - Stable complex in MD simulation (RMSD < 3 Å)
     - High success rate (>5% of generated sequences)
     """
-    
-    system.set_research_goal(research_goal)
+
     print("🎯 Research Goal:")
     print(research_goal)
     print()
+
+    # Set research goal (IMPORTANT: this is async!)
+    print("📝 Setting research goal...")
+    await system.set_research_goal(research_goal)
+    print("✓ Research goal set\n")
     
     # Generate hypothesis with tool calling
     print("🧬 Step 2: Generating hypothesis with LLM tool calling enabled...")
