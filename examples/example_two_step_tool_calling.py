@@ -53,11 +53,13 @@ async def main():
     Design affibody peptide binders of length 68 amino acids for SARS-CoV-2 spike protein receptor binding domain (RBD) 
     to optimize binding affinity and stability. Target sequence: 
     NITNLCPFGEVFNATRFASVYAWNRKRISNCVADYSVLYNSASFSTFKCYGVSPTKLNDLCFTNVYADSFVIRGDEVRQIAPGQTGKIADYNYKLPDDFTGCVIAWNSNNLDSKVGGNYNYLYRLFRKSNLKPFERDISTEIYQAGSTPCNGVEGFNCYFPLQSYGFQPTNGVGYQPYRVVVLSFELLHAPATVCGPKKSTNLVKNKCVNF
-    
+    To template: peptide sequence: DPIQMGNDEFQKQNCLLEGEKQKLISEEDLLRKRREQLKHKLEQLRNSCA 
     Goals:
     - Binding affinity < 10 nM
     - Stable complex in MD simulation (RMSD < 3 Å)
     - High success rate (>5% of generated sequences)
+    Strategy:
+    - Use literature searching followed by Bindcraft agent to optimize
     """
 
     print("🎯 Research Goal:")
@@ -87,7 +89,7 @@ async def main():
     print("="*80 + "\n")
     
     # Display hypothesis
-    print(f"📋 Hypothesis: {hypothesis.summary}\n")
+    print(f"📋 Hypothesis: {hypothesis}\n")
     
     # Check if tools were called
     if hypothesis.metadata.get("tool_calls_made"):
