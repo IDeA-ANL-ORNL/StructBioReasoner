@@ -461,9 +461,10 @@ class BinderDesignSystem(JnanaSystem):
         if hasattr(self, 'protognosis_adapter') and self.protognosis_adapter:
             if hasattr(self.protognosis_adapter, 'coscientist') and self.protognosis_adapter.coscientist:
                 coscientist = self.protognosis_adapter.coscientist
-                if hasattr(coscientist, 'agents') and 'generation' in coscientist.agents:
-                    # Get the first generation agent (there may be multiple)
-                    generation_agents = [agent for agent_id, agent in coscientist.agents.items()
+                # Agents are stored in supervisor.agents, not coscientist.agents
+                if hasattr(coscientist, 'supervisor') and hasattr(coscientist.supervisor, 'agents'):
+                    # Get all generation agents from supervisor
+                    generation_agents = [agent for agent_id, agent in coscientist.supervisor.agents.items()
                                        if agent_id.startswith('generation')]
                     if generation_agents:
                         # Set research_plan_config in ALL generation agents' memory
@@ -475,11 +476,11 @@ class BinderDesignSystem(JnanaSystem):
                         for gen_agent in generation_agents:
                             if hasattr(gen_agent, 'memory') and gen_agent.memory:
                                 gen_agent.memory.metadata['research_plan_config'] = research_plan_config
-                        self.logger.info(f"Set research_plan_config in {len(generation_agents)} generation agents with target sequence ({len(target_sequence)} residues)")
+                        self.logger.info(f"✓ Set research_plan_config in {len(generation_agents)} generation agents with target sequence ({len(target_sequence)} residues)")
                     else:
-                        self.logger.warning("No generation agents found in CoScientist")
+                        self.logger.warning("No generation agents found in supervisor")
                 else:
-                    self.logger.warning("CoScientist does not have agents attribute")
+                    self.logger.warning("CoScientist does not have supervisor.agents")
             else:
                 self.logger.warning("ProtoGnosis adapter does not have coscientist")
         else:
