@@ -1,14 +1,5 @@
 from academy.exchange import LocalExchangeFactory
 from academy.manager import Manager
-from bindcraft.core.agentic_parsl import (ForwardFoldingAgent, 
-                                          InverseFoldingAgent,
-                                          QualityControlAgent,
-                                          AnalysisAgent,
-                                          PeptideDesignCoordinator)
-from bindcraft.core.folding import Folding
-from bindcraft.core.inverse_folding import InverseFolding
-from bindcraft.analysis.energy import SimpleEnergy
-from bindcraft.util.quality_control import SequenceQualityControl
 from concurrent.futures import ThreadPoolExecutor
 import dill as pickle
 import asyncio
@@ -71,14 +62,90 @@ class BindCraftAgent:
             True if initialization successful, False otherwise
         """
         try:
-            from bindcraft.core.agentic_parsl import (ForwardFoldingAgent, 
-                                                      InverseFoldingAgent,
-                                                      QualityControlAgent,
-                                                      AnalysisAgent,
-                                                      PeptideDesignCoordinator)
+            from bindcraft.core.coordinators import ParslDesignCoordinator
+            from bindcraft.core.folding import Chai
+            from bindcraft.core.inverse_folding import ProteinMPNN
+            from bindcraft.analysis.energy import SimpleEnergy
+            from bindcraft.util.quality_control import SequenceQualityControl
             from parsl import Config
             from ...utils.parsl_settings import LocalSettings
+
+            self.logger.info('Trying to spin things up')
             self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
+
+            cwd = Path(self.config.get('cwd', os.getcwd()))
+            cwd.mkdir(exist_ok=True)
+
+            fasta_dir = cwd / "fastas"
+            folds_dir = cwd / "folds"
+            fasta_dir.mkdir(exist_ok=True)
+            folds_dir.mkdir(exist_ok=True)
+
+            target_sequence = self.config['target_sequence']
+            binder_sequence = self.config.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
+            device = self.config.get('device', 'cuda:0')
+            num_rounds = self.config.get('num_rounds', 3)
+
+            if_kwargs =  self.config.get('if_kwargs', {
+                'num_seq': self.config.get('num_seq', 25),
+                'batch_size': self.config.get('batch_size', 250),
+                'max_retries': self.config.get('retries', 5),
+                'sampling_temp': self.config.get('temp', '0.1'),
+                'model_name': self.config.get('mpnn_model', 'v_48_020'),
+                'model_weights': self.config.get('mpnn_weights', 'soluble_model_weights'),
+                'proteinmpnn_path': self.config.get('proteinmpnn_path', '/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN'),
+                'device': device
+            })
+
+            qc_kwargs = self.config.get('qc_kwargs', {
+                'max_repeat': 4,
+                'max_appearance_ratio': 0.33,
+                'max_charge': 5,
+                'max_charge_ratio': 0.5,
+                'max_hydrophobic_ratio': 0.8,
+                'min_diversity': 8,
+                'bad_motifs': None,
+                'bad_n_termini': None # use defaults
+            })
+
+            # Initialize algorithm instances with required parameters
+            chai = Chai(
+                fasta_dir=fasta_dir,
+                out=folds_dir,
+                diffusion_steps=100,
+                device=device  # or 'cpu' if GPU not available
+            )
+
+            proteinmpnn = ProteinMPNN(**if_kwargs)
+
+            qc_alg = SequenceQualityControl(**qc_kwargs)
+            energy_alg = SimpleEnergy()
+
+            self.logger.info('Initialized algorithms')
+
+            self.manager = await Manager.from_exchange_factory(
+                factory=LocalExchangeFactory(),
+                executors=ThreadPoolExecutor(),
+            )
+
+            await self.manager.__aenter__()
+
+            self.logger.info('Launching bindcraft handles')
+
+            # Launch coordinator with handles to other agents
+            self.coordinator = await self.manager.launch(
+                ParslDesignCoordinator,
+                args=(chai,
+                      proteinmpnn,
+                      energy_alg,
+                      qc_alg,
+                      self.parsl_settings,
+                      if_kwargs['num_seq'], 
+                      if_kwargs['max_retries'],
+                      -10.,
+                     ),
+            )
+
         except ImportError as e:
             self.logger.error(f'Cannot import BindCraft components: {e}')
             self.logger.info('Make sure BindCraft is installed and in PYTHONPATH')
@@ -92,6 +159,7 @@ class BindCraftAgent:
         return True
 
     async def is_ready(self) -> bool:
+        self.logger.info('Checking if we are initialized')
         if not hasattr(self, 'initialized'):
             await self.initialize()
         return self.initialized
@@ -146,77 +214,79 @@ class BindCraftAgent:
         folds_dir = cwd / "folds"
         fasta_dir.mkdir(exist_ok=True)
         folds_dir.mkdir(exist_ok=True)
-
-        # these need to be somehow passed into the call
+            
         target_sequence = data['target_sequence']
         binder_sequence = data.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
-        device = data.get('device', 'cuda:0')
         num_rounds = data.get('num_rounds', 3)
+        
+        if False:
+            # these need to be somehow passed into the call
+            device = data.get('device', 'cuda:0')
 
-        if_kwargs = data.get('if_kwargs', {
-            'num_seq': data.get('num_seq', 25),
-            'batch_size': data.get('batch_size', 250),
-            'max_retries': data.get('retries', 5),
-            'sampling_temp': data.get('temp', '0.1'),
-            'model_name': data.get('mpnn_model', 'v_48_020'),
-            'model_weights': data.get('mpnn_weights', 'soluble_model_weights'),
-            'proteinmpnn_path': data.get('proteinmpnn_path', '/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN'),
-            'device': device
-        })
+            if_kwargs = data.get('if_kwargs', {
+                'num_seq': data.get('num_seq', 25),
+                'batch_size': data.get('batch_size', 250),
+                'max_retries': data.get('retries', 5),
+                'sampling_temp': data.get('temp', '0.1'),
+                'model_name': data.get('mpnn_model', 'v_48_020'),
+                'model_weights': data.get('mpnn_weights', 'soluble_model_weights'),
+                'proteinmpnn_path': data.get('proteinmpnn_path', '/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN'),
+                'device': device
+            })
 
-        qc_kwargs = data.get('qc_kwargs', {
-            'max_repeat': 4,
-            'max_appearance_ratio': 0.33,
-            'max_charge': 5,
-            'max_charge_ratio': 0.5,
-            'max_hydrophobic_ratio': 0.8,
-            'min_diversity': 8,
-            'bad_motifs': None,
-            'bad_n_termini': None # use defaults
-        })
+            qc_kwargs = data.get('qc_kwargs', {
+                'max_repeat': 4,
+                'max_appearance_ratio': 0.33,
+                'max_charge': 5,
+                'max_charge_ratio': 0.5,
+                'max_hydrophobic_ratio': 0.8,
+                'min_diversity': 8,
+                'bad_motifs': None,
+                'bad_n_termini': None # use defaults
+            })
 
-        # Initialize algorithm instances with required parameters
-        chai = Chai(
-            fasta_dir=fasta_dir,
-            out=folds_dir,
-            diffusion_steps=100,
-            device=device  # or 'cpu' if GPU not available
-        )
+            # Initialize algorithm instances with required parameters
+            chai = Chai(
+                fasta_dir=fasta_dir,
+                out=folds_dir,
+                diffusion_steps=100,
+                device=device  # or 'cpu' if GPU not available
+            )
 
-        proteinmpnn = ProteinMPNN(**if_kwargs)
+            proteinmpnn = ProteinMPNN(**if_kwargs)
 
-        self.manager = await Manager.from_exchange_factory(
-            factory=LocalExchangeFactory(),
-            executors=ThreadPoolExecutor(),
-        )
+            self.manager = await Manager.from_exchange_factory(
+                factory=LocalExchangeFactory(),
+                executors=ThreadPoolExecutor(),
+            )
 
-        await self.manager.__aenter__()
+            await self.manager.__aenter__()
 
-        self.logger.info('Launching bindcraft handles')
+            self.logger.info('Launching bindcraft handles')
 
-        # Launch individual agents
-        self.fold_agent = await self.manager.launch(
-            FoldingAgent,
-            args=(chai, proteinmpnn, self.parsl_settings)
-        )
-        self.qc_agent = await self.manager.launch(
-            QualityControlAgent,
-            args=(SequenceQualityControl(**qc_kwargs),)
-        )
-        self.analyzer_agent = await self.manager.launch(
-            AnalysisAgent,
-            args=(SimpleEnergy(),)
-        )
+            ## Launch individual agents
+            #self.fold_agent = await self.manager.launch(
+            #    FoldingAgent,
+            #    args=(chai, proteinmpnn, self.parsl_settings)
+            #)
+            #self.qc_agent = await self.manager.launch(
+            #    QualityControlAgent,
+            #    args=(SequenceQualityControl(**qc_kwargs),)
+            #)
+            #self.analyzer_agent = await self.manager.launch(
+            #    AnalysisAgent,
+            #    args=(SimpleEnergy(),)
+            #)
 
-        # Launch coordinator with handles to other agents
-        self.coordinator = await self.manager.launch(
-            PeptideDesignCoordinator,
-            args=(self.fold_agent, 
-                  self.qc_agent, 
-                  self.analyzer_agent, 
-                  if_kwargs['num_seq'], 
-                  if_kwargs['max_retries'])
-        )
+            ## Launch coordinator with handles to other agents
+            #self.coordinator = await self.manager.launch(
+            #    PeptideDesignCoordinator,
+            #    args=(self.fold_agent, 
+            #          self.qc_agent, 
+            #          self.analyzer_agent, 
+            #          if_kwargs['num_seq'], 
+            #          if_kwargs['max_retries'])
+            #)
 
         # Run the workflow
         results = await self.coordinator.run_full_workflow(

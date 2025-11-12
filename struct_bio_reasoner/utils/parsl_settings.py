@@ -128,6 +128,7 @@ class AuroraSettings(BaseComputeSettings):
 
     def config_factory(self, run_dir: PathLike) -> Config:
         """Create a Parsl configuration for running on Aurora."""
+        self.worker_init += f'; {run_dir.resolve()}'
         return Config(
             executors=[
                 HighThroughputExecutor(
