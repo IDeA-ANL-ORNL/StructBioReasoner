@@ -144,7 +144,7 @@ class MDAgentAdapter:
             # Launch MDAgent components
             self.builder_handle = await self.manager.launch(Builder)
             self.simulator_handle = await self.manager.launch(MDSimulator)
-            self.parsl_settings = AuroraSettings(**self.parsl_config).config_factory(Path.cwd())
+            self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
 
             self.logger.info('launching coordinator')
             self.coordinator_handle = await self.manager.launch(
@@ -254,8 +254,9 @@ class MDAgentAdapter:
         try:
             # Create simulation directory
             sim_id = f"mdagent_{protein_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            self.logger.info('Running simulations at:')
-            self.logger.info(','.join([str(pdb) for pdb in pdb_path]))
+            for pdb in pdb_path:
+                self.logger.info(f'Running simulations at: {pdb}')
+
             sim_paths = [Path(f'data/sims/mdagent_{i}') for i in range(len(pdb_path))]
             for sim_path in sim_paths:
                 sim_path.mkdir(parents=True, exist_ok=True)
@@ -567,11 +568,10 @@ class MDAgentAdapter:
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> SimAnalysis:
-
         #### Rewrite this according to how binder analysis adds to hypothesis
         self.logger.info('We are about to run MD')
         checkpoint_file = hypothesis.binder_analysis.checkpoint_file
-        #checkpoint_file = 'bindcraft_checkpoint_20251106_224945.pkl'
+        #checkpoint_file = 'bindcraft_checkpoint_20251113_172815.pkl'
         checkpoint_data = pickle.load(open(checkpoint_file, 'rb'))
         all_cycles = checkpoint_data['all_cycles']
         passing_structures = [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
