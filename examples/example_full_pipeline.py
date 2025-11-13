@@ -106,7 +106,6 @@ async def full_binder_design_pipeline():
     # Verify binder data
     #if initial_hypothesis.has_binder_data():
     binder_data = initial_hypothesis.binder_data
-    print(binder_data)
     #print(f"  - Target: {binder_data.target_name}")
     #print(f"  - Proposed peptides: {len(binder_data.proposed_peptides)}")
     #else:
@@ -169,16 +168,20 @@ async def full_binder_design_pipeline():
 
         binder_data = current_hypothesis.binder_data
 
-        target_sequence = system._extract_target_sequence(research_goal)
-        #print("\n📊 Binder Information:")
+        print("\n📊 Binder Information:")
         #print(f"  - Target sequence: {binder_data.target_sequence[:50]}... ({len(binder_data.target_sequence)} residues)")
-        #print(f"  - Proposed peptides: {len(binder_data.proposed_peptides)}")
-        if binder_data['proposed_peptides']:
-            print(f"  - First peptide: {binder_data['proposed_peptides'][0]['sequence'][:50]}...")
+        print(f"  - Proposed peptides: {len(binder_data['proposed_peptides'])}")
+        #if binder_data.proposed_peptides:
+        #    print(f"  - First peptide: {binder_data.proposed_peptides[0]['sequence'][:50]}...")
 
+        target_sequence = system._extract_target_sequence(research_goal)
         # Prepare BindCraft config
         # NOTE: The BindCraft agent will automatically extract sequences from hypothesis.binder_data
         # We can also pass them explicitly in the config (they will override if present)
+        parsl_config = {
+            'available_accelerators': [i for i in range(12)],
+            'nodes': 200
+        }
         bindcraft_config = {
             # These will be extracted from hypothesis.binder_data by BindCraft agent
             # but we include them here for clarity and as fallback
