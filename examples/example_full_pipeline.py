@@ -106,8 +106,9 @@ async def full_binder_design_pipeline():
     # Verify binder data
     #if initial_hypothesis.has_binder_data():
     binder_data = initial_hypothesis.binder_data
-    print(f"  - Target: {binder_data.target_name}")
-    print(f"  - Proposed peptides: {len(binder_data.proposed_peptides)}")
+    print(binder_data)
+    #print(f"  - Target: {binder_data.target_name}")
+    #print(f"  - Proposed peptides: {len(binder_data.proposed_peptides)}")
     #else:
     #    print("  ❌ No binder data found!")
     #    return None
@@ -168,11 +169,12 @@ async def full_binder_design_pipeline():
 
         binder_data = current_hypothesis.binder_data
 
-        print("\n📊 Binder Information:")
-        print(f"  - Target sequence: {binder_data.target_sequence[:50]}... ({len(binder_data.target_sequence)} residues)")
-        print(f"  - Proposed peptides: {len(binder_data.proposed_peptides)}")
-        if binder_data.proposed_peptides:
-            print(f"  - First peptide: {binder_data.proposed_peptides[0]['sequence'][:50]}...")
+        target_sequence = system._extract_target_sequence(research_goal)
+        #print("\n📊 Binder Information:")
+        #print(f"  - Target sequence: {binder_data.target_sequence[:50]}... ({len(binder_data.target_sequence)} residues)")
+        #print(f"  - Proposed peptides: {len(binder_data.proposed_peptides)}")
+        if binder_data['proposed_peptides']:
+            print(f"  - First peptide: {binder_data['proposed_peptides'][0]['sequence'][:50]}...")
 
         # Prepare BindCraft config
         # NOTE: The BindCraft agent will automatically extract sequences from hypothesis.binder_data
@@ -180,8 +182,8 @@ async def full_binder_design_pipeline():
         bindcraft_config = {
             # These will be extracted from hypothesis.binder_data by BindCraft agent
             # but we include them here for clarity and as fallback
-            "target_sequence": binder_data.target_sequence,
-            "binder_sequence": binder_data.proposed_peptides[0]["sequence"] if binder_data.proposed_peptides else None,
+            "target_sequence": target_sequence,
+            "binder_sequence": binder_data['proposed_peptides'][0]["sequence"] if binder_data['proposed_peptides'] else None,
             "num_rounds": 3,
             "num_seqs": parameters["num_seqs"],
             "sampling_temp": parameters["sampling_temp"],
