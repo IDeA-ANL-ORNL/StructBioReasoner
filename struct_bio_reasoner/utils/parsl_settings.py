@@ -37,22 +37,31 @@ class BaseComputeSettings(ABC, BaseSettings):
 
 class LocalSettings(BaseComputeSettings):
     available_accelerators: Union[int, Sequence[str]] = [f'{i}' for i in range(12)]
+    nodes: int = 1
     retries: int = 1
     label: str = 'htex'
     worker_port_range: Tuple[int, int] = (10000, 20000)
 
     def config_factory(self, run_dir: PathLike) -> Config:
+        ppn = self.available_accelerators
+        if isinstance(ppn, list):
+            ppn = len(ppn)
         return Config(
             run_dir=str(run_dir),
             retries=self.retries,
             executors=[
                 HighThroughputExecutor(
+                    provider=LocalProvider(
+                        nodes_per_block=self.nodes,
+                        launcher=MpiExecLauncher(
+                            bind_cmd="--cpu-bind", overrides=f"--depth=200 --ppn {ppn}"
+                        ),  # Updates to the mpiexec command
+                    ),
                     label=self.label,
                     cpu_affinity="block",
                     worker_debug=True,
                     available_accelerators=self.available_accelerators,
                     worker_port_range=self.worker_port_range,
-                    provider=LocalProvider(init_blocks=1, max_blocks=1)
                 ),
             ],
         )
