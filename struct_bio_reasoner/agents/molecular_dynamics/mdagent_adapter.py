@@ -13,7 +13,7 @@ The adapter translates between:
 import dill as pickle
 import asyncio
 import logging
-from ...utils import AuroraSettings
+from ...utils.parsl_settings import AuroraSettings, LocalSettings
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
@@ -36,7 +36,7 @@ from ...core.base_agent import BaseAgent
 from ...data.protein_hypothesis import SimAnalysis, ProteinHypothesis
 
 
-class MDAgentAdapter(BaseAgent):
+class MDAgentAdapter:
     """
     Adapter that wraps MDAgent components to work within StructBioReasoner.
     
@@ -59,14 +59,14 @@ class MDAgentAdapter(BaseAgent):
         Args:
             config: Configuration dictionary with MDAgent settings
         """
-        super().__init__(config)
-        
         self.agent_id = agent_id
+        self.config = config
         self.agent_type = "md_simulation"
         self.specialization = "mdagent_backend"
+        self.logger = logging.getLogger(__name__)
         
         # MDAgent configuration
-        self.mdagent_config = config.get("mdagent", {})
+        self.mdagent_config = self.config.get("mdagent", {})
         self.solvent_model = self.mdagent_config.get("solvent_model", "explicit")
         self.force_field = self.mdagent_config.get("force_field", "amber14")
         self.water_model = self.mdagent_config.get("water_model", "tip3p")
@@ -87,7 +87,7 @@ class MDAgentAdapter(BaseAgent):
         # State tracking
         self.active_simulations = {}
         self.completed_simulations = {}
-        
+
         self.logger.info(f"MDAgentAdapter initialized with {self.solvent_model} solvent")
 
     def __del__(self):
@@ -110,12 +110,13 @@ class MDAgentAdapter(BaseAgent):
             return False
 
         try:
+            self.logger.info('trying to import MDAgent package')
             # Import MDAgent components
             # Note: MDAgent should be installed and available in Python path
             # The agents are defined in agents.py at the root of MDAgent repo
             try:
                 # Try importing from mdagent package (if installed as package)
-                from MDAgent.agents_no_FE import Builder, MDSimulator, MDCoordinator
+                from MDAgent.core.agents_no_FE import Builder, MDSimulator, MDCoordinator
             except ImportError:
                 try:
                     # Try importing from agents module (if MDAgent is in PYTHONPATH)
@@ -127,6 +128,7 @@ class MDAgentAdapter(BaseAgent):
                     self.initialized = False
                     return False
 
+            self.logger.info('survived import')
             # Create Academy manager using async context manager pattern
             # This ensures the exchange client is properly initialized
             self.manager = await Manager.from_exchange_factory(
@@ -137,14 +139,17 @@ class MDAgentAdapter(BaseAgent):
             # Enter the manager context to initialize exchange client
             await self.manager.__aenter__()
 
+            self.logger.info('launching handles')
+
             # Launch MDAgent components
             self.builder_handle = await self.manager.launch(Builder)
             self.simulator_handle = await self.manager.launch(MDSimulator)
-            self.parsl_settings = AuroraSettings(**self.parsl_config).config_factory(Path.cwd() / "simulations")
+            self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
 
+            self.logger.info('launching coordinator')
             self.coordinator_handle = await self.manager.launch(
                 MDCoordinator,
-                args=(self.builder_handle, self.simulator_handle, self.parsl_config)
+                args=(self.builder_handle, self.simulator_handle, self.parsl_settings)
             )
 
             self.initialized = True
@@ -158,9 +163,12 @@ class MDAgentAdapter(BaseAgent):
             if self.manager:
                 try:
                     await self.manager.__aexit__(None, None, None)
-                except:
-                    pass
-                self.manager = None
+                    self.logger.info('Academy manager context exited successfully')
+                except Exception as e:
+                    self.logger.warning(f'Error exiting manager context: {e}')
+                finally: 
+                    self.manager = None
+
             return False
     
     async def generate_hypotheses(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -173,7 +181,7 @@ class MDAgentAdapter(BaseAgent):
         Returns:
             List of hypothesis dictionaries
         """
-        if not self.is_ready():
+        if not self.initialized:
             self.logger.error("MDAgent adapter not ready")
             return []
         
@@ -239,15 +247,19 @@ class MDAgentAdapter(BaseAgent):
         Returns:
             Simulation results dictionary
         """
-        if not self.is_ready():
+        if not await self.is_ready():
             self.logger.error("MDAgent adapter not ready")
             return {}
         
         try:
             # Create simulation directory
             sim_id = f"mdagent_{protein_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            sim_path = Path.cwd() / "simulations" / sim_id
-            sim_path.mkdir(parents=True, exist_ok=True)
+            for pdb in pdb_path:
+                self.logger.info(f'Running simulations at: {pdb}')
+
+            sim_paths = [Path(f'data/sims/mdagent_{i}') for i in range(len(pdb_path))]
+            for sim_path in sim_paths:
+                sim_path.mkdir(parents=True, exist_ok=True)
             
             # Prepare build kwargs
             build_kwargs = custom_build_kwargs or {
@@ -262,15 +274,18 @@ class MDAgentAdapter(BaseAgent):
                 'equil_steps': self.equil_steps,
                 'prod_steps': self.prod_steps,
             }
+
+            build_kwargs = [build_kwargs.copy() for _ in range(len(sim_paths))]
+            sim_kwargs = [sim_kwargs.copy() for _ in range(len(sim_paths))]
             
             # Run MDAgent workflow
             self.logger.info(f"Starting MDAgent simulation: {sim_id}")
             
             results = await self.coordinator_handle.deploy_md(
-                path=sim_path,
-                initial_pdb=pdb_path.resolve(),
-                build_kwargs=build_kwargs,
-                sim_kwargs=sim_kwargs,
+                paths=sim_paths,
+                initial_pdbs=pdb_path,
+                build_kwargss=build_kwargs,
+                sim_kwargss=sim_kwargs,
             )
             
             # Store results
@@ -283,6 +298,9 @@ class MDAgentAdapter(BaseAgent):
             
             # Analyze results and create structured output
             analysis = await self._analyze_mdagent_results(sim_id, results)
+            
+            # Clean up agent/parsl
+            self.cleanup()
             
             self.logger.info(f"MDAgent simulation completed: {sim_id}")
             return analysis
@@ -542,9 +560,6 @@ class MDAgentAdapter(BaseAgent):
                     self.simulator_handle = None
                     self.coordinator_handle = None
 
-            # Call parent cleanup
-            await super().cleanup()
-
             self.logger.info("MDAgent adapter cleanup completed")
 
         except Exception as e:
@@ -553,35 +568,48 @@ class MDAgentAdapter(BaseAgent):
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> SimAnalysis:
-
         #### Rewrite this according to how binder analysis adds to hypothesis
+        self.logger.info('We are about to run MD')
         checkpoint_file = hypothesis.binder_analysis.checkpoint_file
+        #checkpoint_file = 'bindcraft_checkpoint_20251113_172815.pkl'
         checkpoint_data = pickle.load(open(checkpoint_file, 'rb'))
         all_cycles = checkpoint_data['all_cycles']
         passing_structures = [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
         # unpack list of lists in passing_structures
-        passing_structures = [Path(item) for sublist in passing_structures for item in sublist]
+        passing_structures = [Path(item).resolve() for sublist in passing_structures for item in sublist]
+        self.logger.info('Checkpoint loaded')
+        # TODO: get kwargs for build/sim from task_params
+        AMBERHOME="/lus/flare/projects/FoundEpidem/msinclair/envs/ambertools"
         sim_results = await self.run_md_simulation( 
-                               pdb_path=passing_structures,
-                               protein_name = "unknown",
-                            )
-                               # TODO:
-                               # if have weird systems (like rna/small molec/change md steps)
-                               #custom_build_kwargs: Optional[Dict[str, Any]] = None,
-                               #custom_sim_kwargs: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+            pdb_path=passing_structures,
+            protein_name = "unknown",
+            custom_build_kwargs = {'protein': True,
+                                   'amberhome': AMBERHOME},
+            custom_sim_kwargs = {'equil_steps': 1000,
+                                 'prod_steps': 10000,
+                                 'n_equil_cycles': 2,
+                                 'platform': 'OpenCL'},
+        )
        
 
         analysis = SimAnalysis(
             protein_id='',
-            simulation_time_in_ns=sim_results['simulation_time'],
+            simulation_time_in_ns=sim_results['trajectory_info']['time_ns'],
             rmsd=sim_results['rmsd'],
             rmsf=sim_results['rmsf']
+            # ADD RoG
         )
 
         analysis.confidence_score = self._calculate_confidence(analysis)
         analysis.tools_used = self._get_tools_used()
 
         return analysis
+
+    async def is_ready(self) -> bool:
+        if not hasattr(self, 'initialized'):
+            await self.initialize()
+        return self.initialized
+    
 
     def _calculate_confidence(self,
                               analysis: SimAnalysis) -> float:

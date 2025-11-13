@@ -1,14 +1,5 @@
 from academy.exchange import LocalExchangeFactory
 from academy.manager import Manager
-from bindcraft.core.agentic import (ForwardFoldingAgent, 
-                                    InverseFoldingAgent,
-                                    QualityControlAgent,
-                                    AnalysisAgent,
-                                    PeptideDesignCoordinator)
-from bindcraft.core.folding import Folding
-from bindcraft.core.inverse_folding import InverseFolding
-from bindcraft.analysis.energy import SimpleEnergy
-from bindcraft.util.quality_control import SequenceQualityControl
 from concurrent.futures import ThreadPoolExecutor
 import dill as pickle
 import asyncio
@@ -48,6 +39,13 @@ class BindCraftAgent:
         self.fold_backend = config.get('folding', 'chai')
         self.inv_fold_backend = config.get('inverse_folding', 'proteinmpnn')
 
+        self.parsl_config = self.config.get('parsl', {})
+        self.manager = None
+        self.forward_folder = None
+        self.inverse_folder = None
+        self.qc_agent = None
+        self.analyzer_agent = None
+
         self.logger.info(f'BindCraft agent using: {self.fold_backend},{self.inv_fold_backend}')
 
         # NOTE: look at bindcraft for this
@@ -57,16 +55,130 @@ class BindCraftAgent:
         #    raise AttributeError('`target_sequence` not defined in config!')
 
     async def initialize(self):
-        """"""
-        # NOTE: check if model is available somehow
-        pass
+        """
+        Initialize BindCraft components.
 
-    def is_ready(self) -> bool:
-        # NOTE: need to check initialize
-        pass
+        Returns:
+            True if initialization successful, False otherwise
+        """
+        try:
+            from bindcraft.core.coordinators import ParslDesignCoordinator
+            from bindcraft.core.folding import Chai
+            from bindcraft.core.inverse_folding import ProteinMPNN
+            from bindcraft.analysis.energy import SimpleEnergy
+            from bindcraft.util.quality_control import SequenceQualityControl
+            from parsl import Config
+            from ...utils.parsl_settings import LocalSettings
 
-    def cleanup(self):
-        pass
+            self.logger.info('Trying to spin things up')
+            self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
+
+            cwd = Path(self.config.get('cwd', os.getcwd()))
+            cwd.mkdir(exist_ok=True)
+
+            fasta_dir = cwd / "fastas"
+            folds_dir = cwd / "folds"
+            fasta_dir.mkdir(exist_ok=True)
+            folds_dir.mkdir(exist_ok=True)
+
+            target_sequence = self.config['target_sequence']
+            binder_sequence = self.config.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
+            device = self.config.get('device', 'cuda:0')
+            num_rounds = self.config.get('num_rounds', 3)
+
+            if_kwargs =  self.config.get('if_kwargs', {
+                'num_seq': self.config.get('num_seq', 25),
+                'batch_size': self.config.get('batch_size', 250),
+                'max_retries': self.config.get('retries', 5),
+                'sampling_temp': self.config.get('temp', '0.1'),
+                'model_name': self.config.get('mpnn_model', 'v_48_020'),
+                'model_weights': self.config.get('mpnn_weights', 'soluble_model_weights'),
+                'proteinmpnn_path': self.config.get('proteinmpnn_path', '/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN'),
+                'device': device
+            })
+
+            qc_kwargs = self.config.get('qc_kwargs', {
+                'max_repeat': 4,
+                'max_appearance_ratio': 0.33,
+                'max_charge': 5,
+                'max_charge_ratio': 0.5,
+                'max_hydrophobic_ratio': 0.8,
+                'min_diversity': 8,
+                'bad_motifs': None,
+                'bad_n_termini': None # use defaults
+            })
+
+            # Initialize algorithm instances with required parameters
+            chai = Chai(
+                fasta_dir=fasta_dir,
+                out=folds_dir,
+                diffusion_steps=100,
+                device=device  # or 'cpu' if GPU not available
+            )
+
+            proteinmpnn = ProteinMPNN(**if_kwargs)
+
+            qc_alg = SequenceQualityControl(**qc_kwargs)
+            energy_alg = SimpleEnergy()
+
+            self.logger.info('Initialized algorithms')
+
+            self.manager = await Manager.from_exchange_factory(
+                factory=LocalExchangeFactory(),
+                executors=ThreadPoolExecutor(),
+            )
+
+            await self.manager.__aenter__()
+
+            self.logger.info('Launching bindcraft handles')
+
+            # Launch coordinator with handles to other agents
+            self.coordinator = await self.manager.launch(
+                ParslDesignCoordinator,
+                args=(chai,
+                      proteinmpnn,
+                      energy_alg,
+                      qc_alg,
+                      self.parsl_settings,
+                      if_kwargs['num_seq'], 
+                      if_kwargs['max_retries'],
+                      -10.,
+                     ),
+            )
+
+        except ImportError as e:
+            self.logger.error(f'Cannot import BindCraft components: {e}')
+            self.logger.info('Make sure BindCraft is installed and in PYTHONPATH')
+            self.logger.info('Install from: https://github.com/msinclair-py/bindcraft/tree/agent_acad')
+            self.initialized = False
+            return False
+
+        self.logger.info(f'Successfully imported BindCraft components.')
+        self.initialized = True
+        
+        return True
+
+    async def is_ready(self) -> bool:
+        self.logger.info('Checking if we are initialized')
+        if not hasattr(self, 'initialized'):
+            await self.initialize()
+        return self.initialized
+
+    async def cleanup(self):
+        try:
+            if self.manager:
+                try:
+                    await self.manager.__aexit__(None, None, None)
+                    self.logger.info('Academy manager context exited successfully')
+                except Exception as e:
+                    self.logger.warning(f'Error exiting manager context: {e}')
+                finally:
+                    self.manager = None
+
+            self.logger.info('BindCraft agent cleanup completed')
+
+        except Exception as e:
+            self.logger.error(f'BindCraft agent cleanup failed: {e}')
 
     def write_checkpoint(self, results: dict[str, Any]):
         #Use timestemp tom get unique name
@@ -85,7 +197,7 @@ class BindCraftAgent:
     async def generate_binder_hypothesis(self, 
                                          data: dict[str, Any]) -> Optional[ProteinHypothesis]:
         """"""
-        if not self.is_ready():
+        if not await self.is_ready():
             self.logger.error('BindCraft agent not ready')
             return None
 
@@ -102,90 +214,96 @@ class BindCraftAgent:
         folds_dir = cwd / "folds"
         fasta_dir.mkdir(exist_ok=True)
         folds_dir.mkdir(exist_ok=True)
-
-        # these need to be somehow passed into the call
+            
         target_sequence = data['target_sequence']
         print(f"\n{'='*80}")
         print(f"BindCraft _generate_binder_hypothesis - SEQUENCES BEING USED:")
         print(f"  target_sequence: {target_sequence[:50]}... ({len(target_sequence)} residues)")
         binder_sequence = data.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
-        print(f"  binder_sequence: {binder_sequence[:50]}... ({len(binder_sequence)} residues)")
-        print(f"{'='*80}\n")
-        device = data.get('device', 'cuda:0')
         num_rounds = data.get('num_rounds', 3)
+        
+        if False:
+            # these need to be somehow passed into the call
+            device = data.get('device', 'cuda:0')
 
-        if_kwargs = data.get('if_kwargs', {
-            'num_seq': data.get('num_seq', 25),
-            'batch_size': data.get('batch_size', 250),
-            'max_retries': data.get('retries', 5),
-            'sampling_temp': data.get('temp', '0.1'),
-            'model_name': data.get('mpnn_model', 'v_48_020'),
-            'model_weights': data.get('mpnn_weights', 'soluble_model_weights'),
-            'proteinmpnn_path': data.get('proteinmpnn_path', '/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN'),
-            'device': device
-        })
+            if_kwargs = data.get('if_kwargs', {
+                'num_seq': data.get('num_seq', 25),
+                'batch_size': data.get('batch_size', 250),
+                'max_retries': data.get('retries', 5),
+                'sampling_temp': data.get('temp', '0.1'),
+                'model_name': data.get('mpnn_model', 'v_48_020'),
+                'model_weights': data.get('mpnn_weights', 'soluble_model_weights'),
+                'proteinmpnn_path': data.get('proteinmpnn_path', '/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN'),
+                'device': device
+            })
 
-        qc_kwargs = data.get('qc_kwargs', {
-            'max_repeat': 4,
-            'max_appearance_ratio': 0.33,
-            'max_charge': 5,
-            'max_charge_ratio': 0.5,
-            'max_hydrophobic_ratio': 0.8,
-            'min_diversity': 8,
-            'bad_motifs': None,
-            'bad_n_termini': None # use defaults
-        })
+            qc_kwargs = data.get('qc_kwargs', {
+                'max_repeat': 4,
+                'max_appearance_ratio': 0.33,
+                'max_charge': 5,
+                'max_charge_ratio': 0.5,
+                'max_hydrophobic_ratio': 0.8,
+                'min_diversity': 8,
+                'bad_motifs': None,
+                'bad_n_termini': None # use defaults
+            })
 
-        # Initialize algorithm instances with required parameters
-        chai = Chai(
-            fasta_dir=fasta_dir,
-            out=folds_dir,
-            diffusion_steps=100,
-            device=device  # or 'cpu' if GPU not available
+            # Initialize algorithm instances with required parameters
+            chai = Chai(
+                fasta_dir=fasta_dir,
+                out=folds_dir,
+                diffusion_steps=100,
+                device=device  # or 'cpu' if GPU not available
+            )
+
+            proteinmpnn = ProteinMPNN(**if_kwargs)
+
+            self.manager = await Manager.from_exchange_factory(
+                factory=LocalExchangeFactory(),
+                executors=ThreadPoolExecutor(),
+            )
+
+            await self.manager.__aenter__()
+
+            self.logger.info('Launching bindcraft handles')
+
+            ## Launch individual agents
+            #self.fold_agent = await self.manager.launch(
+            #    FoldingAgent,
+            #    args=(chai, proteinmpnn, self.parsl_settings)
+            #)
+            #self.qc_agent = await self.manager.launch(
+            #    QualityControlAgent,
+            #    args=(SequenceQualityControl(**qc_kwargs),)
+            #)
+            #self.analyzer_agent = await self.manager.launch(
+            #    AnalysisAgent,
+            #    args=(SimpleEnergy(),)
+            #)
+
+            ## Launch coordinator with handles to other agents
+            #self.coordinator = await self.manager.launch(
+            #    PeptideDesignCoordinator,
+            #    args=(self.fold_agent, 
+            #          self.qc_agent, 
+            #          self.analyzer_agent, 
+            #          if_kwargs['num_seq'], 
+            #          if_kwargs['max_retries'])
+            #)
+
+        # Run the workflow
+        results = await self.coordinator.run_full_workflow(
+            target_sequence=target_sequence,
+            binder_sequence=binder_sequence,
+            fasta_base_path=fasta_dir,
+            pdb_base_path=folds_dir,
+            remodel_indices=[],  # Interface indices to redesign
+            num_rounds=num_rounds
         )
 
-        proteinmpnn = ProteinMPNN(**if_kwargs)
+        await self.cleanup()
 
-        async with await Manager.from_exchange_factory(
-            factory=LocalExchangeFactory(),
-            executors=ThreadPoolExecutor(),
-        ) as manager:
-            # Launch individual agents
-            forward_folder = await manager.launch(
-                ForwardFoldingAgent,
-                args=(chai,)
-            )
-            inverse_folder = await manager.launch(
-                InverseFoldingAgent,
-                args=(proteinmpnn,)
-            )
-            qc_agent = await manager.launch(
-                QualityControlAgent,
-                args=(SequenceQualityControl(**qc_kwargs),)
-            )
-            analyzer = await manager.launch(
-                AnalysisAgent,
-                args=(SimpleEnergy(),)
-            )
-
-            # Launch coordinator with handles to other agents
-            coordinator = await manager.launch(
-                PeptideDesignCoordinator,
-                args=(forward_folder, inverse_folder, qc_agent, analyzer, if_kwargs['num_seq'], if_kwargs['max_retries'])
-            )
-
-
-            # Run the workflow
-            results = await coordinator.run_full_workflow(
-                target_sequence=target_sequence,
-                binder_sequence=binder_sequence,
-                fasta_base_path=fasta_dir,
-                pdb_base_path=folds_dir,
-                remodel_indices=[],  # Interface indices to redesign
-                n_rounds=num_rounds
-            )
-
-            return results
+        return results
 
     async def _create_binder_hypothesis(self,
                                         results: dict[str, Any]) -> ProteinHypothesis:
@@ -231,43 +349,7 @@ class BindCraftAgent:
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> BinderAnalysis:
-        """
-        Analyze hypothesis and run BindCraft design.
-
-        Extracts target_sequence and binder_sequence from hypothesis.binder_data
-        if available, otherwise falls back to task_params.
-        """
-        print(hypothesis)
-        print(hypothesis.binder_data)
-        # STEP 1: Extract sequences from hypothesis binder_data if available
-        if hypothesis.has_binder_data() and hypothesis.binder_data:
-            binder_data = hypothesis.binder_data  # Direct attribute access
-
-            # Override task_params with sequences from hypothesis
-            if binder_data['target_sequence'] and binder_data['target_sequence'] != "UNKNOWN":
-                task_params['target_sequence'] = binder_data.target_sequence
-                self.logger.info(f"Using target sequence from hypothesis: {binder_data.target_sequence[:50]}...")
-
-            # Get binder sequence from proposed peptides if available
-            if binder_data['proposed_peptides'] and len(binder_data['proposed_peptides']) > 0:
-                # Use the first proposed peptide as the initial binder sequence
-                first_peptide = binder_data['proposed_peptides'][0]
-                if isinstance(first_peptide, dict) and 'sequence' in first_peptide:
-                    task_params['binder_sequence'] = first_peptide['sequence']
-                    self.logger.info(f"Using binder sequence from hypothesis: {first_peptide['sequence'][:50]}...")
-                elif hasattr(first_peptide, 'sequence'):
-                    task_params['binder_sequence'] = first_peptide.sequence
-                    self.logger.info(f"Using binder sequence from hypothesis: {first_peptide.sequence[:50]}...")
-
-        # STEP 2: Verify required sequences are present
-        if 'target_sequence' not in task_params:
-            raise ValueError("target_sequence not found in hypothesis binder_data or task_params")
-
-        if 'binder_sequence' not in task_params:
-            self.logger.warning("binder_sequence not found in hypothesis, using default")
-
-        # STEP 3: Run BindCraft with extracted sequences
-        result = await self._generate_binder_hypothesis(task_params)
+        result = await self.generate_binder_hypothesis(task_params)
         # Write result to file
         all_cycles = result['all_cycles']
         passing_structures = len(
