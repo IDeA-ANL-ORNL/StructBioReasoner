@@ -216,6 +216,9 @@ class BindCraftAgent:
         folds_dir.mkdir(exist_ok=True)
             
         target_sequence = data['target_sequence']
+        print(f"\n{'='*80}")
+        print(f"BindCraft _generate_binder_hypothesis - SEQUENCES BEING USED:")
+        print(f"  target_sequence: {target_sequence[:50]}... ({len(target_sequence)} residues)")
         binder_sequence = data.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
         num_rounds = data.get('num_rounds', 3)
         

@@ -166,11 +166,6 @@ Thumbs.db
 *.old
 
 # Debug Files
-debug_*.py
-test_*.py
-*_debug.py
-*_test.py
-
 # Large Model Files
 *.model
 *.pkl
@@ -246,6 +241,8 @@ structbio_venv
 pics
 
 # Misc testing things
-test/
-test.log
-test.err
+data/fastas/
+data/folds/
+data/jnana.db
+data/fastas/trial_0/fixed_design.jsonl
+data/fastas/trial_0/parsed_design.jsonl
