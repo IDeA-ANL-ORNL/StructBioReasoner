@@ -13,7 +13,7 @@ The adapter translates between:
 import dill as pickle
 import asyncio
 import logging
-from ...utils.parsl_settings import AuroraSettings, LocalSettings
+from ...utils.parsl_settings import LocalSettings
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
@@ -144,7 +144,7 @@ class MDAgentAdapter:
             # Launch MDAgent components
             self.builder_handle = await self.manager.launch(Builder)
             self.simulator_handle = await self.manager.launch(MDSimulator)
-            self.parsl_settings = AuroraSettings(**self.parsl_config).config_factory(Path.cwd())
+            self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd()) 
 
             self.logger.info('launching coordinator')
             self.coordinator_handle = await self.manager.launch(
@@ -579,16 +579,17 @@ class MDAgentAdapter:
         passing_structures = [Path(item).resolve() for sublist in passing_structures for item in sublist]
         self.logger.info('Checkpoint loaded')
         # TODO: get kwargs for build/sim from task_params
-        AMBERHOME="/lus/flare/projects/FoundEpidem/msinclair/envs/ambertools"
+        AMBERHOME="/lus/eagle/projects/FoundEpidem/msinclair/conda_envs/ambertools"
         sim_results = await self.run_md_simulation( 
             pdb_path=passing_structures,
             protein_name = "unknown",
             custom_build_kwargs = {'protein': True,
-                                   'amberhome': AMBERHOME},
+                                   'amberhome': AMBERHOME,
+                                   'delete_temp_file': False},
             custom_sim_kwargs = {'equil_steps': 1000,
                                  'prod_steps': 10000,
                                  'n_equil_cycles': 2,
-                                 'platform': 'OpenCL'},
+                                 'platform': 'CUDA'},
         )
        
 
