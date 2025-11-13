@@ -176,9 +176,14 @@ class BinderDesignSystem(JnanaSystem):
         await super().start()
 
         # Initialize design-specific components
-        #await self._initialize_design_tools()
+        
+        await self._initialize_design_tools()
         await self._initialize_design_agents()
-        await self._initialize_tool_registry()  # NEW: Initialize tool registry
+
+        ### If we want the llm to directly use tool calling then initialize the tool registry.
+        ### Otherwise keep it false
+        if False:
+            await self._initialize_tool_registry()  # NEW: Initialize tool registry
         await self._initialize_knowledge_foundation()
 
         self.design_system_ready = True

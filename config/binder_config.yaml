@@ -110,7 +110,7 @@ agents:
     bindcraft:
       cwd: '/flare/FoundEpidem/avasan/IDEAL/Agentics/StructBioReasoner/data'
       target_sequence: 'NITNLCPFGEVFNATRFASVYAWNRKRISNCVADYSVLYNSASFSTFKCYGVSPTKLNDLCFTNVYADSFVIRGDEVRQIAPGQTGKIADYNYKLPDDFTGCVIAWNSNNLDSKVGGNYNYLYRLFRKSNLKPFERDISTEIYQAGSTPCNGVEGFNCYFPLQSYGFQPTNGVGYQPYRVVVLSFELLHAPATVCGPKKSTNLVKNKCVNF'
-      binder_sequence: 'DPIQMGNDEFQKQNCLLEGEKQKLISEEDLLRKRREQLKHKLEQLRNSCA'
+      #binder_sequence: 'DPIQMGNDEFQKQNCLLEGEKQKLISEEDLLRKRREQLKHKLEQLRNSCA'
       device: 'xpu'
       num_rounds: 1
       fold_backend: "chai"  # Options: chai, alphafold
@@ -118,8 +118,8 @@ agents:
     
     # InverseFolding parameters
     inverse_folding:
-      num_seq: 2
-      batch_size: 2
+      #num_seq: 2
+      #batch_size: 2
       max_retries: 5
       sampling_temp: "0.1"
       model_name: "v_48_020"
