@@ -23,7 +23,8 @@ class BindCraftAgent:
     def __init__(self, 
                  agent_id: str,
                  config: dict[str, Any],
-                 model_manager: UnifiedModelManager):
+                 model_manager: UnifiedModelManager,
+                 parsl_config: dict[str, Any]):
         """"""
         self.agent_id = agent_id
         self.config = config
@@ -39,7 +40,7 @@ class BindCraftAgent:
         self.fold_backend = config.get('folding', 'chai')
         self.inv_fold_backend = config.get('inverse_folding', 'proteinmpnn')
 
-        self.parsl_config = self.config.get('parsl', {})
+        self.parsl_config = parsl_config #self.config.get('parsl', {})
         self.manager = None
         self.forward_folder = None
         self.inverse_folder = None

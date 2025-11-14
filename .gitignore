@@ -250,3 +250,4 @@ bindcraft_output/
 fastas/
 logs/test.err
 logs/two_steptoolcall.err
+parsl_out/

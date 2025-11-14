@@ -56,7 +56,7 @@ async def full_binder_design_pipeline():
     
     system = BinderDesignSystem(
         config_path="config/binder_config.yaml",
-        jnana_config_path="config/test_jnana_config.yaml",
+        jnana_config_path="../Jnana/config/config.yaml",
         enable_agents=['computational_design', 'molecular_dynamics']
     )
     
@@ -123,7 +123,7 @@ async def full_binder_design_pipeline():
     
     # Initial parameters
     parameters = {
-        "num_seqs": 50,
+        "num_seq": 10,
         "sampling_temp": 0.2,
         "qc_filters": {
             "multiplicity": 0.5,
@@ -156,7 +156,7 @@ async def full_binder_design_pipeline():
         # ---------------------------------------------------------------------
         print(f"\n[{iteration}.a] Running BindCraft optimization...")
         print(f"  Parameters:")
-        print(f"    - num_seqs: {parameters['num_seqs']}")
+        #print(f"    - num_seqs: {parameters['num_seqs']}")
         print(f"    - sampling_temp: {parameters['sampling_temp']}")
         print(f"    - simulation_time: {parameters['simulation_time']} ns")
         
@@ -180,7 +180,7 @@ async def full_binder_design_pipeline():
         # We can also pass them explicitly in the config (they will override if present)
         parsl_config = {
             'available_accelerators': [i for i in range(12)],
-            'nodes': 200
+            'nodes': 1
         }
         bindcraft_config = {
             # These will be extracted from hypothesis.binder_data by BindCraft agent
@@ -188,13 +188,15 @@ async def full_binder_design_pipeline():
             "target_sequence": target_sequence,
             "binder_sequence": binder_data['proposed_peptides'][0]["sequence"] if binder_data['proposed_peptides'] else None,
             "num_rounds": 3,
-            "num_seqs": parameters["num_seqs"],
+            "num_seq": parameters["num_seq"],
             "sampling_temp": parameters["sampling_temp"],
             "qc_filters": parameters["qc_filters"],
             "structure_filters": parameters["structure_filters"]
         }
         
+        print(f"{bindcraft_config=}")
         # Run BindCraft
+        print(system.design_agents)
         bindcraft_agent = system.design_agents['computational_design']
         bindcraft_results = await bindcraft_agent.analyze_hypothesis(
             current_hypothesis,

@@ -52,7 +52,8 @@ class MDAgentAdapter:
     
     def __init__(self, 
                  agent_id: str,
-                 config: Dict[str, Any]):
+                 config: Dict[str, Any],
+                 parsl_config: Dict[str, Any]):
         """
         Initialize MDAgent adapter.
         
@@ -61,6 +62,7 @@ class MDAgentAdapter:
         """
         self.agent_id = agent_id
         self.config = config
+
         self.agent_type = "md_simulation"
         self.specialization = "mdagent_backend"
         self.logger = logging.getLogger(__name__)
@@ -82,7 +84,7 @@ class MDAgentAdapter:
         self.coordinator_handle = None
 
         # Load parsl kwargs
-        self.parsl_config = self.config.get('parsl', {})
+        self.parsl_config = parsl_config
         
         # State tracking
         self.active_simulations = {}

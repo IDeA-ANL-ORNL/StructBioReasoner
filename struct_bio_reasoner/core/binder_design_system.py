@@ -89,7 +89,7 @@ class BinderDesignSystem(JnanaSystem):
         
         # Load protein-specific configuration
         self.binder_config = load_binder_config(config_path)
-        
+        self.parsl_config = self.binder_config['parsl']
         print('loaded binder config')
         # Determine Jnana config path
         if not jnana_config_path:
@@ -238,6 +238,7 @@ class BinderDesignSystem(JnanaSystem):
         # Initialize structural analysis agent
         if 'computational_design' in self.enable_agents:
             try:
+
                 design_config = self.binder_config.get("agents", {}).get("computational_design", asdict(BinderConfig()))
 
                 if 'bindcraft' in design_config:
@@ -253,8 +254,10 @@ class BinderDesignSystem(JnanaSystem):
                 self.design_agents['computational_design'] = BindCraftAgent(
                                                                 agent_id='binder_design',
                                                                 config=design_config,
-                                                                model_manager=self.model_manager
+                                                                model_manager=self.model_manager,
+                                                                parsl_config = self.parsl_config
                                                                 )
+                #print(self.design_agents)
                 self.logger.info("BindCraft agent initialized")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize BindCraft agent: {e}")
@@ -265,7 +268,8 @@ class BinderDesignSystem(JnanaSystem):
                 md_config = agent_configs.get("molecular_dynamics", {})
                 self.design_agents['molecular_dynamics'] = MDAgentAdapter(
                     agent_id="molecular_dynamics",
-                    config=md_config
+                    config=md_config,
+                    parsl_config = self.parsl_config
                 )
                 self.logger.info("MD agent initialized")
             except Exception as e:
@@ -547,12 +551,13 @@ class BinderDesignSystem(JnanaSystem):
 
             task_params['computational_design'].update(design_config)
 
-        if "molecular_dynamics" in self.enable_agents:
-            self.logger.info('we should be here')
-            md_analysis = await self.design_agents['molecular_dynamics'].analyze_hypothesis(
-                protein_hypothesis, task_params
-            )
-            protein_hypothesis.add_md_analysis(md_analysis)
+        if False:
+            if "molecular_dynamics" in self.enable_agents:
+                self.logger.info('we should be here')
+                md_analysis = await self.design_agents['molecular_dynamics'].analyze_hypothesis(
+                    protein_hypothesis, task_params
+                )
+                protein_hypothesis.add_md_analysis(md_analysis)
         
         return protein_hypothesis
     

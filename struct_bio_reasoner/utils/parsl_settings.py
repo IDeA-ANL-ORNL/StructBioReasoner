@@ -54,7 +54,7 @@ class LocalSettings(BaseComputeSettings):
                     provider=LocalProvider(
                         nodes_per_block=self.nodes,
                         launcher=MpiExecLauncher(
-                            bind_cmd="--cpu-bind", overrides=f"--depth=200 --ppn {ppn}"
+                            bind_cmd="--cpu-bind", overrides=f"--depth=4 --ppn {ppn}"
                         ),  # Updates to the mpiexec command
                     ),
                     label=self.label,
