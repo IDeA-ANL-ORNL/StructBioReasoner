@@ -56,7 +56,7 @@ async def full_binder_design_pipeline():
     
     system = BinderDesignSystem(
         config_path="config/binder_config.yaml",
-        jnana_config_path="../Jnana/config/config.yaml",
+        jnana_config_path="config/test_jnana_config.yaml",
         enable_agents=['computational_design', 'molecular_dynamics']
     )
     
