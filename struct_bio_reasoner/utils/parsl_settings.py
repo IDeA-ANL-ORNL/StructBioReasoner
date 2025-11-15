@@ -37,25 +37,26 @@ class BaseComputeSettings(ABC, BaseSettings):
 
 class LocalSettings(BaseComputeSettings):
     available_accelerators: Union[int, Sequence[str]] = [f'{i}' for i in range(12)]
+    worker_init: str = ''
     nodes: int = 1
     retries: int = 1
     label: str = 'htex'
     worker_port_range: Tuple[int, int] = (10000, 20000)
 
     def config_factory(self, run_dir: PathLike) -> Config:
-        ppn = self.available_accelerators
-        if isinstance(ppn, list):
-            ppn = len(ppn)
         return Config(
-            run_dir=str(run_dir),
+            run_dir=str(run_dir/'runinfo'),
             retries=self.retries,
             executors=[
                 HighThroughputExecutor(
                     provider=LocalProvider(
                         nodes_per_block=self.nodes,
+                        init_blocks=1,
+                        max_blocks=1,
                         launcher=MpiExecLauncher(
-                            bind_cmd="--cpu-bind", overrides=f"--depth=4 --ppn {ppn}"
+                            bind_cmd="--cpu-bind", overrides=f"--depth=1 --ppn 1"
                         ),  # Updates to the mpiexec command
+                        worker_init='export TMPDIR=/tmp',#self.worker_init,
                     ),
                     label=self.label,
                     cpu_affinity="block",
@@ -137,7 +138,7 @@ class AuroraSettings(BaseComputeSettings):
 
     def config_factory(self, run_dir: PathLike) -> Config:
         """Create a Parsl configuration for running on Aurora."""
-        self.worker_init += f'; {run_dir.resolve()}'
+        self.worker_init += f'; cd {run_dir.resolve()}'
         return Config(
             executors=[
                 HighThroughputExecutor(

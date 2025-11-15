@@ -69,9 +69,9 @@ async def full_binder_design_pipeline():
     print("\n[STEP 2] Setting research goal...")
     
     research_goal = """
-    Design affibody peptide binders of length 68 amino acids for SARS-CoV-2 spike protein receptor binding domain (RBD) 
+    Design affibody peptide binders of length 68 amino acids for Q9BZQ4|NMNA2_HUMAN Nicotinamide/nicotinic acid mononucleotide adenylyltransferase 2 OS=Homo sapiens OX=9606 GN=NMNAT2 PE=1 SV=1 
     to optimize binding affinity and stability. Target sequence: 
-    NITNLCPFGEVFNATRFASVYAWNRKRISNCVADYSVLYNSASFSTFKCYGVSPTKLNDLCFTNVYADSFVIRGDEVRQIAPGQTGKIADYNYKLPDDFTGCVIAWNSNNLDSKVGGNYNYLYRLFRKSNLKPFERDISTEIYQAGSTPCNGVEGFNCYFPLQSYGFQPTNGVGYQPYRVVVLSFELLHAPATVCGPKKSTNLVKNKCVNF
+    MTETTKTHVILLACGSFNPITKGHIQMFERARDYLHKTGRFIVIGGIVSPVHDSYGKQGLVSSRHRLIMCQLAVQNSDWIRVDPWECYQDTWQTTCSVLEHHRDLMKRVTGCILSNVNTPSMTPVIGQPQNETPQPIYQNSNVATKPTAAKILGKVGESLSRICCVRPPVERFTFVDENANLGTVMRYEEIELRILLLCGSDLLESFCIPGLWNEADMEVIVGDFGIVVVPRDAADTDRIMNHSSILRKYKNNIMVVKDDINHPMSVVSSTKSRLALQHGDGHVVDYLSQPVIDYILKSQLYINASG
     
     Goals:
     - Binding affinity < 10 nM
@@ -198,6 +198,8 @@ async def full_binder_design_pipeline():
         # Run BindCraft
         print(system.design_agents)
         bindcraft_agent = system.design_agents['computational_design']
+        
+        #cosci.stop()
         bindcraft_results = await bindcraft_agent.analyze_hypothesis(
             current_hypothesis,
             bindcraft_config

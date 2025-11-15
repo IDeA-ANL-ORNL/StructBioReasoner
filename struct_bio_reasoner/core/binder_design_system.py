@@ -184,6 +184,7 @@ class BinderDesignSystem(JnanaSystem):
         ### Otherwise keep it false
         if False:
             await self._initialize_tool_registry()  # NEW: Initialize tool registry
+
         await self._initialize_knowledge_foundation()
 
         self.design_system_ready = True
@@ -537,8 +538,8 @@ class BinderDesignSystem(JnanaSystem):
 
                 # Override design_config with sequences from hypothesis
                 if binder_data['target_sequence'] and binder_data['target_sequence'] != "UNKNOWN":
-                    design_config['target_sequence'] = binder_data.target_sequence
-                    self.logger.info(f"Adding target sequence from hypothesis to design_config: {binder_data.target_sequence[:50]}...")
+                    design_config['target_sequence'] = binder_data['target_sequence']
+                    self.logger.info(f"Adding target sequence from hypothesis to design_config: {binder_data['target_sequence'][:50]}...")
 
                 # Get binder sequence from proposed peptides
                 if binder_data['proposed_peptides'] and len(binder_data['proposed_peptides']) > 0:
@@ -558,8 +559,9 @@ class BinderDesignSystem(JnanaSystem):
                     protein_hypothesis, task_params
                 )
                 protein_hypothesis.add_md_analysis(md_analysis)
+        #coscientist.supervisor.stop()
         
-        return protein_hypothesis
+        return protein_hypothesis ## hacky thing to try...
     
     def get_protein_system_status(self) -> Dict[str, Any]:
         """Get protein system status."""

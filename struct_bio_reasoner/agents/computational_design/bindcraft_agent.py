@@ -292,6 +292,7 @@ class BindCraftAgent:
             #          if_kwargs['max_retries'])
             #)
 
+        self.logger.info('Matt was here')
         # Run the workflow
         results = await self.coordinator.run_full_workflow(
             target_sequence=target_sequence,
