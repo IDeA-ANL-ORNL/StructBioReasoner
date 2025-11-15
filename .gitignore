@@ -251,3 +251,14 @@ fastas/
 logs/test.err
 logs/two_steptoolcall.err
 parsl_out/
+chai/
+cmd_parsl.htex.*
+cmd_parsl.htex.*
+cmd_parsl.htex.*
+data_matt/
+parsl.htex.*
+parsl.htex.*
+parsl.htex.*
+runinfo/
+temp.fa
+test_chai.py
