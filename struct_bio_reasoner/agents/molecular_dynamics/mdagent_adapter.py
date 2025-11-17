@@ -72,6 +72,7 @@ class MDAgentAdapter:
         self.solvent_model = self.mdagent_config.get("solvent_model", "explicit")
         self.force_field = self.mdagent_config.get("force_field", "amber14")
         self.water_model = self.mdagent_config.get("water_model", "tip3p")
+        self.amberhome = self.mdagent_config.get('amberhome', None)
         
         # Simulation parameters
         self.equil_steps = self.mdagent_config.get("equil_steps", 10_000)
@@ -119,16 +120,13 @@ class MDAgentAdapter:
             try:
                 # Try importing from mdagent package (if installed as package)
                 from MDAgent.core.agents_no_FE import Builder, MDSimulator, MDCoordinator
+                from molecular_simulations.build import ImplicitSolvent, ExplicitSolvent
             except ImportError:
-                try:
-                    # Try importing from agents module (if MDAgent is in PYTHONPATH)
-                    from agents import Builder, MDSimulator, MDCoordinator
-                except ImportError as e:
-                    self.logger.error(f"Cannot import MDAgent components: {e}")
-                    self.logger.info("Make sure MDAgent is installed and in PYTHONPATH")
-                    self.logger.info("Install from: https://github.com/msinclair-py/MDAgent")
-                    self.initialized = False
-                    return False
+                self.logger.error(f"Cannot import MDAgent components: {e}")
+                self.logger.info("Make sure MDAgent is installed and in PYTHONPATH")
+                self.logger.info("Install from: https://github.com/msinclair-py/MDAgent")
+                self.initialized = False
+                return False
 
             self.logger.info('survived import')
             # Create Academy manager using async context manager pattern
@@ -144,7 +142,11 @@ class MDAgentAdapter:
             self.logger.info('launching handles')
 
             # Launch MDAgent components
-            self.builder_handle = await self.manager.launch(Builder)
+            self.builder_handle = await self.manager.launch(
+                Builder, args=(
+                    ImplicitSolvent, ExplicitSolvent, self.amberhome
+                )
+            )
             self.simulator_handle = await self.manager.launch(MDSimulator)
             self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
 
@@ -267,9 +269,12 @@ class MDAgentAdapter:
             build_kwargs = custom_build_kwargs or {
                 'solvent': self.solvent_model,
                 'protein': True,
-                'out': 'system.pdb'
+                'out': 'system.pdb',
             }
             
+            if 'amberhome' not in build_kwargs:
+                build_kwargs['amberhome'] = self.amberhome
+
             # Prepare simulation kwargs
             sim_kwargs = custom_sim_kwargs or {
                 'solvent': self.solvent_model,
@@ -573,7 +578,6 @@ class MDAgentAdapter:
         #### Rewrite this according to how binder analysis adds to hypothesis
         self.logger.info('We are about to run MD')
         checkpoint_file = hypothesis.binder_analysis.checkpoint_file
-        #checkpoint_file = 'bindcraft_checkpoint_20251113_172815.pkl'
         checkpoint_data = pickle.load(open(checkpoint_file, 'rb'))
         all_cycles = checkpoint_data['all_cycles']
         passing_structures = [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
@@ -581,16 +585,14 @@ class MDAgentAdapter:
         passing_structures = [Path(item).resolve() for sublist in passing_structures for item in sublist]
         self.logger.info('Checkpoint loaded')
         # TODO: get kwargs for build/sim from task_params
-        AMBERHOME="/lus/flare/projects/FoundEpidem/msinclair/envs/ambertools"
         sim_results = await self.run_md_simulation( 
             pdb_path=passing_structures,
             protein_name = "unknown",
-            custom_build_kwargs = {'protein': True,
-                                   'amberhome': AMBERHOME},
+            custom_build_kwargs = {'protein': True},
             custom_sim_kwargs = {'equil_steps': 1000,
                                  'prod_steps': 10000,
                                  'n_equil_cycles': 2,
-                                 'platform': 'OpenCL'},
+                                 'platform': 'CUDA'},
         )
        
 
