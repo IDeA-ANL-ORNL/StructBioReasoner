@@ -149,7 +149,8 @@ async def full_binder_design_pipeline():
                 research_goal=research_goal,
                 strategy="binder_gen"#"coscientist_binder_design"  # New strategy for binder design
             )
-            hyp_count+=1
+            if initial_hypothesis!=None:
+                hyp_count+=1
         except:
             continue
     logger.info(f"✓ Initial hypothesis generated: {initial_hypothesis.hypothesis_id}")
