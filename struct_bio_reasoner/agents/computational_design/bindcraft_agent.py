@@ -214,7 +214,7 @@ class BindCraftAgent:
                                           data: dict[str, Any]) -> Optional[ProteinHypothesis]:
         """"""
         # prepare output paths
-        cwd = Path(data.get('cwd', os.getcwd()))
+        cwd = Path(self.config.get('cwd', os.getcwd()))
         cwd.mkdir(exist_ok=True)
 
         fasta_dir = cwd / "fastas"
