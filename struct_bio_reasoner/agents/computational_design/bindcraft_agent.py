@@ -98,6 +98,9 @@ class BindCraftAgent:
                 'device': device
             })
 
+            if 'device' not in if_kwargs:
+                if_kwargs['device'] = device
+
             qc_kwargs = self.config.get('qc_kwargs', {
                 'max_repeat': 4,
                 'max_appearance_ratio': 0.33,
