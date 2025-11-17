@@ -133,20 +133,23 @@ class BindCraftAgent:
 
             self.logger.info('Launching bindcraft handles')
 
-            # Launch coordinator with handles to other agents
-            self.coordinator = await self.manager.launch(
-                ParslDesignCoordinator,
-                args=(chai,
-                      proteinmpnn,
-                      energy_alg,
-                      qc_alg,
-                      self.parsl_settings,
-                      if_kwargs['num_seq'], 
-                      if_kwargs['max_retries'],
-                      -10.,
-                     ),
-            )
+            try:
+                # Launch coordinator with handles to other agents
+                self.coordinator = await self.manager.launch(
+                    ParslDesignCoordinator,
+                    args=(chai,
+                          proteinmpnn,
+                          energy_alg,
+                          qc_alg,
+                          self.parsl_settings,
+                          if_kwargs['num_seq'], 
+                          if_kwargs['max_retries'],
+                          -10.,
+                         ),
+                )
 
+            except Exception as e:
+                self.logger.exception("An error occurred with the ParslDesignCoordinator")
         except ImportError as e:
             self.logger.error(f'Cannot import BindCraft components: {e}')
             self.logger.info('Make sure BindCraft is installed and in PYTHONPATH')
