@@ -108,23 +108,23 @@ agents:
     
     # BindCraft-specific settings
     bindcraft:
-      cwd: '/flare/FoundEpidem/avasan/IDEAL/Agentics/StructBioReasoner/data'
+      cwd: '/eagle/FoundEpidem/avasan/IDEAL/Agents/StructBioReasoner'
       target_sequence: 'NITNLCPFGEVFNATRFASVYAWNRKRISNCVADYSVLYNSASFSTFKCYGVSPTKLNDLCFTNVYADSFVIRGDEVRQIAPGQTGKIADYNYKLPDDFTGCVIAWNSNNLDSKVGGNYNYLYRLFRKSNLKPFERDISTEIYQAGSTPCNGVEGFNCYFPLQSYGFQPTNGVGYQPYRVVVLSFELLHAPATVCGPKKSTNLVKNKCVNF'
       binder_sequence: 'DPIQMGNDEFQKQNCLLEGEKQKLISEEDLLRKRREQLKHKLEQLRNSCA'
-      device: 'xpu'
+      device: 'cuda:0'
       num_rounds: 1
       fold_backend: "chai"  # Options: chai, alphafold
       inv_fold_backend: "proteinmpnn"
     
     # InverseFolding parameters
     inverse_folding:
-      num_seq: 10
-      batch_size: 50
+      num_seq: 5
+      batch_size: 5
       max_retries: 5
       sampling_temp: "0.1"
       model_name: "v_48_020"
       model_weights: "soluble_model_weights"
-      proteinmpnn_path: "/lus/flare/projects/FoundEpidem/msinclair/pkgs/ProteinMPNN"  # Update with actual path
+      proteinmpnn_path: "/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN"  # Update with actual path
     
     # Quality control
     quality_control:
@@ -134,8 +134,8 @@ agents:
       max_charge_ratio: 0.5
       max_hydrophobic_ratio: 0.8
       min_diversity: 8
-      bad_motifs: null
-      bad_n_termini: null
+      bad_motifs: [] #null
+      bad_n_termini: [] #null
     
     confidence_threshold: 0.7
 
@@ -258,5 +258,5 @@ security:
     audit_log_access: true
 
 parsl:
-  available_accelerators: ["0", "1", "2", "3", "4","5", "6", "7", "8", "9", "10", "11"]
+  available_accelerators: 4
   nodes: 1

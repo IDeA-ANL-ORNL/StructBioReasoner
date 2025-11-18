@@ -176,7 +176,7 @@ async def full_binder_design_pipeline():
     
     # Initial parameters
     parameters = {
-        "num_seq": 10,
+        "num_seq": 5,
         "sampling_temp": 0.2,
         "qc_filters": {
             "multiplicity": 0.5,
@@ -190,15 +190,17 @@ async def full_binder_design_pipeline():
             "passing": 0.8
         },
         "structure_filters": {
-            "energy": -50.0,
+            "energy": -10.0,
             "rmsd": 2.0,
             "rmsf": 1.5,
             "passing": 0.7
         },
-        "simulation_time": 100  # ns
+        "simulation_time": 10  # ns
     }
     
-    await cleanup_all_queues()
+    if False:
+        await cleanup_all_queues()
+    
     while iteration < 1:#max_iterations:
         iteration += 1
         logger.info(f"\n{'='*60}")
@@ -240,7 +242,7 @@ async def full_binder_design_pipeline():
             # but we include them here for clarity and as fallback
             "target_sequence": target_sequence,
             "binder_sequence": binder_data['proposed_peptides'][0]["sequence"] if binder_data['proposed_peptides'] else None,
-            "num_rounds": 3,
+            "num_rounds": 1,
             "num_seq": parameters["num_seq"],
             "sampling_temp": parameters["sampling_temp"],
             "qc_filters": parameters["qc_filters"],

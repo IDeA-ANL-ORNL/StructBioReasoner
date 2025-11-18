@@ -10,7 +10,7 @@ agents:
     max_tokens: 10486
     model: gpt-4o
     provider: openai
-    temperature: 0.8
+    temperature: 0.6
   meta_review:
     api_key: ${OPENAI_API_KEY}
     max_tokens: 4096
