@@ -26,54 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent / '../Jnana'))
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-import gc
-import multiprocessing
-from queue import PriorityQueue, Queue  # Standard library queues
-import time
-
-async def cleanup_all_queues():
-    """Clean up ALL queues and workers"""
-    
-    print("🧹 Cleaning up multiprocessing resources...\n")
-    
-    # 1. Find and close all queue objects
-    logger.info("1. Finding queue objects...")
-    queues_found = 0
-    for obj in gc.get_objects():
-        # Check for both standard and multiprocessing queues
-        if isinstance(obj, (PriorityQueue, Queue)):
-            queues_found += 1
-            try:
-                if hasattr(obj, 'close'):
-                    obj.close()
-                if hasattr(obj, 'join_thread'):
-                    obj.join_thread()
-                logger.info(f"   ✓ Closed queue: {type(obj).__name__}")
-            except Exception as e:
-                logger.info(f"   ✗ Error closing queue: {e}")
-    
-    logger.info(f"   Total queues closed: {queues_found}\n")
-    
-    # 2. Terminate active child processes
-    logger.info("2. Terminating child processes...")
-    active = multiprocessing.active_children()
-    for proc in active:
-        logger.info(f"   Terminating {proc.name} (PID: {proc.pid})")
-        proc.terminate()
-        proc.join(timeout=2)
-        if proc.is_alive():
-            proc.kill()
-    
-    logger.info(f"   Terminated {len(active)} processes\n")
-    
-    # 3. Force garbage collection
-    logger.info("3. Running garbage collection...")
-    gc.collect()
-    time.sleep(1)
-    
-    logger.info("✅ Cleanup complete!")
-
-
+from struct_bio_reasoner.utils.cleanup_queue import cleanup_all_queues
 
 async def full_binder_design_pipeline():
     """
@@ -198,7 +151,7 @@ async def full_binder_design_pipeline():
         "simulation_time": 10  # ns
     }
     
-    if True:
+    if False:
         await cleanup_all_queues()
     
     while iteration < 1:#max_iterations:
@@ -234,7 +187,7 @@ async def full_binder_design_pipeline():
         # NOTE: The BindCraft agent will automatically extract sequences from hypothesis.binder_data
         # We can also pass them explicitly in the config (they will override if present)
         parsl_config = {
-            'available_accelerators': [str(i) for i in range(12)],
+            'available_accelerators': [i for i in range(12)],
             'nodes': 1
         }
         bindcraft_config = {
@@ -254,21 +207,35 @@ async def full_binder_design_pipeline():
         logger.info(system.design_agents)
         bindcraft_agent = system.design_agents['computational_design']
         
-        #cosci.stop()
-        bindcraft_results = await bindcraft_agent.analyze_hypothesis(
-            current_hypothesis,
-            bindcraft_config
-        )
+        if False: # placing False since this is under heavy maintenance
+            #cosci.stop()
+            bindcraft_results = await bindcraft_agent.analyze_hypothesis(
+                current_hypothesis,
+                bindcraft_config
+            )
         
-        logger.info(f"  ✓ BindCraft complete:")
-        logger.info(f"    - Total sequences: {bindcraft_results.total_sequences}")
-        logger.info(f"    - Passing sequences: {bindcraft_results.passing_sequences}")
-        logger.info(f"    - Passing structures: {bindcraft_results.passing_structures}")
-        logger.info(f"    - Success rate: {bindcraft_results.success_rate:.1%}")
+            logger.info(f"  ✓ BindCraft complete:")
+            logger.info(f"    - Total sequences: {bindcraft_results.total_sequences}")
+            logger.info(f"    - Passing sequences: {bindcraft_results.passing_sequences}")
+            logger.info(f"    - Passing structures: {bindcraft_results.passing_structures}")
+            logger.info(f"    - Success rate: {bindcraft_results.success_rate:.1%}")
+            
+            # Add results to hypothesis
+            current_hypothesis.add_binder_analysis(bindcraft_results)
         
-        # Add results to hypothesis
-        current_hypothesis.add_binder_analysis(bindcraft_results)
-        
+        if True:
+            from struct_bio_reasoner.data.protein_hypothesis import BinderAnalysis
+            bindcraft_results = BinderAnalysis(protein_id="X",
+                                    num_rounds = 1,
+                                    total_sequences = 1000,
+                                    passing_sequences = 800,
+                                    passing_structures = 50,
+                                    success_rate = 0.05,
+                                    checkpoint_file = '')
+            recommendation = await system.generate_recommendation(bindcraft_results)
+            logger.info(f"Recommendation: {recommendation}")
+        import sys
+        sys.exit()
         # ---------------------------------------------------------------------
         # STEP 4b: Run MD Simulations
         # ---------------------------------------------------------------------

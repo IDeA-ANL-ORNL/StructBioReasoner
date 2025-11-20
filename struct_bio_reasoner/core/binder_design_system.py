@@ -477,6 +477,7 @@ class BinderDesignSystem(JnanaSystem):
                     # Get all generation agents from supervisor
                     generation_agents = [agent for agent_id, agent in coscientist.supervisor.agents.items()
                                        if agent_id.startswith('generation')]
+
                     if generation_agents:
                         # Set research_plan_config in ALL generation agents' memory
                         research_plan_config = {
@@ -539,30 +540,54 @@ class BinderDesignSystem(JnanaSystem):
                 # Override design_config with sequences from hypothesis
                 if binder_data['target_sequence'] and binder_data['target_sequence'] != "UNKNOWN":
                     design_config['target_sequence'] = binder_data['target_sequence']
-                    self.logger.info(f"Adding target sequence from hypothesis to design_config: {binder_data['target_sequence'][:50]}...")
+                    self.logger.info(f"Adding target sequence \
+                                        from hypothesis to design_config:\
+                                        {binder_data['target_sequence'][:50]}...")
 
                 # Get binder sequence from proposed peptides
                 if binder_data['proposed_peptides'] and len(binder_data['proposed_peptides']) > 0:
                     first_peptide = binder_data['proposed_peptides'][0]
                     if isinstance(first_peptide, dict) and 'sequence' in first_peptide:
                         design_config['binder_sequence'] = first_peptide['sequence']
-                        self.logger.info(f"Adding binder sequence from hypothesis to design_config: {first_peptide['sequence'][:50]}...")
+                        self.logger.info(f"Adding binder sequence"+\
+                                        f"from hypothesis to design_config:"+\
+                                        f"{first_peptide['sequence'][:50]}...")
             else:
-                self.logger.warning("Hypothesis does not have binder_data! Using config defaults for sequences.")
+                self.logger.warning("Hypothesis doesnt have binder_data! config default seqs.")
 
             task_params['computational_design'].update(design_config)
 
-        if False:
-            if "molecular_dynamics" in self.enable_agents:
-                self.logger.info('we should be here')
-                md_analysis = await self.design_agents['molecular_dynamics'].analyze_hypothesis(
-                    protein_hypothesis, task_params
-                )
-                protein_hypothesis.add_md_analysis(md_analysis)
-        #coscientist.supervisor.stop()
         
-        return protein_hypothesis ## hacky thing to try...
+        return protein_hypothesis
     
+    async def generate_recommendation(self,
+                                      results,
+                                      runtype='bindcraft'
+                                        ):
+        """
+        Generate a protein-specific hypothesis.
+
+        Args:
+            results
+        Returns:
+            Generated recommendation
+        """
+        #self.logger.info(f"Generating protein hypothesis with strategy: {strategy}")
+
+        if runtype == 'bindcraft':
+            conclusion = f"After running bindcraft {results.num_rounds} rounds and generating {results.total_sequences} sequences total, {results.passing_structures} structures pass sequence and structure quality control. I want at least 200 passing structures before going to md simulations"
+            self.logger.info(f"Conclusion after running {runtype}: {conclusion}")
+            results_pass = {'run_type': 'bindcraft',
+                            'run_conc': conclusion}
+            recommendation = await self.generate_single_recommendation(results_pass)
+        self.logger.info(f"Here is the protein recommendation: \n {[rec.to_dict() for rec in recommendation]}")
+        #protein_recommendation = ProteinHypothesis.from_unified_hypothesis(
+        #    recommendation,
+        #    #biological_context=biological_context # this goes into `protein_metadata`
+        #)
+        
+        return [rec.to_dict() for rec in recommendation] #protein_recommendation
+
     def get_protein_system_status(self) -> Dict[str, Any]:
         """Get protein system status."""
         base_status = self.get_system_status()
