@@ -588,6 +588,60 @@ class BinderDesignSystem(JnanaSystem):
         
         return [rec.to_dict() for rec in recommendation] #protein_recommendation
 
+    async def generate_recommendedconfig(self,
+                                      previous_run_type,
+                                      previous_run_config,
+                                      recommendation,
+                                        ):
+        """
+        Generate a protein-specific hypothesis.
+
+        Args:
+            results
+        Returns:
+            Generated recommendation
+        """
+        previous_run = {'run_type': previous_run_type,
+                        'config': previous_run_config}
+        recommended_configs = await self.generate_single_recommend_config(previous_run,
+                        recommendation)
+        self.logger.info(f"Here is the recommended config: \n {[rec.to_dict() for rec in recommended_configs]}")
+        
+        return [rec.to_dict() for rec in recommended_configs] #protein_recommendation
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def get_protein_system_status(self) -> Dict[str, Any]:
         """Get protein system status."""
         base_status = self.get_system_status()

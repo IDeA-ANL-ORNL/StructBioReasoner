@@ -234,6 +234,23 @@ async def full_binder_design_pipeline():
                                     checkpoint_file = '')
             recommendation = await system.generate_recommendation(bindcraft_results)
             logger.info(f"Recommendation: {recommendation}")
+        
+        if True:
+            previous_run_config ={
+                "target_sequence": target_sequence,
+                "binder_sequence": binder_data['proposed_peptides'][0]["sequence"] if binder_data['proposed_peptides'] else None,
+                "num_rounds": 1,
+                "num_seq": parameters["num_seq"],
+                "sampling_temp": parameters["sampling_temp"],
+                "qc_filters": parameters["qc_filters"],
+                "structure_filters": parameters["structure_filters"]
+            }
+            previous_run_type = 'bindcraft'    
+            
+            await system.generate_recommendedconfig(previous_run_type,
+                                previous_run_config,
+                                recommendation)
+
         import sys
         sys.exit()
         # ---------------------------------------------------------------------

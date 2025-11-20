@@ -184,7 +184,7 @@ async def full_binder_design_pipeline():
             "repeat": 0.3,
             "charge_ratio": 0.5,
             "check_bad_motifs": True,
-            "net_charge": 0.4,
+            "net_charge": 4,
             "bad_terminus": True,
             "hydrophobicity": 0.6,
             "passing": 0.8
@@ -198,7 +198,7 @@ async def full_binder_design_pipeline():
         "simulation_time": 10  # ns
     }
     
-    if True:
+    if False:
         await cleanup_all_queues()
     
     while iteration < 1:#max_iterations:

@@ -111,7 +111,7 @@ agents:
       cwd: '/flare/FoundEpidem/avasan/IDEAL/Agentics/StructBioReasoner'
       target_sequence: 'NITNLCPFGEVFNATRFASVYAWNRKRISNCVADYSVLYNSASFSTFKCYGVSPTKLNDLCFTNVYADSFVIRGDEVRQIAPGQTGKIADYNYKLPDDFTGCVIAWNSNNLDSKVGGNYNYLYRLFRKSNLKPFERDISTEIYQAGSTPCNGVEGFNCYFPLQSYGFQPTNGVGYQPYRVVVLSFELLHAPATVCGPKKSTNLVKNKCVNF'
       binder_sequence: 'DPIQMGNDEFQKQNCLLEGEKQKLISEEDLLRKRREQLKHKLEQLRNSCA'
-      device: 'cuda:0'
+      device: 'xpu'
       num_rounds: 1
       fold_backend: "chai"  # Options: chai, alphafold
       inv_fold_backend: "proteinmpnn"
@@ -124,7 +124,7 @@ agents:
       sampling_temp: "0.1"
       model_name: "v_48_020"
       model_weights: "soluble_model_weights"
-      proteinmpnn_path: "/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN"  # Update with actual path
+      proteinmpnn_path: "/lus/flare/projects/FoundEpidem/avasan/Software/ProteinMPNN"  # Update with actual path
     
     # Quality control
     quality_control:
@@ -173,6 +173,8 @@ agents:
       prod_steps: 1_000_000  # 2ns at 2fs timestep
       protein: true
       output_file: "system.pdb"
+      ambertools: "/lus/flare/projects/Aurora_deployment/avasan/envs/ambertools" 
+      platform: "OpenCL"
 
   # Energetic Analysis Agent
   energetic_analysis:
