@@ -4,6 +4,21 @@
 
 This guide explains how BindCraft computational design has been integrated as a **tool** that LLM agents in Jnana can call during hypothesis generation. This is **optional** and **backward compatible** - the existing pipeline in `examples/example_full_pipeline.py` continues to work unchanged.
 
+---
+
+## 📊 Complete Workflow Documentation
+
+For a comprehensive visual workflow with detailed function calls and step-by-step process, see:
+- **[HYPOTHESIS_GENERATION_WORKFLOW.md](./HYPOTHESIS_GENERATION_WORKFLOW.md)** - Complete workflow documentation with Mermaid diagrams showing:
+  - All 5 hypothesis generation strategies
+  - Two-step tool calling approach
+  - Config defaults and override mechanism
+  - Complete function call sequence
+
+This document provides a high-level overview of the tool integration architecture.
+
+---
+
 ## Architecture
 
 ```
@@ -30,7 +45,7 @@ This guide explains how BindCraft computational design has been integrated as a 
 │              StructBioReasoner                              │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │         BindCraftAgent                                │  │
-│  │  - run_design_cycle()                                 │  │
+│  │  - run_design()                                  .       │
 │  │  - Returns: sequences, structures, metrics            │  │
 │  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
