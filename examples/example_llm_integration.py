@@ -70,7 +70,7 @@ async def full_binder_design_pipeline():
     logger.info("\n[STEP 2] Setting research goal...")
     
     research_goal = """
-    Design affibody peptide binders of length 68 amino acids for Q9BZQ4|NMNA2_HUMAN Nicotinamide/nicotinic acid mononucleotide adenylyltransferase 2 OS=Homo sapiens OX=9606 GN=NMNAT2 PE=1 SV=1 
+    Design affibody and only affibody for Q9BZQ4|NMNA2_HUMAN Nicotinamide/nicotinic acid mononucleotide adenylyltransferase 2 OS=Homo sapiens OX=9606 GN=NMNAT2 PE=1 SV=1 
     to optimize binding affinity and stability. Target sequence: 
     MTETTKTHVILLACGSFNPITKGHIQMFERARDYLHKTGRFIVIGGIVSPVHDSYGKQGLVSSRHRLIMCQLAVQNSDWIRVDPWECYQDTWQTTCSVLEHHRDLMKRVTGCILSNVNTPSMTPVIGQPQNETPQPIYQNSNVATKPTAAKILGKVGESLSRICCVRPPVERFTFVDENANLGTVMRYEEIELRILLLCGSDLLESFCIPGLWNEADMEVIVGDFGIVVVPRDAADTDRIMNHSSILRKYKNNIMVVKDDINHPMSVVSSTKSRLALQHGDGHVVDYLSQPVIDYILKSQLYINASG
     
