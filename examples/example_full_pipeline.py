@@ -277,7 +277,7 @@ async def full_binder_design_pipeline():
         md_agent = system.design_agents['molecular_dynamics']
         md_results = await md_agent.analyze_hypothesis(
             current_hypothesis,
-            {"simulation_time": parameters["simulation_time"]}
+            {"simulation_time": parameters["simulation_time"]} # <- these will be our game time running params
         )
         
         # Extract MD metrics

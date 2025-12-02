@@ -16,6 +16,7 @@ import logging
 from ...utils.parsl_settings import AuroraSettings, LocalSettings
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
+import numpy as np
 from datetime import datetime
 
 # MDAgent imports (from https://github.com/msinclair-py/MDAgent)
@@ -78,6 +79,9 @@ class MDAgentAdapter:
         self.equil_steps = self.mdagent_config.get("equil_steps", 10_000)
         self.prod_steps = self.mdagent_config.get("prod_steps", 1_000_000)
         
+        p_steps = self.prod_steps * 4 / 1000000
+        self.logger.info(f'Will run MD for {p_steps} ns')
+        
         # MDAgent components (initialized in initialize())
         self.manager = None
         self.builder_handle = None
@@ -121,7 +125,8 @@ class MDAgentAdapter:
                 # Try importing from mdagent package (if installed as package)
                 from MDAgent.core.agents_no_FE import Builder, MDSimulator, MDCoordinator
                 from molecular_simulations.build import ImplicitSolvent, ExplicitSolvent
-            except ImportError:
+                from molecular_simulations.simulate import ImplicitSimulator, Simulator
+            except ImportError as e:
                 self.logger.error(f"Cannot import MDAgent components: {e}")
                 self.logger.info("Make sure MDAgent is installed and in PYTHONPATH")
                 self.logger.info("Install from: https://github.com/msinclair-py/MDAgent")
@@ -144,10 +149,14 @@ class MDAgentAdapter:
             # Launch MDAgent components
             self.builder_handle = await self.manager.launch(
                 Builder, args=(
-                    ImplicitSolvent, ExplicitSolvent, self.amberhome
+                    ImplicitSolvent, ExplicitSolvent
                 )
             )
-            self.simulator_handle = await self.manager.launch(MDSimulator)
+            self.simulator_handle = await self.manager.launch(
+                MDSimulator, args=(
+                    ImplicitSimulator, Simulator
+                )
+            )
             self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
 
             self.logger.info('launching coordinator')
@@ -294,31 +303,32 @@ class MDAgentAdapter:
                 build_kwargss=build_kwargs,
                 sim_kwargss=sim_kwargs,
             )
+           
+            for sim_id, result in enumerate(results):
+                # Store results
+                self.completed_simulations[sim_id] = {
+                    'results': result,
+                    'build_kwargs': build_kwargs,
+                    'sim_kwargs': sim_kwargs,
+                    'timestamp': datetime.now().isoformat()
+                }
             
-            # Store results
-            self.completed_simulations[sim_id] = {
-                'results': results,
-                'build_kwargs': build_kwargs,
-                'sim_kwargs': sim_kwargs,
-                'timestamp': datetime.now().isoformat()
-            }
-            
+            self.logger.info('Analyzing simulation results')
             # Analyze results and create structured output
-            analysis = await self._analyze_mdagent_results(sim_id, results)
+            analysis = await self._analyze_mdagent_results(results)
             
             # Clean up agent/parsl
             self.cleanup()
             
-            self.logger.info(f"MDAgent simulation completed: {sim_id}")
+            self.logger.info(f"MDAgent simulation completed")
+
             return analysis
 
         except Exception as e:
             self.logger.error(f"MDAgent simulation failed: {e}")
             return {}
     
-    async def _analyze_mdagent_results(self,
-                                      sim_id: str,
-                                      results: Dict[str, Any]) -> Dict[str, Any]:
+    async def _analyze_mdagent_results(self, results: Dict[int, Any]) -> Dict[str, Any]:
         """
         Analyze MDAgent simulation results.
 
@@ -329,36 +339,49 @@ class MDAgentAdapter:
         Returns:
             Structured analysis results
         """
-        # Extract paths
-        build_path = results.get('build')
-        sim_status = results.get('sim')
+        analyses = {sim_id: {} for sim_id in range(len(results))}
+        for sim_id, result in enumerate(results):
+            build_path = result.get('build')
+            sim_status = result.get('sim')
 
-        # Basic analysis structure
-        analysis = {
-            'simulation_id': sim_id,
-            'build_path': str(build_path) if build_path else None,
-            'simulation_status': sim_status,
-            'solvent_model': self.solvent_model,
-            'success': sim_status == 'success',
-            'confidence': 0.8 if sim_status == 'success' else 0.0,
-            'timestamp': datetime.now().isoformat()
-        }
+            # Basic analysis structure
+            analysis = {
+                'simulation_id': sim_id,
+                'build_path': str(build_path) if build_path else None,
+                'simulation_status': sim_status,
+                'solvent_model': self.solvent_model,
+                'success': 'unknown',
+                'confidence': 0.8 if sim_status == 'success' else 0.0,
+                'timestamp': datetime.now().isoformat()
+            }
 
-        # Perform trajectory analysis if simulation succeeded
-        if sim_status == 'success' and build_path:
-            try:
-                trajectory_analysis = await self._analyze_trajectory(build_path)
-                analysis['trajectory_analysis'] = trajectory_analysis
+            # Perform trajectory analysis if simulation succeeded
+            if sim_status == 'success' and build_path:
+                try:
+                    self.logger.info(f'Analyzing {build_path}!')
+                    trajectory_analysis = await self._analyze_trajectory(build_path)
+                    analysis['trajectory_analysis'] = trajectory_analysis
 
-                # Update confidence based on trajectory quality
-                if trajectory_analysis:
-                    analysis['confidence'] = self._calculate_confidence(trajectory_analysis)
 
-            except Exception as e:
-                self.logger.warning(f"Trajectory analysis failed: {e}")
-                analysis['trajectory_analysis_error'] = str(e)
+                    # Update confidence based on trajectory quality
+                    if trajectory_analysis:
+                        analysis['confidence'] = self._calculate_confidence(trajectory_analysis)
 
-        return analysis
+                    analysis['success'] = True
+
+                except Exception as e:
+                    self.logger.warning(f"Trajectory analysis failed: {e}")
+                    analysis['trajectory_analysis_error'] = str(e)
+
+                analyses[sim_id] = analysis
+
+        self.logger.info(f'{analyses=}')
+
+        #analyses['rmsd'] = 
+        #analyses['rmsf'] = 
+        #analyses['rog'] = 
+
+        return analyses
 
     async def _analyze_trajectory(self, build_path: Path) -> Optional[Dict[str, Any]]:
         """
@@ -380,21 +403,23 @@ class MDAgentAdapter:
                 return self._create_placeholder_analysis()
 
             # Look for trajectory files
-            traj_files = list(Path(build_path).glob("*.dcd"))
-            if not traj_files:
-                traj_files = list(Path(build_path).glob("*.xtc"))
-            if not traj_files:
+            build_path = Path(build_path)
+            trajectory = build_path / self.mdagent_config['output_dcd']
+
+            if not trajectory.exists():
                 self.logger.warning("No trajectory files found")
                 return self._create_placeholder_analysis()
 
             # Load topology
-            pdb_files = list(Path(build_path).glob("*.pdb"))
-            if not pdb_files:
+            pdb_file = build_path / self.mdagent_config['topology']
+            if not pdb_file.exists():
                 self.logger.warning("No PDB topology file found")
                 return self._create_placeholder_analysis()
 
             # Load trajectory
-            traj = md.load(str(traj_files[0]), top=str(pdb_files[0]))
+            traj = md.load(str(trajectory), top=str(pdb_file))
+
+            self.logger.info('Loaded trajectory')
 
             # Compute structural metrics
             analysis = {}
@@ -589,19 +614,21 @@ class MDAgentAdapter:
             pdb_path=passing_structures,
             protein_name = "unknown",
             custom_build_kwargs = {'protein': True},
-            custom_sim_kwargs = {'equil_steps': 1000,
-                                 'prod_steps': 10000,
+            custom_sim_kwargs = {'equil_steps': self.equil_steps,
+                                 'prod_steps': self.prod_steps,
                                  'n_equil_cycles': 2,
-                                 'platform': 'CUDA'},
+                                 'platform': 'OpenCL'},
         )
-       
-
+        
+        summary_stats = self.summarize(sim_results)
+        
+        self.logger.info(f'{summary_stats=}')
         analysis = SimAnalysis(
             protein_id='',
-            simulation_time_in_ns=sim_results['trajectory_info']['time_ns'],
-            rmsd=sim_results['rmsd'],
-            rmsf=sim_results['rmsf']
-            # ADD RoG
+            simulation_time_in_ns=self.prod_steps * 4 / 1000000,
+            rmsd=summary_stats['rmsd'],
+            rmsf=summary_stats['rmsf'],
+            rog=summary_stats['radius_of_gyration']
         )
 
         analysis.confidence_score = self._calculate_confidence(analysis)
@@ -613,7 +640,49 @@ class MDAgentAdapter:
         if not hasattr(self, 'initialized'):
             await self.initialize()
         return self.initialized
-    
+
+    def summarize(self,
+                  results: dict[str, Any]) -> dict[str, Any]:
+        N = len(results)
+        rmsds = np.zeros((N, 3))
+        rmsfs = np.zeros((N, 3))
+        rogs = np.zeros((N, 3))
+
+        for i, v in enumerate(results.values()):
+            analysis = v['trajectory_analysis']
+            n_frames = analysis['trajectory_info']['n_frames']
+            rmsds[i, 0] = analysis['rmsd']['mean']
+            rmsds[i, 1] = analysis['rmsd']['std']
+            rmsds[i, 2] = n_frames
+
+            rmsfs[i, 0] = analysis['rmsf']['mean']
+            rmsfs[i, 1] = analysis['rmsf']['std']
+            rmsfs[i, 2] = n_frames
+            
+            rogs[i, 0] = analysis['radius_of_gyration']['mean']
+            rogs[i, 1] = analysis['radius_of_gyration']['std']
+            rogs[i, 2] = n_frames
+
+        return {
+            'rmsd': self.population_stats(rmsds),
+            'rmsf': self.population_stats(rmsfs),
+            'rog': self.population_stats(rogs)
+        }
+
+    def population_stats(self,
+                         data: np.ndarray) -> np.ndarray:
+        means = data[:, 0]
+        stds = data[:, 1]
+        ns = data[:, 2].astype(float)
+
+        N_total = ns.sum()
+        mean_combined = (ns * means).sum() / N_total
+        
+        # Formula: sigma^2 = ( Σ n_i (s_i^2 + (m_i - μ)^2) ) / N
+        var_combined = (ns * (stds**2 + (means - mean_combined)**2)).sum() / N_total
+        std_combined = np.sqrt(var_combined)
+        
+        return np.array([mean_combined, std_combined])
 
     def _calculate_confidence(self,
                               analysis: SimAnalysis) -> float:

@@ -10,6 +10,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
+import numpy as np
 
 # Import Jnana components
 import sys
@@ -224,8 +225,9 @@ class SimAnalysis:
 
     # Simulation analysis
     simulation_time_in_ns: int = 1
-    rmsd: dict = field(default_factory=dict)
-    rmsf: dict = field(default_factory=dict)
+    rmsd: np.ndarray = field(default_factory=lambda x: np.zeros(2))
+    rmsf: np.ndarray = field(default_factory=lambda x: np.zeros(2))
+    rog: np.ndarray = field(default_factory=lambda x: np.zeros(2))
 
     # Analysis metadata
     tools_used: list[str] = field(default_factory=list)

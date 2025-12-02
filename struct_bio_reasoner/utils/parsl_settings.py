@@ -42,6 +42,7 @@ class LocalSettings(BaseComputeSettings):
     retries: int = 1
     label: str = 'htex'
     worker_port_range: Tuple[int, int] = (10000, 20000)
+    worker_init: str='export TMPDIR=/tmp'
 
     def config_factory(self, run_dir: PathLike) -> Config:
         return Config(
@@ -56,7 +57,7 @@ class LocalSettings(BaseComputeSettings):
                         launcher=MpiExecLauncher(
                             bind_cmd="--cpu-bind", overrides=f"--depth=1 --ppn 1"
                         ),  # Updates to the mpiexec command
-                        worker_init='export TMPDIR=/tmp',#self.worker_init,
+                        worker_init=self.worker_init,
                     ),
                     label=self.label,
                     cpu_affinity="block",
