@@ -22,6 +22,7 @@ from jnana.core.jnana_system import JnanaSystem
 from ..data.protein_hypothesis import ProteinHypothesis
 from ..agents.computational_design.bindcraft_agent import BindCraftAgent
 from ..agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
+from ..agents.structure_prediction.chai_agent import ChaiAgent
 from ..agents.energetic.energy_agent import EnergeticAnalysisAgent
 from ..tools.pymol_wrapper import PyMOLWrapper
 from ..tools.biopython_utils import BioPythonUtils
@@ -107,7 +108,7 @@ class BinderDesignSystem(JnanaSystem):
         
         # Protein-specific configuration
         self.enable_tools = enable_tools or []
-        self.enable_agents = enable_agents or ['computational_design', 'molecular_dynamics']
+        self.enable_agents = enable_agents or ['computational_design', 'molecular_dynamics', 'structure_prediction']
         self.knowledge_graph_enabled = knowledge_graph
         self.literature_processing_enabled = literature_processing
         
@@ -275,6 +276,17 @@ class BinderDesignSystem(JnanaSystem):
                 self.logger.info("MD agent initialized")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize MD agent: {e}")
+
+        if 'structure_prediction' in self.enable_agents:
+            try:
+                pred_config = agent_configs.get('structure_prediction', {})
+                self.design_agents['structure_prediction'] = ChaiAgent(
+                    agent_id='structure_prediction',
+                    config=pred_config,
+                    parsl_config=parsl_config,
+                )
+            except Exception as e:
+                self.logger.warning(f'Failed to initialize structure prediction agent: {e}')
         
         self.logger.info(f"Initialized {len(self.design_agents)} protein agents")
 
