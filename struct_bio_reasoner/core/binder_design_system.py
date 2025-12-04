@@ -24,6 +24,7 @@ from ..agents.computational_design.bindcraft_agent import BindCraftAgent
 from ..agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
 from ..agents.structure_prediction.chai_agent import ChaiAgent
 from ..agents.energetic.energy_agent import EnergeticAnalysisAgent
+from ..agents.hiper_rag.rag_agent import RAGWrapper 
 from ..tools.pymol_wrapper import PyMOLWrapper
 from ..tools.biopython_utils import BioPythonUtils
 from ..utils.config_loader import load_binder_config
@@ -276,6 +277,19 @@ class BinderDesignSystem(JnanaSystem):
                 self.logger.info("MD agent initialized")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize MD agent: {e}")
+
+        # Initialize molecular dynamics agent
+        if "rag" in self.enable_agents:
+            try:
+                rag_config = agent_configs.get("rag", {})
+                self.design_agents['rag'] = RAGWrapper(
+                    agent_id="rag",
+                    config=rag_config,
+                    model_manager = self.model_manager
+                )
+                self.logger.info("RAG agent initialized")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize RAG agent: {e}")
 
         if 'structure_prediction' in self.enable_agents:
             try:
