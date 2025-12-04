@@ -74,7 +74,6 @@ async def cleanup_all_queues():
     logger.info("✅ Cleanup complete!")
 
 
-
 async def full_binder_design_pipeline():
     """
     Complete binder design pipeline integrating Jnana + StructBioReasoner.

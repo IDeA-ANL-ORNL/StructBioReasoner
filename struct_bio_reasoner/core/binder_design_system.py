@@ -636,38 +636,6 @@ class BinderDesignSystem(JnanaSystem):
         return [rec.to_dict() for rec in recommended_configs] #protein_recommendation
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     def get_protein_system_status(self) -> Dict[str, Any]:
         """Get protein system status."""
         base_status = self.get_system_status()
