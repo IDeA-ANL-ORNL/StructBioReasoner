@@ -263,3 +263,5 @@ runinfo/
 temp.fa
 test_chai.py
 matt_structbioenv.txt
+struct_bio_reasoner/agents/hiper_rag/__rag_agent.py
+struct_bio_reasoner/agents/hiper_rag/_rag_agent.py

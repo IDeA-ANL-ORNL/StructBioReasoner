@@ -221,7 +221,8 @@ class RAGWrapper:
         if not await self.is_ready():
             self.logger.error('RAG agent not ready')
             return None
-        return await self._generate_rag_hypothesis(data)
+        rag_results =  await self._generate_rag_hypothesis(data)
+        return await self.postprocess(rag_results)
 
     async def _generate_rag_hypothesis(self,
                     data: dict[str, Any]) -> data[str, Any]:
@@ -238,7 +239,7 @@ class RAGWrapper:
         return results
     
     async def postprocess(self,
-                            results: dit[str, Any]) -> ProteinHypothesis:
+                            results: dict[str, Any]) -> ProteinHypothesis:
         hypothesis_content = f"""
         Prompt: {results['prompt']}.
         Content from RAG: {results['response']}
