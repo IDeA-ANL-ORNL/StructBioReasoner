@@ -45,3 +45,24 @@ async def test_hiper_rag_implement():
     data = {'prompt': user_prompt}
     rag_agent = system.design_agents['rag']
     rag_results = await rag_agent.generate_rag_hypothesis(data)
+
+async def main():
+    """Main entry point"""
+    try:
+        final_hypothesis = await test_hiper_rag_implement()
+
+        if final_hypothesis:
+            print("Pipeline successful")
+            return True
+        else:
+            print("Pipeline failed")
+            return False
+    except Exception as e:
+        print("Pipeline error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+if __name__ == "__main__":
+    success = asyncio.run(main())
+    sys.exit(0 if success else 1)
