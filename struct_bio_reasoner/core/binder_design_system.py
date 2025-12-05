@@ -27,7 +27,11 @@ from ..agents.energetic.energy_agent import EnergeticAnalysisAgent
 try:
     from ..agents.hiper_rag.rag_agent import RAGWrapper 
     RAG_EXISTS=True
-except:
+except Exception as e:
+    print("RAG not working because:")
+    print(e)
+    import traceback
+    traceback.print_exc()
     RAG_EXISTS=False
 
 from ..tools.pymol_wrapper import PyMOLWrapper
@@ -288,6 +292,7 @@ class BinderDesignSystem(JnanaSystem):
             if RAG_EXISTS:
                 try:
                     rag_config = agent_configs.get("rag", {})
+                    self.logger.info(rag_config)
                     self.design_agents['rag'] = RAGWrapper(
                         agent_id="rag",
                         config=rag_config,

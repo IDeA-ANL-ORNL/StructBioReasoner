@@ -18,6 +18,9 @@ from parsl.launchers import MpiExecLauncher
 
 from academy.agent import Agent, action
 from academy.handle import Handle
+from academy.exchange import LocalExchangeFactory
+from academy.manager import Manager
+from concurrent.futures import ThreadPoolExecutor
 
 from jnana.core.model_manager import UnifiedModelManager
 
@@ -43,67 +46,67 @@ from distllm.generate.prompts import IdentityPromptTemplateConfig
 from distllm.rag.search import Retriever
 from distllm.rag.search import RetrieverConfig
 from distllm.utils import BaseConfig
-
+from .rag_utils import *
 
 logger = logging.getLogger(__name__)
 
-class ChatAppConfig(BaseConfig):
-    """Configuration for the evaluation suite."""
-
-    rag_configs: RetrievalAugmentedGenerationConfig = Field(
-        ...,
-        description='Settings for this RAG application.',
-    )
-    save_conversation_path: Path = Field(
-        ...,
-        description='Directory to save the output files.',
-    )
-
-class ConversationPromptTemplate(PromptTemplate):
-    """Conversation prompt template for RAG.
-
-    Includes the entire conversation history plus the new user question,
-    and optionally the retrieved context.
-    """
-
-    def __init__(self, conversation_history: list[tuple[str, str]]):
-        # conversation_history is a list of (role, text)
-        self.conversation_history = conversation_history
-
-    def preprocess(
-        self,
-        texts: list[str],
-        contexts: list[list[str]] | None = None,
-        scores: list[list[float]] | None = None,
-    ) -> list[str]:
-        """
-        Preprocess the texts before sending to the model.
-
-        We assume `texts` has exactly one element: the latest user query.
-        We build a single string that contains the entire conversation plus
-        the new question. If any retrieval contexts are found, we append them.
-        """
-        if not texts:
-            return ['']  # No user input, return empty prompt.
-
-        # The latest user query:
-        user_input = texts[0]
-
-        # Build the conversation string
-        conversation_str = ''
-        for speaker, text in self.conversation_history:
-            conversation_str += f'{speaker}: {text}\n'
-        # Add the new user question
-        conversation_str += f'User: {user_input}\nAssistant:'
-
-        # Optionally, append retrieved context if it exists
-        if contexts and len(contexts) > 0 and len(contexts[0]) > 0:
-            # contexts[0] is the top-k retrieval results for this query
-            conversation_str += '\n\n[Context from retrieval]\n'
-            for doc in contexts[0]:
-                conversation_str += f'{doc}\n'
-
-        return [conversation_str]
+#class ChatAppConfig(BaseConfig):
+#    """Configuration for the evaluation suite."""
+#
+#    rag_configs: RetrievalAugmentedGenerationConfig = Field(
+#        ...,
+#        description='Settings for this RAG application.',
+#    )
+#    save_conversation_path: Path = Field(
+#        ...,
+#        description='Directory to save the output files.',
+#    )
+#
+#class ConversationPromptTemplate(PromptTemplate):
+#    """Conversation prompt template for RAG.
+#
+#    Includes the entire conversation history plus the new user question,
+#    and optionally the retrieved context.
+#    """
+#
+#    def __init__(self, conversation_history: list[tuple[str, str]]):
+#        # conversation_history is a list of (role, text)
+#        self.conversation_history = conversation_history
+#
+#    def preprocess(
+#        self,
+#        texts: list[str],
+#        contexts: list[list[str]] | None = None,
+#        scores: list[list[float]] | None = None,
+#    ) -> list[str]:
+#        """
+#        Preprocess the texts before sending to the model.
+#
+#        We assume `texts` has exactly one element: the latest user query.
+#        We build a single string that contains the entire conversation plus
+#        the new question. If any retrieval contexts are found, we append them.
+#        """
+#        if not texts:
+#            return ['']  # No user input, return empty prompt.
+#
+#        # The latest user query:
+#        user_input = texts[0]
+#
+#        # Build the conversation string
+#        conversation_str = ''
+#        for speaker, text in self.conversation_history:
+#            conversation_str += f'{speaker}: {text}\n'
+#        # Add the new user question
+#        conversation_str += f'User: {user_input}\nAssistant:'
+#
+#        # Optionally, append retrieved context if it exists
+#        if contexts and len(contexts) > 0 and len(contexts[0]) > 0:
+#            # contexts[0] is the top-k retrieval results for this query
+#            conversation_str += '\n\n[Context from retrieval]\n'
+#            for doc in contexts[0]:
+#                conversation_str += f'{doc}\n'
+#
+#        return [conversation_str]
 
 
 class RAGAgent(Agent):
@@ -115,7 +118,7 @@ class RAGAgent(Agent):
         self.config = ChatAppConfig.from_yaml(config_inp)
         self.rag_model = self.config.rag_configs.get_rag_model()
         self.conversation_history = []
-
+        print(self.config)
     @action
     async def rag_with_model(self,
                         user_input):
@@ -154,7 +157,8 @@ class RAGWrapper:
         self.agent_id = agent_id
         self.config = config
         self.model_manager = model_manager
-        
+        self.logger = logging.getLogger(__name__)
+
         self.capabilities = [
             'rag_generation',
             'literature_scanning',
@@ -175,10 +179,10 @@ class RAGWrapper:
         try:
             self.rag_coord = await self.manager.launch(
                 RAGAgent,
-                args=self.rag_config
-
+                args=(self.rag_config),
             )
             logger.info('Launching RAG')
+            self.initialized = True
         except Exception as e:
             self.logger.exception("An error occurred with the RAGAgent")
             return False
@@ -188,6 +192,7 @@ class RAGWrapper:
         self.logger.info('Checking if we are initialized')
         if not hasattr(self, 'initialized'):
             await self.initialize()
+            
         return self.initialized
 
     async def cleanup(self):
@@ -225,7 +230,7 @@ class RAGWrapper:
         return await self.postprocess(rag_results)
 
     async def _generate_rag_hypothesis(self,
-                    data: dict[str, Any]) -> data[str, Any]:
+                    data: dict[str, Any]) -> dict[str, Any]:
         '''
         call RAGAgent with input data
         data includes user prompt

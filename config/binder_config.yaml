@@ -152,8 +152,8 @@ agents:
       retriever_config:
         faiss_config:
           name: faiss_index_v2
-          dataset_dir: /homes/ogokdemir/Nov30Demo/semantic_chunks/embeddings/merged
-          faiss_index_path: /homes/ogokdemir/Nov30Demo/faiss_indices/sfr_mistral_nmnat
+          dataset_dir: /flare/FoundEpidem/biostructreasoner/merged
+          faiss_index_path: /flare/FoundEpidem/biostructreasoner/faiss_indices/sfr_mistral_nmnat
           dataset_chunk_paths: null
           precision: float32
           search_algorithm: exact
@@ -169,8 +169,7 @@ agents:
     
       verbose: false
     
-    save_conversation_path: /homes/ogokdemir/Nov30Demo/conversation_logs
-
+    save_conversation_path: /lus/flare/projects/FoundEpidem/avasan/IDEAL/Agentics/StructBioReasoner/output/rag_logs
   # Molecular Dynamics Agent
   molecular_dynamics:
     enabled: true

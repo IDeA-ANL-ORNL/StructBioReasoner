@@ -20,7 +20,7 @@ async def test_hiper_rag_implement():
     system = BinderDesignSystem(
         config_path="config/binder_config.yaml",
         jnana_config_path="config/test_jnana_config.yaml",
-        enable_agents=['computational_design', 'molecular_dynamics']
+        enable_agents=['computational_design', 'molecular_dynamics', 'rag']
     )
     
     await system.start()
