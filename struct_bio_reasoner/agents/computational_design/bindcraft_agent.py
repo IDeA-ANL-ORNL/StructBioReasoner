@@ -69,7 +69,6 @@ class BindCraftAgent:
             from parsl import Config
             from ...utils.parsl_settings import LocalSettings
 
-            self.logger.info('Trying to spin things up')
             self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
 
             cwd = Path(self.config.get('cwd', os.getcwd()))
@@ -164,7 +163,6 @@ class BindCraftAgent:
         return True
 
     async def is_ready(self) -> bool:
-        self.logger.info('Checking if we are initialized')
         if not hasattr(self, 'initialized'):
             await self.initialize()
         return self.initialized
@@ -270,33 +268,6 @@ class BindCraftAgent:
 
             await self.manager.__aenter__()
 
-            self.logger.info('Launching bindcraft handles')
-
-            ## Launch individual agents
-            #self.fold_agent = await self.manager.launch(
-            #    FoldingAgent,
-            #    args=(chai, proteinmpnn, self.parsl_settings)
-            #)
-            #self.qc_agent = await self.manager.launch(
-            #    QualityControlAgent,
-            #    args=(SequenceQualityControl(**qc_kwargs),)
-            #)
-            #self.analyzer_agent = await self.manager.launch(
-            #    AnalysisAgent,
-            #    args=(SimpleEnergy(),)
-            #)
-
-            ## Launch coordinator with handles to other agents
-            #self.coordinator = await self.manager.launch(
-            #    PeptideDesignCoordinator,
-            #    args=(self.fold_agent, 
-            #          self.qc_agent, 
-            #          self.analyzer_agent, 
-            #          if_kwargs['num_seq'], 
-            #          if_kwargs['max_retries'])
-            #)
-
-        self.logger.info('Matt was here')
         # Run the workflow
         results = await self.coordinator.run_full_workflow(
             target_sequence=target_sequence,
