@@ -10,8 +10,6 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from bindcraft.core.folding import Chai
-from bindcraft.core.inverse_folding import ProteinMPNN
 
 from jnana.core.model_manager import UnifiedModelManager
 
@@ -64,7 +62,7 @@ class BindCraftAgent:
         """
         try:
             from bindcraft.core.coordinators import ParslDesignCoordinator
-            from bindcraft.core.folding import Chai
+            from bindcraft.core.folding import ChaiBinder
             from bindcraft.core.inverse_folding import ProteinMPNN
             from bindcraft.analysis.energy import SimpleEnergy
             from bindcraft.util.quality_control import SequenceQualityControl
@@ -113,7 +111,7 @@ class BindCraftAgent:
             })
 
             # Initialize algorithm instances with required parameters
-            chai = Chai(
+            chai = ChaiBinder(
                 fasta_dir=fasta_dir,
                 out=folds_dir,
                 diffusion_steps=100,

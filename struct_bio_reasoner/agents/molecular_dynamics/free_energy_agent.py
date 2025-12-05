@@ -170,9 +170,8 @@ class FEAgent:
         
         try:
             # Extract context
-            protein_sequence = context.get('protein_sequence', '')
             target_protein = context.get('target_protein', 'unknown')
-            pdb_path = context.get('pdb_path')
+            sim_path = context.get('sim_root_path')
             
             if not pdb_path:
                 self.logger.error("No PDB path provided in context")
@@ -181,7 +180,7 @@ class FEAgent:
             # Run MD simulation using FEAgent
             self.logger.info("Running {self.free_energy.calculator.__name__}")
             calculation_result = await self.run_calculations(
-                pdb_path=Path(pdb_path),
+                sim_path=Path(sim_path),
                 protein_name=target_protein
             )
             
@@ -212,7 +211,7 @@ class FEAgent:
         return hypotheses
     
     async def run_calculations(self,
-                               pdb_path: Union[Path, List[Path]],
+                               sim_path: Union[Path, list[Path]],
                                protein_name: str = "unknown",
                                custom_sim_kwargs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -232,34 +231,32 @@ class FEAgent:
             return {}
         
         try:
-            # Create simulation directory
-            sim_id = f"mdagent_{protein_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            sim_path = Path.cwd() / "simulations" / sim_id
-            sim_path.mkdir(parents=True, exist_ok=True)
-            
             # Run FEAgent workflow
             self.logger.info(f"Starting FEAgent simulation: {sim_id}")
             
+            # This looks weird but ensures we only run dirs with simulations
+            # in them. Skips over failed runs, or extraneous dirs
+            if isinstance(sim_path, list):
+                paths = []
+                for path in sim_path:
+                    paths += [p.parent for p in path.glob('*/prod.dcd')]
+            else:
+                paths = [path.parent for path in sim_path.glob('*/prod.dcd')]
+
             # Interpret config for each system
             fe_kwargss = await self._unpack_dataclass_config(paths)
 
             results = await self.coordinator_handle.deploy(
                 path=paths,
                 fe_kwargss=fe_kwargss,
-            )
+            ) # list of dicts with `path`, `success` and `fe`
             
             # Store results
-            self.completed_simulations[sim_id] = {
+            analysis = {
                 'results': results,
-                'build_kwargs': build_kwargs,
-                'sim_kwargs': sim_kwargs,
                 'timestamp': datetime.now().isoformat()
             }
             
-            # Analyze results and create structured output
-            analysis = await self._analyze_mdagent_results(sim_id, results)
-            
-            self.logger.info(f"FEAgent simulation completed: {sim_id}")
             return analysis
 
         except Exception as e:
@@ -274,7 +271,7 @@ class FEAgent:
         fe_kwargss = []
         for path in paths:
             dict_copy = dict_config.copy()
-            u = mda.Universe(str(path / ''), str(path / ''))
+            u = mda.Universe(str(path / 'system.prmtop'), str(path / 'prod.dcd'))
             sel1 = u.select_atoms(sels[0])
             sel2 = u.select_atoms(sels[1])
 
@@ -289,17 +286,20 @@ class FEAgent:
     def format_for_cpptraj(self,
                            resids: list[int]) -> str:
         """"""
-        string = ''
-        cur = None
-        start = None
+        string = ':'
+        cur = resids[0] - 1
+        start = resids[0]
         end = None
         for resid in resids:
-            if start is None:
-                start = resid
-
             if resid - cur > 1:
                 end = cur
-                first = resid
+                string += f'{start}-{end},'
+                start = resid
+
+            cur = resid
+        
+        end = resids[-1]
+        string += f'{start}-{end}'
 
         return string
 
@@ -314,7 +314,7 @@ class FEAgent:
         return {
             'status': 'placeholder',
             'message': 'Detailed trajectory analysis not available (MDAgent not installed)',
-            'free_energy': {'mean': 0.0, 'std': 0.0, 'unit': 'kcal/mol'},
+            'free_energy': {0: {'path': None, 'mean': 0.0, 'std': 0.0, 'unit': 'kcal/mol'}},
         }
 
     def _calculate_confidence(self, trajectory_analysis: Dict[str, Any]) -> float:
@@ -331,21 +331,6 @@ class FEAgent:
             return 0.5
 
         confidence = 0.8  # Base confidence
-
-        # Adjust based on RMSD stability
-        rmsd_std = trajectory_analysis.get('rmsd', {}).get('std', 0.0)
-        if rmsd_std < 0.1:
-            confidence += 0.1  # Very stable
-        elif rmsd_std > 0.3:
-            confidence -= 0.1  # Less stable
-
-        # Adjust based on trajectory length
-        traj_info = trajectory_analysis.get('trajectory_info', {})
-        n_frames = traj_info.get('n_frames', 0)
-        if n_frames > 1000:
-            confidence += 0.05  # Good sampling
-        elif n_frames < 100:
-            confidence -= 0.1  # Poor sampling
 
         # Clamp to [0, 1]
         return max(0.0, min(1.0, confidence))
@@ -398,15 +383,9 @@ class FEAgent:
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> SimAnalysis:
-        #### Rewrite this according to how binder analysis adds to hypothesis
-        checkpoint_file = hypothesis.binder_analysis.checkpoint_file
-        checkpoint_data = pickle.load(open(checkpoint_file, 'rb'))
-        all_cycles = checkpoint_data['all_cycles']
-        passing_structures = [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
-        # unpack list of lists in passing_structures
-        passing_structures = [Path(item) for sublist in passing_structures for item in sublist]
+        paths = task_params['simulation_paths']
         energies = await self.run_calculations( 
-                               pdb_path=passing_structures,
+                               sim_path = paths,
                                protein_name = "unknown",
                             )
 

@@ -42,7 +42,6 @@ class LocalSettings(BaseComputeSettings):
     retries: int = 1
     label: str = 'htex'
     worker_port_range: Tuple[int, int] = (10000, 20000)
-    worker_init: str='export TMPDIR=/tmp'
 
     def config_factory(self, run_dir: PathLike) -> Config:
         return Config(

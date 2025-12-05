@@ -244,6 +244,7 @@ class MDAgentAdapter:
         return hypotheses
     
     async def run_md_simulation(self,
+                                root_path: Path,
                                pdb_path: Union[Path, List[Path]],
                                protein_name: str = "unknown",
                                custom_build_kwargs: Optional[Dict[str, Any]] = None,
@@ -270,10 +271,6 @@ class MDAgentAdapter:
             for pdb in pdb_path:
                 self.logger.info(f'Running simulations at: {pdb}')
 
-            sim_paths = [Path(f'data/sims/mdagent_{i}') for i in range(len(pdb_path))]
-            for sim_path in sim_paths:
-                sim_path.mkdir(parents=True, exist_ok=True)
-            
             # Prepare build kwargs
             build_kwargs = custom_build_kwargs or {
                 'solvent': self.solvent_model,
@@ -290,6 +287,13 @@ class MDAgentAdapter:
                 'equil_steps': self.equil_steps,
                 'prod_steps': self.prod_steps,
             }
+
+            self.logger.info(f'{sim_kwargs=}')
+            
+            sim_paths = [Path(root_path) / f'mdagent_{i}' for i in range(len(pdb_path))]
+            for sim_path in sim_paths:
+                sim_path.mkdir(parents=True, exist_ok=True)
+            
 
             build_kwargs = [build_kwargs.copy() for _ in range(len(sim_paths))]
             sim_kwargs = [sim_kwargs.copy() for _ in range(len(sim_paths))]
@@ -318,7 +322,7 @@ class MDAgentAdapter:
             analysis = await self._analyze_mdagent_results(results)
             
             # Clean up agent/parsl
-            self.cleanup()
+            await self.cleanup()
             
             self.logger.info(f"MDAgent simulation completed")
 
@@ -374,12 +378,6 @@ class MDAgentAdapter:
                     analysis['trajectory_analysis_error'] = str(e)
 
                 analyses[sim_id] = analysis
-
-        self.logger.info(f'{analyses=}')
-
-        #analyses['rmsd'] = 
-        #analyses['rmsf'] = 
-        #analyses['rog'] = 
 
         return analyses
 
@@ -602,33 +600,43 @@ class MDAgentAdapter:
                                  task_params: dict[str, Any]) -> SimAnalysis:
         #### Rewrite this according to how binder analysis adds to hypothesis
         self.logger.info('We are about to run MD')
+        structures = task_params['simulation_paths']
+        out = task_params['root_output_path']
+        prod_steps = task_params.get('steps', self.prod_steps)
+
+        """
         checkpoint_file = hypothesis.binder_analysis.checkpoint_file
         checkpoint_data = pickle.load(open(checkpoint_file, 'rb'))
         all_cycles = checkpoint_data['all_cycles']
         passing_structures = [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
         # unpack list of lists in passing_structures
         passing_structures = [Path(item).resolve() for sublist in passing_structures for item in sublist]
+        # DELETE AFTER READING
+        passing_structures = passing_structures[:int(len(passing_structures)//12*12)]
+        # DONE DELETING
         self.logger.info('Checkpoint loaded')
+        """
+
         # TODO: get kwargs for build/sim from task_params
         sim_results = await self.run_md_simulation( 
-            pdb_path=passing_structures,
+            root_path=out,
+            pdb_path=structures,
             protein_name = "unknown",
-            custom_build_kwargs = {'protein': True},
+            custom_build_kwargs = {'protein': True,},
             custom_sim_kwargs = {'equil_steps': self.equil_steps,
-                                 'prod_steps': self.prod_steps,
+                                 'prod_steps': prod_steps,
                                  'n_equil_cycles': 2,
                                  'platform': 'OpenCL'},
         )
         
         summary_stats = self.summarize(sim_results)
         
-        self.logger.info(f'{summary_stats=}')
         analysis = SimAnalysis(
             protein_id='',
             simulation_time_in_ns=self.prod_steps * 4 / 1000000,
             rmsd=summary_stats['rmsd'],
             rmsf=summary_stats['rmsf'],
-            rog=summary_stats['radius_of_gyration']
+            rog=summary_stats['rog']
         )
 
         analysis.confidence_score = self._calculate_confidence(analysis)
@@ -648,8 +656,9 @@ class MDAgentAdapter:
         rmsfs = np.zeros((N, 3))
         rogs = np.zeros((N, 3))
 
-        for i, v in enumerate(results.values()):
+        for i, v in results.items():
             analysis = v['trajectory_analysis']
+            self.logger.info(f'{list(analysis.keys())=}')
             n_frames = analysis['trajectory_info']['n_frames']
             rmsds[i, 0] = analysis['rmsd']['mean']
             rmsds[i, 1] = analysis['rmsd']['std']

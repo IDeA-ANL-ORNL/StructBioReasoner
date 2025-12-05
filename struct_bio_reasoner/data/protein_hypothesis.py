@@ -236,6 +236,22 @@ class SimAnalysis:
 
 
 @dataclass
+class FoldAnalysis:
+    """"""
+    analysis_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    folding_algorithm: str = 'Chai-1'
+
+    # metadata
+    unique_models: int = 1
+    total_models: int = 5
+    best_models: list[Path] = field(default_factory=list)
+    scores: dict[str, np.ndarray] = field(default_factory=dict)
+
+    tools_used: list[str] = field(default_factory=list)
+    confidence_score: float = 0.0
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+
+@dataclass
 class EvolutionaryAnalysis:
     """Evolutionary analysis results for a protein hypothesis."""
     analysis_id: str = field(default_factory=lambda: str(uuid.uuid4()))

@@ -283,7 +283,7 @@ class BinderDesignSystem(JnanaSystem):
                 self.design_agents['structure_prediction'] = ChaiAgent(
                     agent_id='structure_prediction',
                     config=pred_config,
-                    parsl_config=parsl_config,
+                    parsl_config=self.parsl_config,
                 )
             except Exception as e:
                 self.logger.warning(f'Failed to initialize structure prediction agent: {e}')
