@@ -115,7 +115,8 @@ class RAGAgent(Agent):
     '''
     def __init__(self,
                 config_inp):
-        self.config = ChatAppConfig.from_yaml(config_inp)
+        print(config_inp)
+        self.config = ChatAppConfig.from_dict(config_inp)
         self.rag_model = self.config.rag_configs.get_rag_model()
         self.conversation_history = []
         print(self.config)
@@ -158,6 +159,7 @@ class RAGWrapper:
         self.config = config
         self.model_manager = model_manager
         self.logger = logging.getLogger(__name__)
+        self.generated_hypotheses = []
 
         self.capabilities = [
             'rag_generation',
@@ -165,7 +167,7 @@ class RAGWrapper:
             'hypothesis_generation'
             ]
                                                                
-        self.rag_config = config.get('rag')
+        self.rag_config = config#config.get('rag')
         self.manager = None
 
     async def initialize(self):
@@ -179,7 +181,7 @@ class RAGWrapper:
         try:
             self.rag_coord = await self.manager.launch(
                 RAGAgent,
-                args=(self.rag_config),
+                args=(self.rag_config,),
             )
             logger.info('Launching RAG')
             self.initialized = True
@@ -227,6 +229,7 @@ class RAGWrapper:
             self.logger.error('RAG agent not ready')
             return None
         rag_results =  await self._generate_rag_hypothesis(data)
+        self.logger.info(f"{rag_results=}")
         return await self.postprocess(rag_results)
 
     async def _generate_rag_hypothesis(self,

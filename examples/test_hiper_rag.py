@@ -41,7 +41,7 @@ async def test_hiper_rag_implement():
     
     session_id = await system.set_research_goal(research_goal)
     logger.info(f"✓ Research goal set (session: {session_id})")
-    user_prompt = "Identify proteins that are involved with physical interactions with NMNAT-2 in at least one pathway involved in cancer. Return this as a json with this format: {interacting_protein_name: string, interacting_protein_uniprot_id: string}"
+    user_prompt = "Identify proteins that are involved with physical interactions with NMNAT-2. Return this as a json with this format: {interacting_protein_name: string, interacting_protein_uniprot_id: string}"
     data = {'prompt': user_prompt}
     rag_agent = system.design_agents['rag']
     rag_results = await rag_agent.generate_rag_hypothesis(data)

@@ -143,9 +143,13 @@ agents:
   rag:
     rag_configs:
       generator_config:
-        _target_: ArgoGeneratorConfig
-        model: "argo:gpt-4.1"  # Optional, uses env var if not specified
-        base_url: "http://lambda5:55625"  # Optional, uses env var if not specified
+        #_target_: ArgoGeneratorConfig
+        #model: "argo:gpt-4.1"  # Optional, uses env var if not specified
+        #base_url: "http://lambda5:55625"  # Optional, uses env var if not specified
+        #temperature: 0.0
+        #max_tokens: 32768
+        _target_: OpenAIAPIGeneratorConfig
+        model: "gpt-4o"
         temperature: 0.0
         max_tokens: 32768
     

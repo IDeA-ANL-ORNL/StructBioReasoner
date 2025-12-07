@@ -290,8 +290,10 @@ class BinderDesignSystem(JnanaSystem):
         # Initialize molecular dynamics agent
         if "rag" in self.enable_agents:
             if RAG_EXISTS:
+                print(f"{agent_configs=}")
                 try:
-                    rag_config = agent_configs.get("rag", {})
+                    rag_config = agent_configs["rag"]#.get("rag", {})
+                    self.logger.info(f"{rag_config=}")
                     self.logger.info(rag_config)
                     self.design_agents['rag'] = RAGWrapper(
                         agent_id="rag",
