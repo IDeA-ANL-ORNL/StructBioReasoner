@@ -368,9 +368,8 @@ class FEAgent:
                     self.logger.warning(f"Error exiting manager context: {e}")
                 finally:
                     self.manager = None
-                    self.builder_handle = None
-                    self.simulator_handle = None
-                    self.coordinator_handle = None
+                    self.fe_handle = None
+                    delattr(self, 'initialized')
 
             # Call parent cleanup
             await super().cleanup()

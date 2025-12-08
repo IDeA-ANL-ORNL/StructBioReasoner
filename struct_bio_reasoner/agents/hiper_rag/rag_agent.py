@@ -207,6 +207,7 @@ class RAGWrapper:
                     self.logger.warning(f'Error exiting manager context: {e}')
                 finally:
                     self.manager = None
+                    delattr(self, 'initialized')
 
             self.logger.info('RAG agent cleanup completed')
 

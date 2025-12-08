@@ -294,7 +294,6 @@ class MDAgentAdapter:
             for sim_path in sim_paths:
                 sim_path.mkdir(parents=True, exist_ok=True)
             
-
             build_kwargs = [build_kwargs.copy() for _ in range(len(sim_paths))]
             sim_kwargs = [sim_kwargs.copy() for _ in range(len(sim_paths))]
             
@@ -589,6 +588,7 @@ class MDAgentAdapter:
                     self.builder_handle = None
                     self.simulator_handle = None
                     self.coordinator_handle = None
+                    delattr(self, 'initialized')
 
             self.logger.info("MDAgent adapter cleanup completed")
 
