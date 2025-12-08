@@ -113,6 +113,7 @@ class ChaiAgent:
                     self.logger.warning(f'Error exiting manager context: {e}')
                 finally:
                     self.manager = None
+                    delattr(self, 'initialized')
 
             self.logger.info('Chai agent cleanup completed')
 

@@ -10,15 +10,13 @@ The adapter translates between:
 - MD simulation results → ProteinHypothesis objects
 """
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 import dill as pickle
 import asyncio
 import logging
-import MDAnalysis as mda
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
-from ...utils.parsl_settings import LocalCPUSettings
 
 # FEAgent imports (from https://github.com/msinclair-py/MDAgent)
 try:
@@ -34,12 +32,11 @@ except ImportError:
     MDAGENT_AVAILABLE = False
     logging.warning("FEAgent not available. Install from https://github.com/msinclair-py/MDAgent")
 
-from ...data.protein_hypothesis import EnergeticAnalysis, ProteinHypothesis
+from ...data.protein_hypothesis import SimAnalysis, ProteinHypothesis
 
 @dataclass
 class FEConfig:
     selections: list=field(default_factory=lambda: ['chain A', 'not chain A'])
-    out: Path=Path('.')
     n_cpus: int=200,
     amberhome: str=''
 
@@ -59,14 +56,15 @@ class FEAgent:
     
     def __init__(self, 
                  agent_id: str,
-                 config: Dict[str, Any],
-                 parsl_config: dict[str, Any]):
+                 config: Dict[str, Any]):
         """
         Initialize FEAgent adapter.
         
         Args:
             config: Configuration dictionary with FEAgent settings
         """
+        super().__init__(config)
+        
         self.agent_id = agent_id
         self.agent_type = "free_energy"
         self.specialization = "mmpbsa"
@@ -80,9 +78,7 @@ class FEAgent:
         if not self.fe_config['amberhome']:
             self.fe_config['amberhome'] = config.get('mdagent', {}).get('amberhome', {})
 
-        parsl_config['cores_per_worker'] = self.fe_config['cpus']
-        parsl_config['max_workers_per_node'] = self.fe_config['cpus_per_node'] // self.fe_config['cpus']
-        self.parsl_config = parsl_config
+        self.parsl_config = self.fe_config.get('parsl', {})
         
         # FEAgent components (initialized in initialize())
         self.manager = None
@@ -91,8 +87,6 @@ class FEAgent:
         # State tracking
         self.active_calculations = {}
         self.completed_calculations = {}
-        
-        self.logger = logging.getLogger(__name__)
         
         self.logger.info(f"FEAgent initialized")
 
@@ -122,7 +116,7 @@ class FEAgent:
             try:
                 # Try importing from mdagent package (if installed as package)
                 from MDAgent.core.mmpbsa_agent import FreeEnergy, FECoordinator
-                from molecular_simulations.simulate.mmpbsa import MMPBSA
+                from 
             except ImportError:
                 try:
                     # Try importing from agents module (if MDAgent is in PYTHONPATH)
@@ -144,18 +138,13 @@ class FEAgent:
             # Enter the manager context to initialize exchange client
             await self.manager.__aenter__()
 
-            # worker_init, nodes, max_workers_per_node, cores_per_worker
-            self.parsl_settings = LocalCPUSettings(**self.parsl_config).config_factory(run_dir)
+            self.parsl_config = LocalCPUSettings(**self.parsl_settings).config_factory(run_dir)
 
             # Launch FEAgent components
-            self.fe_handle = await self.manager.launch(
-                FreeEnergy,
-                args=(MMPBSA)
-            )
-
+            self.fe_handle = await self.manager.launch(FreeEnergy)
             self.coordinator_handle = await self.manager.launch(
                 FECoordinator,
-                args=(self.fe_handle, self.parsl_settings)
+                args=(self.fe_handle, self.parsl_config)
             )
 
             self.initialized = True
@@ -229,6 +218,9 @@ class FEAgent:
             return {}
         
         try:
+            # Run FEAgent workflow
+            self.logger.info(f"Starting FEAgent simulation: {sim_id}")
+            
             # This looks weird but ensures we only run dirs with simulations
             # in them. Skips over failed runs, or extraneous dirs
             if isinstance(sim_path, list):
@@ -262,33 +254,22 @@ class FEAgent:
     async def _unpack_dataclass_config(self,
                                        paths: list[Path]) -> list[dict[str, Any]]:
         """"""
-        sels = self.fe_config['selections']
+        dict_config = asdict(self.fe_config)
+        sels = dict_config['selections']
         fe_kwargss = []
         for path in paths:
-            dict_copy = self.fe_config.copy()
+            dict_copy = dict_config.copy()
             u = mda.Universe(str(path / 'system.prmtop'), str(path / 'prod.dcd'))
-
-            protein = u.select_atoms('protein').residues.resids
-            oxts = u.select_atoms('name OXT').residues.resids
-
-            last_protein_resid = oxts[-2]
-            sel0 = [resid for resid in protein if resid <= last_protein_resid]
-            sel1 = [resid for resid in protein if resid > last_protein_resid]
+            sel1 = u.select_atoms(sels[0])
+            sel2 = u.select_atoms(sels[1])
 
             s1 = self.format_for_cpptraj(sel1.residues.resids)
             s2 = self.format_for_cpptraj(sel2.residues.resids)
 
             dict_copy['selections'] = [s1, s2]
-            dict_copy['out'] = path
-
             fe_kwargss.append(dict_copy)
 
         return fe_kwargss
-
-    async def is_ready(self) -> bool:
-        if not hasattr(self, 'initialized'):
-            await self.initialize()
-        return self.initialized
 
     def format_for_cpptraj(self,
                            resids: list[int]) -> str:
@@ -387,7 +368,7 @@ class FEAgent:
 
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
-                                 task_params: dict[str, Any]) -> EnergeticAnalysis:
+                                 task_params: dict[str, Any]) -> SimAnalysis:
         paths = task_params['simulation_paths']
         energies = await self.run_calculations( 
                                sim_path = paths,
@@ -406,7 +387,7 @@ class FEAgent:
         return analysis
 
     def _calculate_confidence(self,
-                              analysis: EnergeticAnalysis) -> float:
+                              analysis: SimAnalysis) -> float:
         # TODO: compute this based on RMSD/RMSF threshholds
         return 0.75
 

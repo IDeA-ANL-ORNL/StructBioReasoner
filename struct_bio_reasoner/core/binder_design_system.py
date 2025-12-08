@@ -22,6 +22,7 @@ from jnana.core.jnana_system import JnanaSystem
 from ..data.protein_hypothesis import ProteinHypothesis
 from ..agents.computational_design.bindcraft_agent import BindCraftAgent
 from ..agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
+from ..agents.molecular_dynamics.free_energy_agent import FEAgent
 from ..agents.structure_prediction.chai_agent import ChaiAgent
 from ..agents.energetic.energy_agent import EnergeticAnalysisAgent
 try:
@@ -286,6 +287,17 @@ class BinderDesignSystem(JnanaSystem):
                 self.logger.info("MD agent initialized")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize MD agent: {e}")
+
+            if 'free_energy' in self.enable_agents:
+                try:
+                    self.design_agents['free_energy'] = FEAgent(
+                        agent_id='free_energy',
+                        config=md_config,
+                        parsl_config = self.parsl_config,
+                    )
+
+                except Exception as e:
+                    self.logger.warning(f'Failed to initialize FE agent: {e}')
 
         # Initialize molecular dynamics agent
         if "rag" in self.enable_agents:

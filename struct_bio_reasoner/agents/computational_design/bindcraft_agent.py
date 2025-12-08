@@ -177,6 +177,7 @@ class BindCraftAgent:
                     self.logger.warning(f'Error exiting manager context: {e}')
                 finally:
                     self.manager = None
+                    delattr(self, 'initialized')
 
             self.logger.info('BindCraft agent cleanup completed')
 
@@ -187,7 +188,9 @@ class BindCraftAgent:
         #Use timestemp tom get unique name
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         checkpoint_file = f'bindcraft_checkpoint_{timestamp}.pkl'
-        pickle.dump(results, open(checkpoint_file, 'wb'))
+        with open(checkpoint_file, 'wb') as pkl:
+            pickle.dump(results, pkl)
+
         return checkpoint_file
 
     async def generate_hypotheses(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -329,8 +332,8 @@ class BindCraftAgent:
         result = await self.generate_binder_hypothesis(task_params)
         # Write result to file
         all_cycles = result['all_cycles']
-        passing_structures = len(
-            [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
+        passing_structures = sum(
+            [len(all_cycles[i]['passing_structures']) for i in range(len(all_cycles))]
         )
         
         total_sequences = result['total_sequences_generated']
