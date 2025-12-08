@@ -132,7 +132,7 @@ class RAGAgent(Agent):
         response_list = self.rag_model.generate(
             texts=[user_input],  # retrieve only on the new user input
             prompt_template=conversation_template,
-            retrieval_top_k=20,
+            retrieval_top_k=200,
             retrieval_score_threshold=0.1,
             debug_retrieval=True,  # Enable debug mode to see retrieval details
         )
