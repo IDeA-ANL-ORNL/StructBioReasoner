@@ -173,10 +173,6 @@ class FEAgent:
             target_protein = context.get('target_protein', 'unknown')
             sim_path = context.get('sim_root_path')
             
-            if not pdb_path:
-                self.logger.error("No PDB path provided in context")
-                return []
-            
             # Run MD simulation using FEAgent
             self.logger.info("Running {self.free_energy.calculator.__name__}")
             calculation_result = await self.run_calculations(
@@ -184,31 +180,11 @@ class FEAgent:
                 protein_name=target_protein
             )
             
-            if calculation_result:
-                # Convert to hypothesis format
-                hypothesis = {
-                    'title': f'FEAgent Simulation Analysis for {target_protein}',
-                    'strategy': 'free_energy_calculation',
-                    'approach': f'{self.free_energy.calculator.__name__} method',
-                    'description': f'FEAgent',
-                    'confidence': calculation_result.get('confidence', 0.75),
-                    'source': 'FEAgent',
-                    'calculation_results': calculation_result,
-                    'execution_plan': {
-                        'solvent_model': self.solvent_model,
-                        'equilibration_steps': self.equil_steps,
-                        'production_steps': self.prod_steps,
-                        'force_field': self.force_field
-                    }
-                }
-                hypotheses.append(hypothesis)
-            
-            self.logger.info(f"Generated {len(hypotheses)} FEAgent-based hypotheses")
-            
         except Exception as e:
             self.logger.error(f"Error generating FEAgent hypotheses: {e}")
+            calculation_result = None
         
-        return hypotheses
+        return calculation_result
     
     async def run_calculations(self,
                                sim_path: Union[Path, list[Path]],
@@ -250,12 +226,13 @@ class FEAgent:
                 path=paths,
                 fe_kwargss=fe_kwargss,
             ) # list of dicts with `path`, `success` and `fe`
-            
-            # Store results
+
             analysis = {
-                'results': results,
-                'timestamp': datetime.now().isoformat()
-            }
+                result['path']: {'mean': result['fe'][0],
+                                 'std': result['fe'][1],
+                                 'unit': 'kcal/mol'} 
+                for result in results
+                                }
             
             return analysis
 
@@ -303,7 +280,6 @@ class FEAgent:
 
         return string
 
-    
     def _create_placeholder_analysis(self) -> Dict[str, Any]:
         """
         Create placeholder analysis when detailed analysis is not available.
@@ -314,7 +290,7 @@ class FEAgent:
         return {
             'status': 'placeholder',
             'message': 'Detailed trajectory analysis not available (MDAgent not installed)',
-            'free_energy': {0: {'path': None, 'mean': 0.0, 'std': 0.0, 'unit': 'kcal/mol'}},
+            'free_energy': {'': {'mean': 0.0, 'std': 0.0, 'unit': 'kcal/mol'}},
         }
 
     def _calculate_confidence(self, trajectory_analysis: Dict[str, Any]) -> float:
@@ -388,13 +364,12 @@ class FEAgent:
                                protein_name = "unknown",
                             )
 
-        analysis = SimAnalysis(
+        analysis = EnergeticAnalysis(
             protein_id='',
-            simulation_time_in_ns=sim_results['simulation_time'],
-            rmsd=sim_results['rmsd'],
-            rmsf=sim_results['rmsf']
+            binding_affinities=energies,
+            force_field='amber19',
         )
-
+    
         analysis.confidence_score = self._calculate_confidence(analysis)
         analysis.tools_used = self._get_tools_used()
 
