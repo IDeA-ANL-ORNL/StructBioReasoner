@@ -87,6 +87,7 @@ class FEAgent:
         # FEAgent components (initialized in initialize())
         self.manager = None
         self.fe_handle = None
+        self.coordinator_handle = None
         
         # State tracking
         self.active_calculations = {}
@@ -272,11 +273,11 @@ class FEAgent:
             oxts = u.select_atoms('name OXT').residues.resids
 
             last_protein_resid = oxts[-2]
-            sel0 = [resid for resid in protein if resid <= last_protein_resid]
-            sel1 = [resid for resid in protein if resid > last_protein_resid]
+            sel1 = [resid for resid in protein if resid <= last_protein_resid]
+            sel2 = [resid for resid in protein if resid > last_protein_resid]
 
-            s1 = self.format_for_cpptraj(sel1.residues.resids)
-            s2 = self.format_for_cpptraj(sel2.residues.resids)
+            s1 = self.format_for_cpptraj(sel1)
+            s2 = self.format_for_cpptraj(sel2)
 
             dict_copy['selections'] = [s1, s2]
             dict_copy['out'] = path

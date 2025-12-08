@@ -604,19 +604,6 @@ class MDAgentAdapter:
         out = task_params['root_output_path']
         prod_steps = task_params.get('steps', self.prod_steps)
 
-        """
-        checkpoint_file = hypothesis.binder_analysis.checkpoint_file
-        checkpoint_data = pickle.load(open(checkpoint_file, 'rb'))
-        all_cycles = checkpoint_data['all_cycles']
-        passing_structures = [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
-        # unpack list of lists in passing_structures
-        passing_structures = [Path(item).resolve() for sublist in passing_structures for item in sublist]
-        # DELETE AFTER READING
-        passing_structures = passing_structures[:int(len(passing_structures)//12*12)]
-        # DONE DELETING
-        self.logger.info('Checkpoint loaded')
-        """
-
         # TODO: get kwargs for build/sim from task_params
         sim_results = await self.run_md_simulation( 
             root_path=out,
@@ -658,7 +645,6 @@ class MDAgentAdapter:
 
         for i, v in results.items():
             analysis = v['trajectory_analysis']
-            self.logger.info(f'{list(analysis.keys())=}')
             n_frames = analysis['trajectory_info']['n_frames']
             rmsds[i, 0] = analysis['rmsd']['mean']
             rmsds[i, 1] = analysis['rmsd']['std']
