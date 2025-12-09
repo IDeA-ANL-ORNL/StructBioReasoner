@@ -31,7 +31,7 @@ from datetime import datetime
 from struct_bio_reasoner.utils.cleanup_queue import cleanup_all_queues
 from jnana.protognosis.core.llm_interface import alcfLLM
 from struct_bio_reasoner.prompts.prompts import get_prompt_manager, config_master
-
+from struct_bio_reasoner.agents.data.protein_hypothesis import ProteinHypothesis
 # Add Jnana to path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'Jnana'))
 
@@ -185,10 +185,13 @@ async def nmnat2_agentic_workflow(research_goal):
                                         temperature = 0.3,
                                         max_tokens = 32678
                                         ) 
+    logger.info(f"{rag_result_json=}")
+    import sys
+    sys.exit()
     rag_result_formatted = [{'interacting_protein_name': name, 'uniprot_id': id, 'sequence':await fetch_uniprot_sequence(id), 'cancer_pathway': cancer_pathway, 'interaction_type': interaction_type, 'therapeutic_rationale': therapeutic_rationale} for name, id, cancer_pathway, interaction_type, therapeutic_rationale in zip(rag_result_json['interacting_protein_name'], rag_result_json['interacting_protein_uniprot_ids'], rag_result_json['cancer_pathways'], rag_result_json['interaction_types'], rag_result_json['therapeutic_rationales'])]
     
     folding_prompt_manager = get_prompt_manager('chai', research_goal, rag_result_formatted, target_prot = target_sequence, prompt_type = 'folding', history_list = [], num_history = 3)
-    folding_result = system.prompt_gen_llm.generate_with_json_output(prompt = folding_prompt_manager.prompt_r,
+    folding_input = system.prompt_gen_llm.generate_with_json_output(prompt = folding_prompt_manager.prompt_r,
                                         json_schema = config_master['chai'],
                                         temperature = 0.3,
                                         max_tokens = 32678
@@ -196,6 +199,13 @@ async def nmnat2_agentic_workflow(research_goal):
     
     logger.info(f"{rag_result_json=}")
     logger.info(f"{folding_result=}")
+    """
+    Execute Chai folding with sequences from folding_result
+    """
+    """
+    system.design_agents['structure_prediction'].generate_binder_hypothesis(folding_result)
+    """
+
     import sys
     sys.exit()
 
