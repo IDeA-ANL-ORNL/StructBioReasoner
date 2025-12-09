@@ -37,32 +37,40 @@ class RAGPromptManager():
     research_goal: str
     input_json: dict[str, Any]
     target_prot: str
+    prompt_type: str
     def __post_init__(self):
         self.prompt_r = self.running_prompt()
         self.prompt_c = self.conclusion_prompt()
     def running_prompt(self):
     # Use Jnana's LLM to generate optimal prompt for HiPerRAG
-        prompt_optimization_request = f""" Given this research goal:
-        {self.research_goal}
-        Generate an optimal prompt for a literature mining system (HiPerRAG) to identify:
-        1. Key proteins that physically interact with {self.target_prot}
-        2. Proteins involved in cancer pathways
-        3. Proteins where disrupting the {self.target_prot} interaction could have therapeutic benefit
+        if self.prompt_type == 'interactome':
+            prompt_optimization_request = f""" Given this research goal:
+            {self.research_goal}
+            Generate an optimal prompt for a literature mining system (HiPerRAG) to identify:
+            1. Key proteins that physically interact with {self.target_prot}
+            2. Proteins involved in cancer pathways
+            3. Proteins where disrupting the {self.target_prot} interaction could have therapeutic benefit
 
-        The prompt should request structured output in JSON format with:
-        - interacting_protein_name: string
-        - interacting_protein_uniprot_id: string
-        - cancer_pathway: string
-        - interaction_type: string (e.g., "direct binding", "complex formation")
-        - therapeutic_rationale: string
+            The prompt should request structured output in JSON format with:
+            - interacting_protein_name: string
+            - interacting_protein_uniprot_id: string
+            - cancer_pathway: string
+            - interaction_type: string (e.g., "direct binding", "complex formation")
+            - therapeutic_rationale: string
 
-        Return ONLY the optimized prompt text, no additional explanation with the prompt in a json format as {config_master['rag']}."""
+            Return ONLY the optimized prompt text, no additional explanation with the prompt in a json format as {config_master['rag']}."""
 
+        elif self.prompt_type == 'binder_design':
+            prompt_optimization_request = f""" Given this research goal:
+            {self.research_goal}
+            Generate an optimal prompt for literature mining using HiPerRAG to identify:
+                starting binders for bindcraft optimization. If clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/nanobody/affitin provided in research_goal""" 
         return prompt_optimization_request
     def conclusion_prompt(self):
        prompt =f""" Generate recommendation using verbatim from this hiper-rag output: 
        {self.input_json}""" 
        return prompt
+
 @dataclass
 class BindCraftPromptManager():
     research_goal: str
@@ -222,7 +230,7 @@ class FreeEnergyPromptManager():
 # I want to make a factory class that can generate the right prompt manager based on the agent type
 def get_prompt_manager(agent_type: str, research_goal: str, input_json: dict[str, Any] | list[dict], target_prot: str, prompt_type: str, history_list: list[dict], num_history: int = 3):
     if agent_type == 'rag':
-        return RAGPromptManager(research_goal, input_json, target_prot)
+        return RAGPromptManager(research_goal, input_json, target_prot, prompt_type)
     elif agent_type == 'bindcraft':
         return BindCraftPromptManager(research_goal, input_json, target_prot, prompt_type, history_list, num_history)
     elif agent_type == 'chai':

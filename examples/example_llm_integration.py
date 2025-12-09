@@ -27,6 +27,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from struct_bio_reasoner.utils.cleanup_queue import cleanup_all_queues
+from jnana.protognosis.core.llm_interface import alcfLLM
+from struct_bio_reasoner.prompts.prompts import get_prompt_manager
 
 async def full_binder_design_pipeline():
     """
@@ -47,6 +49,8 @@ async def full_binder_design_pipeline():
     logger.info("\n" + "="*80)
     logger.info("FULL BINDER DESIGN PIPELINE")
     logger.info("="*80)
+
+    prompt_generator_llm = alcfLLM()
     
     # =========================================================================
     # STEP 1: Initialize BinderDesignSystem
@@ -58,9 +62,8 @@ async def full_binder_design_pipeline():
     system = BinderDesignSystem(
         config_path="config/binder_config.yaml",
         jnana_config_path="config/jnana_config.yaml",
-        enable_agents=['computational_design', 'molecular_dynamics']
+        enable_agents=['rag', 'computational_design', 'molecular_dynamics']
     )
-    
     await system.start()
     logger.info("✓ System initialized")
     
@@ -69,17 +72,29 @@ async def full_binder_design_pipeline():
     # =========================================================================
     logger.info("\n[STEP 2] Setting research goal...")
     
+    # Define research goal
     research_goal = """
-    Design affibody and only affibody for Q9BZQ4|NMNA2_HUMAN Nicotinamide/nicotinic acid mononucleotide adenylyltransferase 2 OS=Homo sapiens OX=9606 GN=NMNAT2 PE=1 SV=1 
-    to optimize binding affinity and stability. Target sequence: 
-    MTETTKTHVILLACGSFNPITKGHIQMFERARDYLHKTGRFIVIGGIVSPVHDSYGKQGLVSSRHRLIMCQLAVQNSDWIRVDPWECYQDTWQTTCSVLEHHRDLMKRVTGCILSNVNTPSMTPVIGQPQNETPQPIYQNSNVATKPTAAKILGKVGESLSRICCVRPPVERFTFVDENANLGTVMRYEEIELRILLLCGSDLLESFCIPGLWNEADMEVIVGDFGIVVVPRDAADTDRIMNHSSILRKYKNNIMVVKDDINHPMSVVSSTKSRLALQHGDGHVVDYLSQPVIDYILKSQLYINASG
-    
+    Design biologic binders for NMNAT-2 (Nicotinamide/nicotinic acid mononucleotide adenylyltransferase 2, Q9BZQ4)
+    using affibody, affitin, or nanobody scaffolds (or other biologic scaffolds if clinical evidence supports it).
+
+    Target: Q9BZQ4|NMNA2_HUMAN Nicotinamide/nicotinic acid mononucleotide adenylyltransferase 2
+    Sequence: MTETTKTHVILLACGSFNPITKGHIQMFERARDYLHKTGRFIVIGGIVSPVHDSYGKQGLVSSRHRLIMCQLAVQNSDWIRVDPWECYQDTWQTTCSVLEHHRDLMKRVTGCILSNVNTPSMTPVIGQPQNETPQPIYQNSNVATKPTAAKILGKVGESLSRICCVRPPVERFTFVDENANLGTVMRYEEIELRILLLCGSDLLESFCIPGLWNEADMEVIVGDFGIVVVPRDAADTDRIMNHSSILRKYKNNIMVVKDDINHPMSVVSSTKSRLALQHGDGHVVDYLSQPVIDYILKSQLYINASG
+
+    Objective: Disrupt physical interactions between NMNAT-2 and proteins involved in cancer pathways.
+
     Goals:
-    - Binding affinity < 10 nM
+    - High binding affinity (< 10 nM)
     - Stable complex in MD simulation (RMSD < 3 Å)
-    - High success rate (>5% of generated sequences)
-    """
-    
+    - Mimic binding interface of natural interacting partners
+    - Prioritize scaffolds with clinical precedent
+
+    Default Scaffolds:
+    - Affibody: VDNKFNKEQQNAFYEILHLPNLNEEQRNAFIQSLKDDPSQSANLLAEAKKLNDAQAPK
+    - Affitin: MGSWAEFKQRLAAIKTRLQALGGSEAELAAFEKEIAAFESELQAYKGKGNPEVEALRKEAAAIRDELQAYRHN
+    - Nanobody: QVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAA...WGQGTLVTVSS
+    """    
+
+
     session_id = await system.set_research_goal(research_goal)
     logger.info(f"✓ Research goal set (session: {session_id})")
     
@@ -98,6 +113,18 @@ async def full_binder_design_pipeline():
     hyp_count=0
     while hyp_count<1:
         try:
+            interactome_rag_prompt_manager = get_prompt_manager('rag', research_goal, {}, target_prot = 'NMNAT-2', prompt_type = 'interactome', history_list = [], num_history = 3) 
+            rag_prompt_to_optimize = interactome_rag_prompt_manager.prompt_r
+            rag_prompt = prompt_generator_llm.generate(prompt = rag_prompt_to_optimize,
+                                                        temperature = 0.3,
+                                                        max_tokens = 32678
+                                                        ) 
+            logger.info(f"prompt: {rag_prompt}")
+            rag_agent = system.design_agents['rag']
+            rag_results = await rag_agent.generate_rag_hypothesis({'prompt': rag_prompt})
+            logger.info(rag_results)
+            import sys
+            sys.exit()
             initial_hypothesis = await system.generate_protein_hypothesis(
                 research_goal=research_goal,
                 strategy="binder_gen"#"coscientist_binder_design"  # New strategy for binder design

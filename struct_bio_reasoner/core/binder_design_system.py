@@ -648,7 +648,7 @@ class BinderDesignSystem(JnanaSystem):
                         'run_conc': prompt_manager.prompt_c}
         recommendation = await self.generate_single_recommendation(results_pass)
         self.logger.info(f"Here is the protein recommendation: \n {[rec.to_dict() for rec in recommendation]}")
-        self.history_list.extend(list(recommendation[0]))
+        self.history_list.extend(list(recommendation)[0])
         recommendation.metadata['history_list'] = self.history_list
         recommendation.metadata['num_history'] = self.num_history
         #protein_recommendation = ProteinHypothesis.from_unified_hypothesis(
@@ -677,6 +677,7 @@ class BinderDesignSystem(JnanaSystem):
                         recommendation)
         self.logger.info(f"Here is the recommended config: \n {[rec.to_dict() for rec in recommended_configs]}")
         
+        self.history_list.extend(list(recommended_configs)[0])
         return [rec.to_dict() for rec in recommended_configs] #protein_recommendation
 
 
