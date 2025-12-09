@@ -31,7 +31,7 @@ from datetime import datetime
 from struct_bio_reasoner.utils.cleanup_queue import cleanup_all_queues
 from jnana.protognosis.core.llm_interface import alcfLLM
 from struct_bio_reasoner.prompts.prompts import get_prompt_manager, config_master
-from struct_bio_reasoner.agents.data.protein_hypothesis import ProteinHypothesis
+from struct_bio_reasoner.data.protein_hypothesis import ProteinHypothesis
 # Add Jnana to path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'Jnana'))
 
