@@ -10,11 +10,13 @@ logger = logging.getLogger(__name__)
 
 config_master = {
     'rag': {'prompt': 'string'},
-    'rag_output': {'interacting_protein_names': 'list[string]',
+
+    'rag_output': {'interactions': 'list[string]',
                    'interacting_protein_uniprot_ids': 'list[string]',
                    'cancer_pathways': 'list[string]',
                    'interaction_types': 'list[string]',
                    'therapeutic_rationales': 'list[string]'},
+
     'bindcraft': {'num_rounds': 'int',
                      'batch_size': 'int', 
                      'max_retries': 'int', 
@@ -157,7 +159,7 @@ class CHAIPromptManager():
         - interaction_type: string (e.g., "direct binding", "complex formation")
         - therapeutic_rationale: string
         Focus on returning the interacting protein name and the list of lists of sequences (target,partner) as a json with the following format:
-        {config_master['chai']}"""
+        {config_master['chai']}. Include only sequence for target {self.target_prot} and sequence for interacting partner"""
         return prompt
 
     def conclusion_prompt(self):

@@ -133,7 +133,7 @@ def parse_hiperrag_response(rag_response: str) -> List[Dict[str, str]]:
 # MAIN WORKFLOW
 # ============================================================================
 
-async def nmnat2_agentic_workflow():
+async def nmnat2_agentic_workflow(research_goal):
     """
     Main agentic workflow for NMNAT-2 binder design.
     """
@@ -159,28 +159,10 @@ async def nmnat2_agentic_workflow():
     logger.info("✓ System initialized")
 
     # Define research goal
-    research_goal = """
-    Design biologic binders for NMNAT-2 (Nicotinamide/nicotinic acid mononucleotide adenylyltransferase 2, Q9BZQ4)
-    using affibody, affitin, or nanobody scaffolds (or other biologic scaffolds if clinical evidence supports it).
 
-    Target: Q9BZQ4|NMNA2_HUMAN Nicotinamide/nicotinic acid mononucleotide adenylyltransferase 2
-    Target Sequence: MTETTKTHVILLACGSFNPITKGHIQMFERARDYLHKTGRFIVIGGIVSPVHDSYGKQGLVSSRHRLIMCQLAVQNSDWIRVDPWECYQDTWQTTCSVLEHHRDLMKRVTGCILSNVNTPSMTPVIGQPQNETPQPIYQNSNVATKPTAAKILGKVGESLSRICCVRPPVERFTFVDENANLGTVMRYEEIELRILLLCGSDLLESFCIPGLWNEADMEVIVGDFGIVVVPRDAADTDRIMNHSSILRKYKNNIMVVKDDINHPMSVVSSTKSRLALQHGDGHVVDYLSQPVIDYILKSQLYINASG
-
-    Objective: Disrupt physical interactions between NMNAT-2 and proteins involved in cancer pathways.
-
-    Goals:
-    - High binding affinity (< 10 nM)
-    - Stable complex in MD simulation (RMSD < 3 Å)
-    - Mimic binding interface of natural interacting partners
-    - Prioritize scaffolds with clinical precedent
-
-    Default Scaffolds:
-    - Affibody: VDNKFNKEQQNAFYEILHLPNLNEEQRNAFIQSLKDDPSQSANLLAEAKKLNDAQAPK
-    - Affitin: MGSWAEFKQRLAAIKTRLQALGGSEAELAAFEKEIAAFESELQAYKGKGNPEVEALRKEAAAIRDELQAYRHN
-    - Nanobody: QVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAA...WGQGTLVTVSS
-    """
 
     session_id = await system.set_research_goal(research_goal)
+    target_sequence = system._extract_target_sequence(research_goal)
     logger.info(f"✓ Research goal set (session: {session_id})")
 
     # ========================================================================
@@ -203,9 +185,21 @@ async def nmnat2_agentic_workflow():
                                         temperature = 0.3,
                                         max_tokens = 32678
                                         ) 
+    rag_result_formatted = [{'interacting_protein_name': name, 'uniprot_id': id, 'sequence':await fetch_uniprot_sequence(id), 'cancer_pathway': cancer_pathway, 'interaction_type': interaction_type, 'therapeutic_rationale': therapeutic_rationale} for name, id, cancer_pathway, interaction_type, therapeutic_rationale in zip(rag_result_json['interacting_protein_name'], rag_result_json['interacting_protein_uniprot_ids'], rag_result_json['cancer_pathways'], rag_result_json['interaction_types'], rag_result_json['therapeutic_rationales'])]
+    
+    folding_prompt_manager = get_prompt_manager('chai', research_goal, rag_result_formatted, target_prot = target_sequence, prompt_type = 'folding', history_list = [], num_history = 3)
+    folding_result = system.prompt_gen_llm.generate_with_json_output(prompt = folding_prompt_manager.prompt_r,
+                                        json_schema = config_master['chai'],
+                                        temperature = 0.3,
+                                        max_tokens = 32678
+                                        ) 
+    
     logger.info(f"{rag_result_json=}")
+    logger.info(f"{folding_result=}")
     import sys
     sys.exit()
+
+
 
     # Extract response from hypothesis
     rag_response_text = rag_hypothesis.content if hasattr(rag_hypothesis, 'content') else str(rag_hypothesis)
@@ -651,9 +645,28 @@ async def nmnat2_agentic_workflow():
 
 
 async def main():
-    """Main entry point"""
+
+    research_goal = """Design biologic binders for NMNAT-2 (Nicotinamide/nicotinic acid mononucleotide adenylyltransferase 2, Q9BZQ4)
+    using affibody, affitin, or nanobody scaffolds (or other biologic scaffolds if clinical evidence supports it).
+
+    Target: Q9BZQ4|NMNA2_HUMAN Nicotinamide/nicotinic acid mononucleotide adenylyltransferase 2
+    Target Sequence: MTETTKTHVILLACGSFNPITKGHIQMFERARDYLHKTGRFIVIGGIVSPVHDSYGKQGLVSSRHRLIMCQLAVQNSDWIRVDPWECYQDTWQTTCSVLEHHRDLMKRVTGCILSNVNTPSMTPVIGQPQNETPQPIYQNSNVATKPTAAKILGKVGESLSRICCVRPPVERFTFVDENANLGTVMRYEEIELRILLLCGSDLLESFCIPGLWNEADMEVIVGDFGIVVVPRDAADTDRIMNHSSILRKYKNNIMVVKDDINHPMSVVSSTKSRLALQHGDGHVVDYLSQPVIDYILKSQLYINASG
+
+    Objective: Disrupt physical interactions between NMNAT-2 and proteins involved in cancer pathways.
+
+    Goals:
+    - High binding affinity (< 10 nM)
+    - Stable complex in MD simulation (RMSD < 3 Å)
+    - Mimic binding interface of natural interacting partners
+    - Prioritize scaffolds with clinical precedent
+
+    Default Scaffolds:
+    - Affibody: VDNKFNKEQQNAFYEILHLPNLNEEQRNAFIQSLKDDPSQSANLLAEAKKLNDAQAPK
+    - Affitin: MGSWAEFKQRLAAIKTRLQALGGSEAELAAFEKEIAAFESELQAYKGKGNPEVEALRKEAAAIRDELQAYRHN
+    - Nanobody: QVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAA...WGQGTLVTVSS"""
+
     try:
-        final_report = await nmnat2_agentic_workflow()
+        final_report = await nmnat2_agentic_workflow(research_goal)
 
         if final_report:
             print("\n✅ Workflow completed successfully!")
