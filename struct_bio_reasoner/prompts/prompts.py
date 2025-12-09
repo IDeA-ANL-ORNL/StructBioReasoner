@@ -151,7 +151,7 @@ class CHAIPromptManager():
         prompt = f"""
         You are an expert in protein structure prediction and understand cellular/cancer pathways. 
         Evaluate the output from hiperrag and decide which protein complexes (self.target_prot and interacting partners) are the most promising to fold.
-
+        The results will be a dictionary with multiple keys. THe elements of each key will be a list and each value in each list is related to each other via inde each other via index 
         Output from hiperrag:
         {self.input_json}
         Make your decision based on this data:
