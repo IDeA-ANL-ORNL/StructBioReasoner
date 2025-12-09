@@ -148,28 +148,48 @@ class CHAIPromptManager():
             self.prompt_r = self.running_prompt()
 
     def running_prompt(self):
+        # Serialize input_json to a formatted string for better LLM readability
+        input_json_str = json.dumps(self.input_json, indent=2, default=str)
+        config_str = json.dumps(config_master['chai'], indent=2)
+
         prompt = f"""
-        You are an expert in protein structure prediction and understand cellular/cancer pathways. 
-        Evaluate the output from hiperrag and decide which protein complexes (self.target_prot and interacting partners) are the most promising to fold.
-        The results will be a dictionary with multiple keys. THe elements of each key will be a list and each value in each list is related to each other via inde each other via index 
+        You are an expert in protein structure prediction and understand cellular/cancer pathways.
+        Evaluate the output from hiperrag and decide which protein complexes ({self.target_prot} and interacting partners) are the most promising to fold.
+        The results will be a dictionary with multiple keys. The elements of each key will be a list and each value in each list is related to each other via index.
+
         Output from hiperrag:
-        {self.input_json}
+        {input_json_str}
+
         Make your decision based on this data:
         - cancer_pathway: string
         - interaction_type: string (e.g., "direct binding", "complex formation")
         - therapeutic_rationale: string
+
         Focus on returning the interacting protein name and the list of lists of sequences (target,partner) as a json with the following format:
-        {config_master['chai']}. Include only sequence for target {self.target_prot} and sequence for interacting partner"""
+        {config_str}
+
+        Include only sequence for target {self.target_prot} and sequence for interacting partner.
+        """
         return prompt
 
     def conclusion_prompt(self):
+        # Serialize input_json and history to formatted strings
+        input_json_str = json.dumps(self.input_json, indent=2, default=str)
+        history_str = json.dumps(self.history_list[:self.num_history], indent=2, default=str)
+        config_str = json.dumps(config_master['mdagent'], indent=2)
+
         prompt = f"""
         You are an expert in evaluating folded structures. Evaluate which structures are the most promising for simulation and which ones should be discarded.
+
         The following structures have been generated including path (which describes the interacting protein name + chai score):
-        {self.input_json}
+        {input_json_str}
+
         Here is the history (which may include details from hiperrag about the interacting proteins):
-        {self.history_list[:self.num_history]}
-        Please provide your decision and reasoning and include the paths of the structures to keep in the format {config_master['mdagent']}."""
+        {history_str}
+
+        Please provide your decision and reasoning and include the paths of the structures to keep in the format:
+        {config_str}
+        """
         return prompt
     
 @dataclass
