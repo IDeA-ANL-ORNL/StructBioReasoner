@@ -17,7 +17,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent.parent.parent / "Jnana"))
 
 from jnana.core.jnana_system import JnanaSystem
-
+from jnana.protognosis.core.agent_core import ContextMemory 
 # Import protein-specific components
 from ..data.protein_hypothesis import ProteinHypothesis
 from ..agents.computational_design.bindcraft_agent import BindCraftAgent
@@ -69,7 +69,7 @@ class BinderConfig:
         'bad_motifs': None,
         'bad_n_termini': None
     })
-    
+    memory: ContextMemory=field(default_factory=lambda: ContextMemory())
 class BinderDesignSystem(JnanaSystem):
     """
     Main binder design system extending Jnana.
@@ -80,6 +80,7 @@ class BinderDesignSystem(JnanaSystem):
     
     def __init__(self, 
                  config_path: Union[str, Path] = "config/binder_config.yaml",
+                 research_goal: str = "Design a binder for SARS-CoV-2 spike protein RBD.",
                  jnana_config_path: Optional[Union[str, Path]] = None,
                  enable_tools: List[str] = None,
                  enable_agents: List[str] = None,
@@ -101,6 +102,8 @@ class BinderDesignSystem(JnanaSystem):
         self.logger = logging.getLogger(__name__)
         
         # Load protein-specific configuration
+        self.memory_binder = ContextMemory()
+        self.memory_binder.set_research_goal(research_goal)
         self.binder_config = load_binder_config(config_path)
         self.parsl_config = self.binder_config['parsl']
         print('loaded binder config')
@@ -646,6 +649,8 @@ class BinderDesignSystem(JnanaSystem):
         recommendation = await self.generate_single_recommendation(results_pass)
         self.logger.info(f"Here is the protein recommendation: \n {[rec.to_dict() for rec in recommendation]}")
         self.history_list.extend(list(recommendation[0]))
+        recommendation.metadata['history_list'] = self.history_list
+        recommendation.metadata['num_history'] = self.num_history
         #protein_recommendation = ProteinHypothesis.from_unified_hypothesis(
         #    recommendation,
         #    #biological_context=biological_context # this goes into `protein_metadata`
