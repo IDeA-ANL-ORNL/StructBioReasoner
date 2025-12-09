@@ -25,6 +25,7 @@ from ..agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
 from ..agents.molecular_dynamics.free_energy_agent import FEAgent
 from ..agents.structure_prediction.chai_agent import ChaiAgent
 from ..agents.energetic.energy_agent import EnergeticAnalysisAgent
+from ..prompts.prompts import get_prompt_manager
 try:
     from ..agents.hiper_rag.rag_agent import RAGWrapper 
     RAG_EXISTS=True
@@ -130,7 +131,8 @@ class BinderDesignSystem(JnanaSystem):
 
         # System state
         self.design_system_ready = False
-        
+        self.history_list = []
+        self.num_history = self.binder_config['history']['num_history']
         #self.start()
         self.logger.info("BinderDesignSystem initialized")
 
@@ -627,14 +629,23 @@ class BinderDesignSystem(JnanaSystem):
             Generated recommendation
         """
         #self.logger.info(f"Generating protein hypothesis with strategy: {strategy}")
+        prompt_manager = get_prompt_manager(
+                agent_type=runtype,
+                research_goal=self.research_goal,
+                input_json=results,
+                target_prot=self.target_prot,
+                prompt_type='conclusion',
+                history_list=self.history_list,
+                num_history=self.num_history
+                )
 
-        if runtype == 'bindcraft':
-            conclusion = f"After running bindcraft {results.num_rounds} rounds and generating {results.total_sequences} sequences total, {results.passing_structures} structures pass sequence and structure quality control. I want at least 200 passing structures before going to md simulations"
-            self.logger.info(f"Conclusion after running {runtype}: {conclusion}")
-            results_pass = {'run_type': 'bindcraft',
-                            'run_conc': conclusion}
-            recommendation = await self.generate_single_recommendation(results_pass)
+        #conclusion = f"After running bindcraft {results.num_rounds} rounds and generating {results.total_sequences} sequences total, {results.passing_structures} structures pass sequence and structure quality control. I want at least 200 passing structures before going to md simulations"
+        self.logger.info(f"Conclusion after running {runtype}: {prompt_manager.prompt_c}")
+        results_pass = {'run_type': runtype,
+                        'run_conc': prompt_manager.prompt_c}
+        recommendation = await self.generate_single_recommendation(results_pass)
         self.logger.info(f"Here is the protein recommendation: \n {[rec.to_dict() for rec in recommendation]}")
+        self.history_list.extend(list(recommendation[0]))
         #protein_recommendation = ProteinHypothesis.from_unified_hypothesis(
         #    recommendation,
         #    #biological_context=biological_context # this goes into `protein_metadata`

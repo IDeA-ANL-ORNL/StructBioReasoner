@@ -2,6 +2,8 @@
 # Extends Jnana configuration for binder design applications
 
 # Binder Design Specific Settings
+history:
+  num_history: 3
 binder_design:
   # Default binder design settings
   default_design:
@@ -295,5 +297,5 @@ security:
     audit_log_access: true
 
 parsl:
-  available_accelerators: 4
+  available_accelerators: ['0', '1'] #tile_names = [f'{gid}.{tid}' for gid in range(6) for tid in range(2)] #4
   nodes: 1
