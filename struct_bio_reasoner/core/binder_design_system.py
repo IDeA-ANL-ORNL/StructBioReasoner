@@ -18,6 +18,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent.parent / "Jnana"))
 
 from jnana.core.jnana_system import JnanaSystem
 from jnana.protognosis.core.agent_core import ContextMemory 
+from jnana.protognosis.core.llm_interface import alcfLLM
 # Import protein-specific components
 from ..data.protein_hypothesis import ProteinHypothesis
 from ..agents.computational_design.bindcraft_agent import BindCraftAgent
@@ -106,6 +107,7 @@ class BinderDesignSystem(JnanaSystem):
         self.memory_binder.set_research_goal(research_goal)
         self.binder_config = load_binder_config(config_path)
         self.parsl_config = self.binder_config['parsl']
+        self.prompt_gen_llm = alcfLLM()
         print('loaded binder config')
         # Determine Jnana config path
         if not jnana_config_path:
@@ -648,7 +650,7 @@ class BinderDesignSystem(JnanaSystem):
                         'run_conc': prompt_manager.prompt_c}
         recommendation = await self.generate_single_recommendation(results_pass)
         self.logger.info(f"Here is the protein recommendation: \n {[rec.to_dict() for rec in recommendation]}")
-        self.history_list.extend(list(recommendation)[0])
+        self.history_list.extend(list(recommendation[0]))
         recommendation.metadata['history_list'] = self.history_list
         recommendation.metadata['num_history'] = self.num_history
         #protein_recommendation = ProteinHypothesis.from_unified_hypothesis(
@@ -677,7 +679,6 @@ class BinderDesignSystem(JnanaSystem):
                         recommendation)
         self.logger.info(f"Here is the recommended config: \n {[rec.to_dict() for rec in recommended_configs]}")
         
-        self.history_list.extend(list(recommended_configs)[0])
         return [rec.to_dict() for rec in recommended_configs] #protein_recommendation
 
 

@@ -10,6 +10,11 @@ logger = logging.getLogger(__name__)
 
 config_master = {
     'rag': {'prompt': 'string'},
+    'rag_output': {'interacting_protein_names': 'list[string]',
+                   'interacting_protein_uniprot_ids': 'list[string]',
+                   'cancer_pathways': 'list[string]',
+                   'interaction_types': 'list[string]',
+                   'therapeutic_rationales': 'list[string]'},
     'bindcraft': {'num_rounds': 'int',
                      'batch_size': 'int', 
                      'max_retries': 'int', 
@@ -67,8 +72,12 @@ class RAGPromptManager():
                 starting binders for bindcraft optimization. If clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/nanobody/affitin provided in research_goal""" 
         return prompt_optimization_request
     def conclusion_prompt(self):
-       prompt =f""" Generate recommendation using verbatim from this hiper-rag output: 
-       {self.input_json}""" 
+       prompt =f""" Using hiper-rag output {self.input_json} clean up and return as json with the following information cleanly: 
+       - interacting_protein_name: string
+       - interacting_protein_uniprot_id: string
+       - cancer_pathway: string
+       - interaction_type: string (e.g., "direct binding", "complex formation")
+       - therapeutic_rationale: string""" 
        return prompt
 
 @dataclass
