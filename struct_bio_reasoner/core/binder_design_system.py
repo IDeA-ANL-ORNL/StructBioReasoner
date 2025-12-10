@@ -136,10 +136,41 @@ class BinderDesignSystem(JnanaSystem):
 
         # System state
         self.design_system_ready = False
-        self.history_list = []
+        self.history = {}
+        self.history['key_items'] = []
+        self.history['decisions'] = []
+        self.history['configurations'] = []
+        self.history['results'] = []
         self.num_history = self.binder_config['history']['num_history']
         #self.start()
         self.logger.info("BinderDesignSystem initialized")
+
+    def append_history(self, key_items: object| None = None,
+                             decision: str|None = None,
+                             configuration: dict[str, Any] | None = None, 
+                             results: dict[str, Any]|None = None):
+        if key_items is not None:
+            self.history['key_items'].append(key_items)
+
+        if decision is not None:
+            self.history['decisions'].append(decision)
+        elif key_items is None:
+            self.history['decisions'].append('No decision')
+        if configuration is not None:
+            self.history['configurations'].append(configuration)
+        elif key_items is None:
+            self.history['configurations'].append('No configuration')
+        if results is not None:
+            self.history['results'].append(results)
+        elif key_items is None:
+            self.history['results'].append('No results')
+
+        if len(self.history['decisions']) > self.num_history:
+            self.history['decisions'].pop(0)
+        if len(self.history['configurations']) > self.num_history:
+            self.history['configurations'].pop(0)
+        if len(self.history['results']) > self.num_history:
+            self.history['results'].pop(0)
 
     def _prepare_jnana_config(self, jnana_config_path: str):
         """

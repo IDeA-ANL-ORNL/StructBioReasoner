@@ -17,7 +17,9 @@ config_master = {
                    'interaction_types': 'list[string]',
                    'therapeutic_rationales': 'list[string]'},
 
-    'computational_design': {'num_rounds': 'int',
+    'computational_design': {
+                    "binder_sequence": 'string',
+                    'num_rounds': 'int',
                      'batch_size': 'int', 
                      'max_retries': 'int', 
                      'sampling_temp': 'float', 
@@ -27,9 +29,13 @@ config_master = {
                                    'max_charge_ratio': 'float', 
                                    'max_hydrophobic_ratio': 'float', 
                                    'min_diversity': 'int'}},
+
     'structure_prediction': {'sequences_to_fold': 'list[list[str]', 'interacting_protein_name': 'list[str]'},
+
     'molecular_dynamics': {'paths_to_simulate': 'list[str]', 'root_output_path': 'str', 'steps': 'int'},
+
     'hotspot': {'paths_to_analyze': 'list[int]'},
+
     'free_energy': {''}
 }
 
@@ -72,7 +78,11 @@ class RAGPromptManager():
             prompt_optimization_request = f""" Given this research goal:
             {self.research_goal}
             Generate an optimal prompt for literature mining using HiPerRAG to identify:
-                starting binders for bindcraft optimization. If clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/nanobody/affitin provided in research_goal""" 
+                starting binders for bindcraft optimization. If clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/nanobody/affitin provided in the research goal.
+                Focus on returning a single peptide amino acid sequence and rationale for this in a json with these keys:
+                 - binder_sequence: string
+                  - rationale: string """ 
+
         return prompt_optimization_request
     def conclusion_prompt(self):
        prompt =f""" Using hiper-rag output {self.input_json} clean up and return as json with the following information cleanly: 
@@ -89,7 +99,7 @@ class BindCraftPromptManager():
     input_json: dict[str, Any]
     target_prot: str
     prompt_type: str
-    history_list : list[dict]
+    history : dict
     num_history: int = 3
     def __post_init__(self):
 
@@ -97,10 +107,11 @@ class BindCraftPromptManager():
         self.prompt_c = None
 
         if self.prompt_type == 'conclusion':
-            self.num_rounds = self.input_json.get('num_rounds', 1)
-            self.total_sequences = self.input_json.get('total_sequences', 100)
-            self.passing_sequences = self.input_json.get('passing_sequences', 0)
-            self.passing_structures = self.input_json.get('passing_structures', 0)
+            self.num_rounds = self.input_json.get('rounds_completed', 1)
+            self.total_sequences = self.input_json.get('total_sequences_generated', 100)
+            self.passing_sequences = self.input_json.get('total_sequences_filtered', 0)
+            self.passing_structures = self.input_json.get('total_sequences_filtered', 0)
+            self.top_binders = dict(sorted(self.input_json['all_cycles'][self.num_rounds].items(), key=lambda x: x[1]['energy'])[:5])
             self.prompt_c = self.conclusion_prompt()
         elif self.prompt_type == 'running':
             self.previous_run_type = self.input_json.get('previous_run_type', 'bindcraft')
@@ -113,19 +124,26 @@ class BindCraftPromptManager():
         RECOMMENDATION FROM PREVIOUS RUN ({self.previous_run_type}):
         run {self.recommendation.metadata['next_task']} for this reason: {self.recommendation.metadata['rationale']}
         This is the history of decisions (least recent first):
-        {self.history_list[:self.num_history] if self.history_list != [] else 'No history'}
+        {self.history['decisions'] if self.history['decisions'] != [] else 'No history'}
+        and the history of results (least recent first):
+        {self.history['results'] if self.history['results'] != [] else 'No history'}
+        and the history of configurations (least recent first):
+        {self.history['configurations'] if self.history['configurations'] != [] else 'No history'}.
+        There are a few very important items to consider encoded here:
+        {self.history['key_items']}
         Please provide your decision and reasoning as a json format with the following format: {config_master['computational_design']}"""
         return prompt
 
     def conclusion_prompt(self):
         prompt = f"""
         You are an expert in computational peptide design optimization. Evaluate the current optimization progress and decide which step to take next (bindcraft, md_simulation).
-
+        If you choose to take bindcraft, should we use a binder that was already generated as the starting or use a scaffold in the research goal ({self.research_goal})?
         BINDCRAFT OPTIMIZATION RESULTS:
         - Total rounds completed: {self.num_rounds}
         - Total sequences generated: {self.total_sequences}
         - Passing sequences: {self.passing_sequences}
         - Passing structures: {self.passing_structures}
+        - Top 5 binders: {self.top_binders}
         This is the history of decisions (least recent first):
         {self.history_list[:self.num_history]}
         Please provide your decision and reasoning."""
