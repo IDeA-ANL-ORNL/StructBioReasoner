@@ -298,7 +298,9 @@ class BindCraftAgent:
                     worst_energy = -10000
                     worst_binder = None
                     for i, binder in enumerate(top_binders):
-                        if binder['energy'] > worst_energy:
+                        if binder['energy'] is None:
+                            worst_binder = i
+                        elif binder['energy'] > worst_energy:
                             worst_energy = binder['energy']
                             worst_binder = i
 

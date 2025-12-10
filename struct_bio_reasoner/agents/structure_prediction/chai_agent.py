@@ -137,8 +137,6 @@ class ChaiAgent:
                                           data: dict[str, Any]) -> Optional[ProteinHypothesis]:
         """"""
         constraints = data.get('constraints', [None] * len(data['sequences']))
-        self.logger.info(f'{constraints=}')
-        self.logger.info(f'{data=}')
 
         # Run the workflow
         results = await self.coordinator.fold_sequences(
