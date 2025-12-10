@@ -601,7 +601,7 @@ class MDAgentAdapter:
         #### Rewrite this according to how binder analysis adds to hypothesis
         self.logger.info('We are about to run MD')
         structures = [Path(p) for p in task_params['simulation_paths']]
-        out = [Path(p) for p in task_params['root_output_path']]
+        out = Path(task_params['root_output_path'])
         prod_steps = task_params.get('steps', self.prod_steps)
         solvent = task_params.get('solvent', 'explicit')
 

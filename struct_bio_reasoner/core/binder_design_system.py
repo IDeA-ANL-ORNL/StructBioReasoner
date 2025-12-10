@@ -71,6 +71,7 @@ class BinderConfig:
         'bad_n_termini': None
     })
     memory: ContextMemory=field(default_factory=lambda: ContextMemory())
+
 class BinderDesignSystem(JnanaSystem):
     """
     Main binder design system extending Jnana.
@@ -108,7 +109,7 @@ class BinderDesignSystem(JnanaSystem):
         self.binder_config = load_binder_config(config_path)
         self.parsl_config = self.binder_config['parsl']
         self.prompt_gen_llm = alcfLLM()
-        print('loaded binder config')
+        
         # Determine Jnana config path
         if not jnana_config_path:
             jnana_config_path = self.binder_config.get("jnana", {}).get("config_path", 
