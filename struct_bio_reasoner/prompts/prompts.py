@@ -156,7 +156,7 @@ class CHAIPromptManager():
         You are an expert in protein structure prediction and understand cellular/cancer pathways.
         Evaluate the output from hiperrag and decide which protein complexes ({self.target_prot} and interacting partners) are the most promising to fold.
         The results will be a dictionary with multiple keys. The elements of each key will be a list and each value in each list is related to each other via index.
-
+        Try to focus on folding the most relevant and smallest proteins possible.
         Output from hiperrag:
         {input_json_str}
 
@@ -164,12 +164,11 @@ class CHAIPromptManager():
         - cancer_pathway: string
         - interaction_type: string (e.g., "direct binding", "complex formation")
         - therapeutic_rationale: string
-
-        Focus on returning the interacting protein name and the list of lists of sequences (target,partner) as a json with the following format:
+        - sequence length: string
+        Focus on returning multiple pairs of sequences (target,partner) and multiple names as a json with the following format:
         {config_str}
 
-        Include only sequence for target {self.target_prot} and sequence for interacting partner.
-        """
+        Include only sequence for target {self.target_prot} and sequence for interacting partner."""
         return prompt
 
     def conclusion_prompt(self):
