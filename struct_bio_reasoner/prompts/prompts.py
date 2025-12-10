@@ -72,7 +72,7 @@ class RAGPromptManager():
             - interaction_type: string (e.g., "direct binding", "complex formation")
             - therapeutic_rationale: string
 
-            Return ONLY the optimized prompt text, no additional explanation with the prompt in a json format as {config_master['rag']}."""
+            Return ONLY the optimized prompt text, no additional explanation with the prompt in a json format as {config_master['rag']} strip any /n characters or anything that obfuscates teh output."""
 
         elif self.prompt_type == 'binder_design':
             prompt_optimization_request = f""" Given this research goal:
