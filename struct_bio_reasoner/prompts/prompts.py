@@ -164,7 +164,7 @@ class CHAIPromptManager():
     input_json: list[dict]
     target_prot: str
     prompt_type: str
-    history_list : list[dict]
+    history : dict
     num_history: int = 3
     def __post_init__(self):
         self.prompt_c = None
@@ -201,7 +201,7 @@ class CHAIPromptManager():
     def conclusion_prompt(self):
         # Serialize input_json and history to formatted strings
         input_json_str = json.dumps(self.input_json, indent=2, default=str)
-        history_str = json.dumps(self.history_list[:self.num_history], indent=2, default=str)
+        history_str = json.dumps(self.history, indent=2, default=str)
         config_str = json.dumps(config_master['molecular_dynamics'], indent=2)
 
         prompt = f"""
@@ -297,15 +297,15 @@ class FreeEnergyPromptManager():
 
 
 # I want to make a factory class that can generate the right prompt manager based on the agent type
-def get_prompt_manager(agent_type: str, research_goal: str, input_json: dict[str, Any] | list[dict], target_prot: str, prompt_type: str, history_list: list[dict], num_history: int = 3):
+def get_prompt_manager(agent_type: str, research_goal: str, input_json: dict[str, Any] | list[dict], target_prot: str, prompt_type: str, history: dict, num_history: int = 3):
     if agent_type == 'rag':
         return RAGPromptManager(research_goal, input_json, target_prot, prompt_type)
     elif agent_type == 'bindcraft':
-        return BindCraftPromptManager(research_goal, input_json, target_prot, prompt_type, history_list, num_history)
+        return BindCraftPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
     elif agent_type == 'chai':
-        return CHAIPromptManager(research_goal, input_json, target_prot, prompt_type, history_list, num_history)
+        return CHAIPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
     elif agent_type == 'mdagent':
-        return MDPromptManager(research_goal, input_json, target_prot, prompt_type, history_list, num_history)
+        return MDPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
 
         
         
