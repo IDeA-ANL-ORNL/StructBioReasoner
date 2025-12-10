@@ -174,7 +174,7 @@ class CHAIPromptManager():
         You are an expert in protein structure prediction and understand cellular/cancer pathways.
         Evaluate the output from hiperrag and decide which protein complexes: ({self.target_prot} and interacting partners) are the most promising to fold.
         The results will be a dictionary with multiple keys. The elements of each key will be a list and each value in each list is related to each other via index.
-        Try to focus on folding the most relevant and smallest proteins possible. The length of partner + target sequencehas to be <2048 or folding will fail. 
+        Try to focus on folding the most relevant and smallest proteins possible. The length of partner + target sequencehas to be <1500 or folding will fail. 
         Output from hiperrag:
         {input_json_str}
 
