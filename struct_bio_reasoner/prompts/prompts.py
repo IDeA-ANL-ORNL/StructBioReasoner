@@ -224,7 +224,7 @@ class MDPromptManager():
     input_json: dict[str, Any]
     target_prot: str
     prompt_type: str
-    history_list : list[dict]
+    history : dict
     num_history: int = 3
     def __post_init__(self):
         self.prompt_c = self.conclusion_prompt()
