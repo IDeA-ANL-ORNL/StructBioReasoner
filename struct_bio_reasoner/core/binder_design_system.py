@@ -108,7 +108,6 @@ class BinderDesignSystem(JnanaSystem):
         self.memory_binder.set_research_goal(research_goal)
         self.binder_config = load_binder_config(config_path)
         self.parsl_config = self.binder_config['parsl']
-        self.prompt_gen_llm = alcfLLM()
         
         # Determine Jnana config path
         if not jnana_config_path:
