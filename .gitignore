@@ -265,3 +265,7 @@ test_chai.py
 matt_structbioenv.txt
 struct_bio_reasoner/agents/hiper_rag/__rag_agent.py
 struct_bio_reasoner/agents/hiper_rag/_rag_agent.py
+examples/example_hotspot_analysis.py
+examples/nmnat2_agentic_binder_workflow_new.py
+examples/nmnat2_agentic_binder_workflow_new2.py
+examples/workflow_implementation/
