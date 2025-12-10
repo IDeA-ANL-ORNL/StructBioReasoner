@@ -110,7 +110,7 @@ async def nmnat2_agentic_workflow(research_goal):
     folding_prompt_manager = get_prompt_manager('chai', research_goal, rag_result_json, target_prot = target_sequence, prompt_type = 'running', history_list = [], num_history = 3)
     logger.info(f"{folding_prompt_manager.prompt_r=}")
     folding_input = system.prompt_gen_llm.generate_with_json_output(prompt = folding_prompt_manager.prompt_r,
-                                        json_schema = config_master['chai'],
+                                        json_schema = config_master['structure_prediction'],
                                         temperature = 0.3,
                                         max_tokens = 32678
                                         ) 

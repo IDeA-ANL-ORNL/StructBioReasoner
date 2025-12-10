@@ -63,7 +63,7 @@ class RAGPromptManager():
             1. Key proteins that physically interact with {self.target_prot}
             2. Proteins involved in cancer pathways
             3. Proteins where disrupting the {self.target_prot} interaction could have therapeutic benefit.
-                These should probably include P53, EGFR
+                Evaluate P53 binding here as well and return if relevant
 
             The prompt should request structured output in JSON format with:
             - interacting_protein_name: string
@@ -85,7 +85,7 @@ class RAGPromptManager():
 
         return prompt_optimization_request
     def conclusion_prompt(self):
-       prompt =f""" Using hiper-rag output {json.dumps(self.input_json)} clean up and return as json with the following information cleanly: 
+       prompt =f""" Using hiper-rag output {self.input_json} clean up and return as json with the following information cleanly: 
        - interacting_protein_name: string
        - interacting_protein_uniprot_id: string
        - cancer_pathway: string

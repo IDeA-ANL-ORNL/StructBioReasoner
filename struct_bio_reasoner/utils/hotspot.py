@@ -17,7 +17,8 @@ from dataclasses import dataclass
 
 try:
     import MDAnalysis as mda
-    from MDAnalysis.analysis import contacts, rms, rmsf
+    from MDAnalysis.analysis import contacts, rms
+    from MDAnalysis.analysis.rms import RMSF as rmsf
     from MDAnalysis.analysis.distances import distance_array
 except ImportError:
     raise ImportError(

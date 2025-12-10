@@ -1,5 +1,7 @@
 import requests
 from pathlib import Path
+from typing import Dict, Any, List, Optional, Callable
+
 
 async def fetch_uniprot_sequence(uniprot_id: str) -> Optional[Dict[str, str]]:
     """
