@@ -671,7 +671,7 @@ class BinderDesignSystem(JnanaSystem):
                 input_json=results,
                 target_prot=self.target_prot,
                 prompt_type='conclusion',
-                history_list=self.history_list,
+                history_list=self.history,
                 num_history=self.num_history
                 )
 

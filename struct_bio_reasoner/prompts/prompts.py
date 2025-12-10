@@ -110,7 +110,7 @@ class BindCraftPromptManager():
             self.total_sequences = self.input_json.get('total_sequences_generated', 100)
             self.passing_sequences = self.input_json.get('total_sequences_filtered', 0)
             self.passing_structures = self.input_json.get('total_sequences_filtered', 0)
-            self.top_binders = dict(sorted(self.input_json['all_cycles'][self.num_rounds].items(), key=lambda x: x[1]['energy'])[:5])
+            self.top_binders = self.input_json.get('top_binders', None)#dict(sorted(self.input_json['all_cycles'][self.num_rounds].items(), key=lambda x: x[1]['energy'])[:5])
             self.prompt_c = self.conclusion_prompt()
         elif self.prompt_type == 'running':
             self.previous_run_type = self.input_json.get('previous_run_type', 'bindcraft')
@@ -136,15 +136,22 @@ class BindCraftPromptManager():
     def conclusion_prompt(self):
         prompt = f"""
         You are an expert in computational peptide design optimization. Evaluate the current optimization progress and decide which step to take next (bindcraft, md_simulation).
-        If you choose to take bindcraft, should we use a binder that was already generated as the starting or use a scaffold in the research goal ({self.research_goal})?
+        If you choose to take bindcraft, recommend either an already generated binder as the starting (in the rationale) or use a scaffold in the research goal ({self.research_goal})?
         BINDCRAFT OPTIMIZATION RESULTS:
         - Total rounds completed: {self.num_rounds}
         - Total sequences generated: {self.total_sequences}
         - Passing sequences: {self.passing_sequences}
         - Passing structures: {self.passing_structures}
-        - Top 5 binders: {self.top_binders}
+        - Top 5 binders: {self.top_binders if self.top_binders != None else "No top binders"}
         This is the history of decisions (least recent first):
-        {self.history_list[:self.num_history]}
+        {self.history['decisions'] if self.history['decisions'] != [] else 'No history'}
+        and the history of results (least recent first):
+        {self.history['results'] if self.history['results'] != [] else 'No history'}
+        and the history of configurations (least recent first):
+        {self.history['configurations'] if self.history['configurations'] != [] else 'No history'}.
+        There are a few very important items to consider encoded here:
+        {self.history['key_items']}
+
         Please provide your decision and reasoning."""
         return prompt
 
@@ -230,14 +237,26 @@ class MDPromptManager():
             Here is the results from the simulations:
             {self.input_json}
             Here is the history (which may include details from hiperrag about the interacting proteins):
-            {self.history_list[:self.num_history]}
+            {self.history['decisions'] if self.history['decisions'] != [] else 'No history'}
+        and the history of results (least recent first):
+            {self.history['results'] if self.history['results'] != [] else 'No history'}
+        and the history of configurations (least recent first):
+            {self.history['configurations'] if self.history['configurations'] != [] else 'No history'}.
+        There are a few very important items to consider encoded here:
+            {self.history['key_items']}
             Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['hotspot']}."""
         elif self.prompt_type == 'binder_design':
             prompt = f"""
             You are an expert in computational peptide design optimization and md simulations. Evaluate the current optimization progress and decide which step to take next (bindcraft, md_simulation, free energy simulations).
             Previous round results: {self.input_json}
             This is the history of decisions (least recent first):
-            {self.history_list[:self.num_history]}
+            {self.history['decisions'] if self.history['decisions'] != [] else 'No history'}
+        and the history of results (least recent first):
+            {self.history['results'] if self.history['results'] != [] else 'No history'}
+        and the history of configurations (least recent first):
+            {self.history['configurations'] if self.history['configurations'] != [] else 'No history'}.
+        There are a few very important items to consider encoded here:
+            {self.history['key_items']}
             Please provide your decision and reasoning."""
 
 @dataclass
