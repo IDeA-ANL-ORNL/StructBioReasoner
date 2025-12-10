@@ -110,7 +110,9 @@ class BindCraftPromptManager():
             self.total_sequences = self.input_json.get('total_sequences_generated', 100)
             self.passing_sequences = self.input_json.get('total_sequences_filtered', 0)
             self.passing_structures = self.input_json.get('total_sequences_filtered', 0)
-            self.top_binders = self.input_json.get('top_binders', None)#dict(sorted(self.input_json['all_cycles'][self.num_rounds].items(), key=lambda x: x[1]['energy'])[:5])
+            self.top_binders = self.input_json.get('top_binders', {})#dict(sorted(self.input_json['all_cycles'][self.num_rounds].items(), key=lambda x: x[1]['energy'])[:5])
+            if self.top_binders == {}:
+                self.top_binders == 'No top binders'
             self.prompt_c = self.conclusion_prompt()
         elif self.prompt_type == 'running':
             self.previous_run_type = self.input_json.get('previous_run_type', 'bindcraft')
@@ -142,7 +144,7 @@ class BindCraftPromptManager():
         - Total sequences generated: {self.total_sequences}
         - Passing sequences: {self.passing_sequences}
         - Passing structures: {self.passing_structures}
-        - Top 5 binders: {self.top_binders if self.top_binders != None else "No top binders"}
+        - Top 5 binders: {self.top_binders}
         This is the history of decisions (least recent first):
         {self.history['decisions'] if self.history['decisions'] != [] else 'No history'}
         and the history of results (least recent first):

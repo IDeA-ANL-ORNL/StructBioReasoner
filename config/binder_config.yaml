@@ -298,5 +298,6 @@ security:
     audit_log_access: true
 
 parsl:
-  available_accelerators: ['0', '1'] #tile_names = [f'{gid}.{tid}' for gid in range(6) for tid in range(2)] #4
+  available_accelerators: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'] 
   nodes: 1
+  worker_init: 'export TMPDIR=/tmp'
