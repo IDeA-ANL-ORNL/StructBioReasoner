@@ -85,7 +85,7 @@ class RAGPromptManager():
 
         return prompt_optimization_request
     def conclusion_prompt(self):
-       prompt =f""" Using hiper-rag output {self.input_json} clean up and return as json with the following information cleanly: 
+       prompt =f""" Using hiper-rag output {json.dumps(self.input_json)} clean up and return as json with the following information cleanly: 
        - interacting_protein_name: string
        - interacting_protein_uniprot_id: string
        - cancer_pathway: string
