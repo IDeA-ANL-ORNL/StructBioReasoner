@@ -180,6 +180,7 @@ agents:
   molecular_dynamics:
     enabled: true
     md_backend: "mdagent"  # Options: "openmm" or "mdagent"
+
     capabilities:
       - "binding_stability_prediction"
       - "complex_validation"
