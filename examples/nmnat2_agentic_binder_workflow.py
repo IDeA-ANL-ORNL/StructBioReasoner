@@ -224,21 +224,7 @@ async def nmnat2_agentic_workflow(research_goal):
             logger.info(f"Starting binder: {starting_binder[:50]}...")
 
             # Default configuration for first iteration
-            current_config = {
-                'binder_sequence': starting_binder,
-                'num_rounds': 1,
-                'batch_size': 10,
-                'max_retries': 5,
-                'sampling_temp': 0.1,
-                'qc_kwargs': {
-                    'max_repeat': 3,
-                    'max_appearance_ratio': 0.3,
-                    'max_charge': 5,
-                    'max_charge_ratio': 0.3,
-                    'max_hydrophobic_ratio': 0.5,
-                    'min_diversity': 2
-                }
-            }
+            current_config = system.binder_config.get("agents", {}).get("computational_design", {})
 
             logger.info(f"Using default configuration: {json.dumps(current_config, indent=2)}")
 
