@@ -288,8 +288,6 @@ class MDAgentAdapter:
                 'prod_steps': self.prod_steps,
             }
 
-            self.logger.info(f'{sim_kwargs=}')
-            
             sim_paths = [Path(root_path) / f'mdagent_{i}' for i in range(len(pdb_path))]
             for sim_path in sim_paths:
                 sim_path.mkdir(parents=True, exist_ok=True)
@@ -306,6 +304,8 @@ class MDAgentAdapter:
                 build_kwargss=build_kwargs,
                 sim_kwargss=sim_kwargs,
             )
+
+            self.logger.info(f'{results=}')
            
             for sim_id, result in enumerate(results):
                 # Store results
@@ -328,6 +328,8 @@ class MDAgentAdapter:
             return analysis
 
         except Exception as e:
+            import traceback
+            self.logger.info(traceback.format_exc())
             self.logger.error(f"MDAgent simulation failed: {e}")
             return {}
     
@@ -618,6 +620,8 @@ class MDAgentAdapter:
                                  'platform': 'OpenCL',
                                  'solvent': solvent},
         )
+
+        self.logger.info(f'{sim_results=}')
         
         summary_stats = self.summarize(sim_results)
         
