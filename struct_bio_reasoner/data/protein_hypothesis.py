@@ -111,7 +111,9 @@ class BinderAnalysis:
     passing_structures: int = 0
     success_rate: float = 0.0
     checkpoint_file: str = ''
+
     # Top binder features
+    top_binders: dict = field(default_factory=dict)
 
     # Analysis metadata
     optimized_hypotheses: list[dict] = field(default_factory=list)

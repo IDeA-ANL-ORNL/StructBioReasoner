@@ -287,11 +287,29 @@ class BindCraftAgent:
 
     async def get_top_binders(self,
                               cycles: list[dict[str, Any]],
-                              n: int=5) -> list[str]:
-        pass
+                              n: int=5) -> dict[int, dict[str, Any]]]:
         top_binders = []
         for cycle in cycles:
-            pass
+            evaluated = cycle['evaluated_structures']
+            for val in evaluated.values():
+                top_binders.append(val)
+
+                if len(top_binders) > n:
+                    worst_energy = -10000
+                    worst_binder = None
+                    for i, binder in enumerate(top_binders):
+                        if binder['energy'] > worst_energy:
+                            worst_energy = binder['energy']
+                            worst_binder = i
+
+                    _ = top_binders.pop(i)
+
+        energies = [binder['energy'] for binder in top_binders]
+        order = np.argsort(energies)
+
+        top_dict = {i: {top_binders[idx]} for i, idx in enumerate(order)}
+
+        return top_dict
 
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
@@ -313,6 +331,7 @@ class BindCraftAgent:
             total_sequences = total_sequences,
             passing_sequences = result['total_sequences_filtered'],
             passing_structures = passing_structures,
+            top_binders = top_binders,
             success_rate = passing_structures  / total_sequences if total_sequences > 0 else 0.0
         )
 
