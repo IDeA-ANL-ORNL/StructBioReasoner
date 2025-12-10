@@ -287,7 +287,7 @@ class BindCraftAgent:
 
     async def get_top_binders(self,
                               cycles: list[dict[str, Any]],
-                              n: int=5) -> dict[int, dict[str, Any]]]:
+                              n: int=5) -> dict[int, dict[str, Any]]:
         top_binders = []
         for cycle in cycles:
             evaluated = cycle['evaluated_structures']
