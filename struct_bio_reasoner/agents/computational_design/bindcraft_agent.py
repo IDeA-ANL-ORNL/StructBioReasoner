@@ -285,46 +285,13 @@ class BindCraftAgent:
 
         return results
 
-    async def _create_binder_hypothesis(self,
-                                        results: dict[str, Any]) -> ProteinHypothesis:
-        all_cycles = results['all_cycles']
-        passing_structures = [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
-
-        passing_file = Path('')
-        passing_file.write_text('\n'.join(passing_structures))
-
-        hypothesis_content = f"""
-        BindCraft run successful for {results['rounds_completed']} rounds. 
-
-        Key findings:
-        - {results['total_sequences_filtered']}/{results['total_sequences_generated']} sequences passed
-        quality control
-        - {len(passing_structures)} passed structural quality control
-
-        Recommended strategies:
-        1. Perform molecular dynamics (MD) simulation
-        2. Compute free energy by MM-PBSA"""
-
-        hypothesis = ProteinHypothesis(
-            title='BindCraft based binder design',
-            content=hypothesis_content.strip(),
-            description=f'BindCraft predicts {len(passing_structures)} novel binder sequences',
-            hypothesis_type='',
-            generation_timestamp=datetime.now().isoformat(),
-            metadata=results,
-        )
-
-        # Set hallmarks based on analysis quality
-        hypothesis.hallmarks = {
-            'testability': 8.5,  # MD predictions are highly testable
-            'specificity': 7.5,  # Specific residue-level predictions
-            'grounded_knowledge': 9.0,  # Based on physics-based simulations
-            'predictive_power': 8.0,  # Quantitative predictions
-            'parsimony': 7.0   # Straightforward thermostability model
-        }
-
-        self.generated_hypotheses.append(hypothesis)
-        return hypothesis
+    async def get_top_binders(self,
+                              cycles: list[dict[str, Any]],
+                              n: int=5) -> list[str]:
+        pass
+        top_binders = []
+        for cycle in cycles:
+            pass
 
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
@@ -337,6 +304,8 @@ class BindCraftAgent:
         )
         
         total_sequences = result['total_sequences_generated']
+
+        top_n_binders = await self.get_top_binders(all_cycles, n=5)
 
         analysis = BinderAnalysis(
             protein_id='',

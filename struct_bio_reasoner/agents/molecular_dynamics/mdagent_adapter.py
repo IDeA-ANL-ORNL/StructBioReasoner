@@ -603,17 +603,20 @@ class MDAgentAdapter:
         structures = task_params['simulation_paths']
         out = task_params['root_output_path']
         prod_steps = task_params.get('steps', self.prod_steps)
+        solvent = task_params.get('solvent', 'explicit')
 
         # TODO: get kwargs for build/sim from task_params
         sim_results = await self.run_md_simulation( 
             root_path=out,
             pdb_path=structures,
             protein_name = "unknown",
-            custom_build_kwargs = {'protein': True,},
+            custom_build_kwargs = {'protein': True,
+                                   'solvent': solvent},
             custom_sim_kwargs = {'equil_steps': self.equil_steps,
                                  'prod_steps': prod_steps,
                                  'n_equil_cycles': 2,
-                                 'platform': 'OpenCL'},
+                                 'platform': 'OpenCL',
+                                 'solvent': solvent},
         )
         
         summary_stats = self.summarize(sim_results)

@@ -30,15 +30,14 @@ config_master = {
                                    'max_hydrophobic_ratio': 'float', 
                                    'min_diversity': 'int'}},
 
-    'structure_prediction': {'sequences_to_fold': 'list[list[str]', 'interacting_protein_name': 'list[str]'},
+    'structure_prediction': {'sequences': 'list[list[str]', 'names': 'list[str]'},
 
-    'molecular_dynamics': {'paths_to_simulate': 'list[str]', 'root_output_path': 'str', 'steps': 'int'},
+    'molecular_dynamics': {'simulation_paths': 'list[str]', 'root_output_path': 'str', 'steps': 'int'},
 
     'hotspot': {'paths_to_analyze': 'list[int]'},
 
     'free_energy': {''}
 }
-
 
 # Create empty PromptManager class as a template and define other classes to inherit from it
 class PromptManager:

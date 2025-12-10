@@ -51,9 +51,6 @@ class ChaiAgent:
 
             self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
 
-            cwd = Path(self.config.get('cwd', os.getcwd()))
-            cwd.mkdir(exist_ok=True)
-
             self.fasta_dir.mkdir(exist_ok=True, parents=True)
             self.fold_dir.mkdir(exist_ok=True, parents=True)
 
@@ -139,12 +136,15 @@ class ChaiAgent:
     async def _generate_binder_hypothesis(self,
                                           data: dict[str, Any]) -> Optional[ProteinHypothesis]:
         """"""
-        self.logger.info('trying to fold')
+        constraints = data.get('constraints', [None] * len(data['sequences']))
+        self.logger.info(f'{constraints=}')
+        self.logger.info(f'{data=}')
+
         # Run the workflow
         results = await self.coordinator.fold_sequences(
             sequences=data['sequences'],
             names=data['names'],
-            constraints=data['constraints'],
+            constraints=constraints,
         )
 
         analysis = await self.collate_results(results)
@@ -158,8 +158,8 @@ class ChaiAgent:
         analysis = {'total_models': len(results),
                     'unique_models': len(results[0].keys()),
                     'best_models': [],
-                    'scores': {i: {} for i in range(len(results))}}
-        for i, result in enumerate(results):
+                    'scores': {}}
+        for result in results:
             best_score = None
             best_model = None
             scores = {}
@@ -171,15 +171,10 @@ class ChaiAgent:
                     best_score = val['scores']['aggregate_score']
                     best_model = val['model']
 
-                if not scores:
-                    for key, val in val['scores'].items():
-                        scores[key] = [val]
-                else:
-                    for key, val in val['scores'].items():
-                        scores[key].append(val)
-                    
+                scores[str(val['model'])] = val['scores']
+
             analysis['best_models'].append(best_model)
-            analysis['scores'][i] = scores
+            analysis['scores'] = scores
 
         return analysis
 

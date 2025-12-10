@@ -82,6 +82,11 @@ class FEAgent:
 
         parsl_config['cores_per_worker'] = self.fe_config['cpus']
         parsl_config['max_workers_per_node'] = self.fe_config['cpus_per_node'] // self.fe_config['cpus']
+        # set these to disallow numpy from screwing up our calculations
+        parsl_config['worker_init'] += '; export OPENBLAS_NUM_THREADS=1'
+        parsl_config['worker_init'] += '; export MKL_NUM_THREADS=1'
+        parsl_config['worker_init'] += '; export OMP_NUM_THREADS=1'
+
         self.parsl_config = parsl_config
         
         # FEAgent components (initialized in initialize())
@@ -96,13 +101,6 @@ class FEAgent:
         self.logger = logging.getLogger(__name__)
         
         self.logger.info(f"FEAgent initialized")
-
-    def __del__(self):
-        """Destructor to ensure manager is cleaned up."""
-        # Note: This is a safety net. Proper cleanup should use async cleanup() method
-        if hasattr(self, 'manager') and self.manager is not None:
-            self.logger.warning("FEAgent deleted without proper cleanup - manager still active")
-            # We can't call async cleanup from __del__, so just log a warning
 
     async def initialize(self) -> bool:
         """
@@ -122,12 +120,12 @@ class FEAgent:
             # The agents are defined in agents.py at the root of FEAgent repo
             try:
                 # Try importing from mdagent package (if installed as package)
-                from MDAgent.core.mmpbsa_agent import FreeEnergy, FECoordinator
+                from MDAgent.core.mmpbsa_agent import FECoordinator
                 from molecular_simulations.simulate.mmpbsa import MMPBSA
             except ImportError:
                 try:
                     # Try importing from agents module (if MDAgent is in PYTHONPATH)
-                    from agents import FreeEnergy, FECoordinator
+                    from agents import FECoordinator
                 except ImportError as e:
                     self.logger.error(f"Cannot import MDAgent components: {e}")
                     self.logger.info("Make sure MDAgent is installed and in PYTHONPATH")
@@ -146,17 +144,11 @@ class FEAgent:
             await self.manager.__aenter__()
 
             # worker_init, nodes, max_workers_per_node, cores_per_worker
-            self.parsl_settings = LocalCPUSettings(**self.parsl_config).config_factory(run_dir)
-
-            # Launch FEAgent components
-            self.fe_handle = await self.manager.launch(
-                FreeEnergy,
-                args=(MMPBSA)
-            )
+            self.parsl_settings = LocalCPUSettings(**self.parsl_config).config_factory(Path.cwd())
 
             self.coordinator_handle = await self.manager.launch(
                 FECoordinator,
-                args=(self.fe_handle, self.parsl_settings)
+                args=(self.parsl_settings,),
             )
 
             self.initialized = True
@@ -175,40 +167,6 @@ class FEAgent:
                 self.manager = None
             return False
     
-    async def generate_hypotheses(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Generate MD-based hypotheses using FEAgent backend.
-        
-        Args:
-            context: Analysis context containing protein information
-            
-        Returns:
-            List of hypothesis dictionaries
-        """
-        if not self.is_ready():
-            self.logger.error("FEAgent adapter not ready")
-            return []
-        
-        hypotheses = []
-        
-        try:
-            # Extract context
-            target_protein = context.get('target_protein', 'unknown')
-            sim_path = context.get('sim_root_path')
-            
-            # Run MD simulation using FEAgent
-            self.logger.info("Running {self.free_energy.calculator.__name__}")
-            calculation_result = await self.run_calculations(
-                sim_path=Path(sim_path),
-                protein_name=target_protein
-            )
-            
-        except Exception as e:
-            self.logger.error(f"Error generating FEAgent hypotheses: {e}")
-            calculation_result = None
-        
-        return calculation_result
-    
     async def run_calculations(self,
                                sim_path: Union[Path, list[Path]],
                                protein_name: str = "unknown",
@@ -225,7 +183,7 @@ class FEAgent:
         Returns:
             Simulation results dictionary
         """
-        if not self.is_ready():
+        if not await self.is_ready():
             self.logger.error("FEAgent adapter not ready")
             return {}
         
@@ -243,21 +201,29 @@ class FEAgent:
             fe_kwargss = await self._unpack_dataclass_config(paths)
 
             results = await self.coordinator_handle.deploy(
-                path=paths,
+                paths=paths,
                 fe_kwargss=fe_kwargss,
             ) # list of dicts with `path`, `success` and `fe`
 
-            analysis = {
-                result['path']: {'mean': result['fe'][0],
-                                 'std': result['fe'][1],
+            self.logger.debug(f'{results=}')
+
+            analysis = {}
+            for result in results:
+                if result['fe'] is None:
+                    mean, std = None, None
+                else:
+                    mean, std = result['fe']
+
+                result['path']: {'mean': mean,
+                                 'std': std,
                                  'unit': 'kcal/mol'} 
-                for result in results
-                                }
             
             return analysis
 
         except Exception as e:
+            import traceback
             self.logger.error(f"FEAgent simulation failed: {e}")
+            self.logger.error(traceback.format_exc())
             return {}
 
     async def _unpack_dataclass_config(self,
@@ -280,7 +246,8 @@ class FEAgent:
             s2 = self.format_for_cpptraj(sel2)
 
             dict_copy['selections'] = [s1, s2]
-            dict_copy['out'] = path
+            dict_copy['out'] = str(path)
+            dict_copy['n_cpus'] = self.fe_config['cpus']
 
             fe_kwargss.append(dict_copy)
 
