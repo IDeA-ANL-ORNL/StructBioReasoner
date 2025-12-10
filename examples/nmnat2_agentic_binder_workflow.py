@@ -29,9 +29,11 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable
 from datetime import datetime
 from struct_bio_reasoner.utils.cleanup_queue import cleanup_all_queues
+from struct_bio_reasoner.utils.uniprot_api import fetch_uniprot_sequence
 from jnana.protognosis.core.llm_interface import alcfLLM
 from struct_bio_reasoner.prompts.prompts import get_prompt_manager, config_master
 from struct_bio_reasoner.data.protein_hypothesis import ProteinHypothesis
+from struct_bio_reasoner.utils.hotspot import get_hotspot_resids_from_simulations
 # Add Jnana to path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'Jnana'))
 
@@ -40,94 +42,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
-
-async def fetch_uniprot_sequence(uniprot_id: str) -> Optional[Dict[str, str]]:
-    """
-    Fetch protein sequence from UniProt API.
-    
-    Args:
-        uniprot_id: UniProt accession ID
-        
-    Returns:
-        Dictionary with protein name and sequence
-    """
-    try:
-        url = f"https://rest.uniprot.org/uniprotkb/{uniprot_id}.fasta"
-        response = requests.get(url)
-        
-        if response.status_code == 200:
-            lines = response.text.strip().split('\n')
-            header = lines[0]
-            sequence = ''.join(lines[1:])
-            
-            # Extract protein name from header
-            # Format: >sp|P12345|PROT_HUMAN Protein name OS=...
-            parts = header.split('|')
-            if len(parts) >= 3:
-                name_part = parts[2].split(' OS=')[0]
-            else:
-                name_part = uniprot_id
-            
-            logger.info(f"Fetched sequence for {uniprot_id}: {name_part} ({len(sequence)} aa)")
-            
-            return {
-                'uniprot_id': uniprot_id,
-                'name': name_part,
-                'sequence': sequence
-            }
-        else:
-            logger.error(f"Failed to fetch {uniprot_id}: HTTP {response.status_code}")
-            return None
-            
-    except Exception as e:
-        logger.error(f"Error fetching UniProt sequence {uniprot_id}: {e}")
-        return None
-
-
-def parse_hiperrag_response(rag_response: str) -> List[Dict[str, str]]:
-    """
-    Parse HiPerRAG response to extract interacting proteins.
-    
-    Args:
-        rag_response: RAG response text
-        
-    Returns:
-        List of dicts with protein_name and uniprot_id
-    """
-    try:
-        # Try to parse as JSON first
-        if '{' in rag_response and '}' in rag_response:
-            # Extract JSON portion
-            start = rag_response.find('{')
-            end = rag_response.rfind('}') + 1
-            json_str = rag_response[start:end]
-            
-            data = json.loads(json_str)
-            
-            # Handle different response formats
-            if isinstance(data, list):
-                return data
-            elif isinstance(data, dict):
-                # Single protein or nested structure
-                if 'interacting_protein_name' in data:
-                    return [data]
-                else:
-                    # Might be {protein1: {...}, protein2: {...}}
-                    return list(data.values())
-        
-        # Fallback: manual parsing
-        logger.warning("Could not parse as JSON, using fallback parsing")
-        return []
-        
-    except Exception as e:
-        logger.error(f"Error parsing HiPerRAG response: {e}")
-        return []
-
 
 # ============================================================================
 # MAIN WORKFLOW
@@ -177,6 +91,8 @@ async def nmnat2_agentic_workflow(research_goal):
                                         ) 
 
     rag_hypothesis = await system.design_agents['rag'].generate_rag_hypothesis({'prompt': rag_prompt})
+    system.history_list.append(rag_hypothesis)
+
     logger.info(f"{rag_hypothesis=}")
     interactome_rag_prompt_manager.input_json = rag_hypothesis
     conclusion_prompt = interactome_rag_prompt_manager.conclusion_prompt()
@@ -190,9 +106,6 @@ async def nmnat2_agentic_workflow(research_goal):
     logger.info(sequences)
     rag_result_json['sequences'] = [s['sequence'] for s in sequences]
     logger.info(f"{rag_result_json=}")
-    #import sys
-    #sys.exit()
-    #rag_result_formatted = [{'interaction': name, 'uniprot_id': id, 'sequence':await fetch_uniprot_sequence(id), 'cancer_pathway': cancer_pathway, 'interaction_type': interaction_type, 'therapeutic_rationale': therapeutic_rationale} for name, id, cancer_pathway, interaction_type, therapeutic_rationale in zip(rag_result_json['interactions'], rag_result_json['interacting_protein_uniprot_ids'], rag_result_json['cancer_pathways'], rag_result_json['interaction_types'], rag_result_json['therapeutic_rationales'])]
     
     folding_prompt_manager = get_prompt_manager('chai', research_goal, rag_result_json, target_prot = target_sequence, prompt_type = 'running', history_list = [], num_history = 3)
     logger.info(f"{folding_prompt_manager.prompt_r=}")
@@ -207,14 +120,44 @@ async def nmnat2_agentic_workflow(research_goal):
     """
     Execute Chai folding with sequences from folding_result
     """
-    """
-    system.design_agents['structure_prediction'].generate_binder_hypothesis(folding_result)
-    """
+    if True:
+        folding_output = await system.design_agents['structure_prediction'].analyze_hypothesis(rag_hypothesis, folding_input)
+    if False:
+        folding_output = {"analysis_id": "d842ca9a-0f37-4fd7-9231-d9145839966b", "folding_algorithm": "Chai-1", "unique_models": 5, "total_models": 2, "best_models": ["data/interactome/folds/nmnat2_p53/protein3.pdb", "data/interactome/folds/nmnat2_fbxo45/protein4.pdb"], "scores": {"0": {"aggregate_score": [[0.37450993061065674], [0.37606847286224365], [0.373186320066452], [0.38200777769088745], [0.3771553933620453]], "ptm": [[0.5082611441612244], [0.5060023665428162], [0.5090510249137878], [0.507888674736023], [0.5092036724090576]], "iptm": [[0.34107211232185364], [0.34358495473861694], [0.3392201364040375], [0.35053756833076477], [0.3441433012485504]], "per_chain_ptm": [[[0.6279827952384949, 0.6040610671043396]], [[0.6258801817893982, 0.6029364466667175]], [[0.625359296798706, 0.6005409955978394]], [[0.6229435801506042, 0.6049138307571411]], [[0.6228601336479187, 0.6027255654335022]]], "per_chain_pair_iptm": [[[[0.6279827952384949, 0.21405690908432007], [0.34107211232185364, 0.6040610671043396]]], [[[0.6258801817893982, 0.21357953548431396], [0.34358495473861694, 0.6029364466667175]]], [[[0.625359296798706, 0.21446824073791504], [0.3392201364040375, 0.6005409955978394]]], [[[0.6229435801506042, 0.21590736508369446], [0.35053756833076477, 0.6049138307571411]]], [[[0.6228601336479187, 0.21368837356567383], [0.3441433012485504, 0.6027255654335022]]]], "has_inter_chain_clashes": [[false], [false], [false], [false], [false]], "chain_chain_clashes": [[[[0, 0], [0, 0]]], [[[0, 0], [0, 0]]], [[[1, 0], [0, 0]]], [[[0, 0], [0, 0]]], [[[0, 0], [0, 0]]]]}, "1": {"aggregate_score": [[0.3203924596309662], [0.3217898905277252], [0.32374289631843567], [0.3141600787639618], [0.3249344825744629]], "ptm": [[0.5748198628425598], [0.5817196369171143], [0.5802063941955566], [0.5755545496940613], [0.5788462162017822]], "iptm": [[0.2567856013774872], [0.25680744647979736], [0.25962701439857483], [0.24881145358085632], [0.26145654916763306]], "per_chain_ptm": [[[0.6657668948173523, 0.8086109161376953]], [[0.6640876531600952, 0.8090826272964478]], [[0.665465235710144, 0.809389591217041]], [[0.6696493029594421, 0.8104386329650879]], [[0.665094792842865, 0.8087285757064819]]], "per_chain_pair_iptm": [[[[0.6657668948173523, 0.21266961097717285], [0.2567856013774872, 0.8086109161376953]]], [[[0.6640876531600952, 0.21302932500839233], [0.25680744647979736, 0.8090826272964478]]], [[[0.665465235710144, 0.21106721460819244], [0.25962701439857483, 0.809389591217041]]], [[[0.6696493029594421, 0.2127392441034317], [0.24881145358085632, 0.8104386329650879]]], [[[0.665094792842865, 0.2132064700126648], [0.26145654916763306, 0.8087285757064819]]]], "has_inter_chain_clashes": [[false], [false], [false], [false], [false]], "chain_chain_clashes": [[[[0, 0], [0, 0]]], [[[0, 0], [0, 0]]], [[[0, 1], [1, 0]]], [[[0, 0], [0, 0]]], [[[1, 0], [0, 0]]]]}}, "tools_used": ["chai"], "confidence_score": 0.75, "timestamp": "2025-12-09T21:00:20.421234"} 
+
+    folding_prompt_manager.input_json = folding_output
+    folding_conclusion = folding_prompt_manager.conclusion_prompt()
+    mdinput = system.prompt_gen_llm.generate_with_json_output(prompt = folding_conclusion,
+                                        json_schema = config_master['mdagent'],
+                                        temperature = 0.3,
+                                        max_tokens = 32678
+                                        ) 
+
+    if True:
+        md_output = await system.design_agents['molecular_dynamics'].analyze_hypothesis(rag_hypothesis, mdinput)
+    
+    md_prompt_manager = get_prompt_manager('mdagent', research_goal, md_output, target_prot = target_sequence, prompt_type = 'interactome_simulation', history_list = system.history_list, num_history = 3) 
+    md_conclusion = md_prompt_manager.prompt_c
+    hotspot_input = system.prompt_gen_llm.generate_with_json_output(prompt = md_conclusion,
+                                        json_schema = config_master['hotspot'],
+                                        temperature = 0.3,
+                                        max_tokens = 32678
+                                        )
+    if False:
+        hotspot_output = get_hotspot_resids_from_simulations(
+            sim_directories,
+            top_n=10,
+            selection1="protein and segid A",
+            selection2="protein and segid B"
+        )
+    if True:
+        hotspot_output = {'NMNAT2_HUMAN_PARTNER1': [45, 67, 89, 102, 134, 156, 178, 199, 211, 234]}
+    system.history_list.append(hotspot_output)
 
     import sys
     sys.exit()
-
-
+    while next_task != 'stop':
+            
 
     # Extract response from hypothesis
     rag_response_text = rag_hypothesis.content if hasattr(rag_hypothesis, 'content') else str(rag_hypothesis)

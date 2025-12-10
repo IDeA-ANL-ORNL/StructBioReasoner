@@ -17,7 +17,7 @@ config_master = {
                    'interaction_types': 'list[string]',
                    'therapeutic_rationales': 'list[string]'},
 
-    'bindcraft': {'num_rounds': 'int',
+    'computational_design': {'num_rounds': 'int',
                      'batch_size': 'int', 
                      'max_retries': 'int', 
                      'sampling_temp': 'float', 
@@ -27,8 +27,8 @@ config_master = {
                                    'max_charge_ratio': 'float', 
                                    'max_hydrophobic_ratio': 'float', 
                                    'min_diversity': 'int'}},
-    'chai': {'sequences_to_fold': 'list[list[str]', 'interacting_protein_name': 'list[str]'},
-    'mdagent': {'paths_to_simulate': 'list[str]'},
+    'structure_prediction': {'sequences_to_fold': 'list[list[str]', 'interacting_protein_name': 'list[str]'},
+    'molecular_dynamics': {'paths_to_simulate': 'list[str]', 'root_output_path': 'str', 'steps': 'int'},
     'hotspot': {'paths_to_analyze': 'list[int]'},
     'free_energy': {''}
 }
@@ -56,7 +56,8 @@ class RAGPromptManager():
             Generate an optimal prompt for a literature mining system (HiPerRAG) to identify:
             1. Key proteins that physically interact with {self.target_prot}
             2. Proteins involved in cancer pathways
-            3. Proteins where disrupting the {self.target_prot} interaction could have therapeutic benefit
+            3. Proteins where disrupting the {self.target_prot} interaction could have therapeutic benefit.
+                These should probably include P53, EGFR
 
             The prompt should request structured output in JSON format with:
             - interacting_protein_name: string
@@ -113,7 +114,7 @@ class BindCraftPromptManager():
         run {self.recommendation.metadata['next_task']} for this reason: {self.recommendation.metadata['rationale']}
         This is the history of decisions (least recent first):
         {self.history_list[:self.num_history] if self.history_list != [] else 'No history'}
-        Please provide your decision and reasoning as a json format with the following format: {config_master['bindcraft']}"""
+        Please provide your decision and reasoning as a json format with the following format: {config_master['computational_design']}"""
         return prompt
 
     def conclusion_prompt(self):
@@ -150,7 +151,7 @@ class CHAIPromptManager():
     def running_prompt(self):
         # Serialize input_json to a formatted string for better LLM readability
         input_json_str = json.dumps(self.input_json, indent=2, default=str)
-        config_str = json.dumps(config_master['chai'], indent=2)
+        config_str = json.dumps(config_master['structure_prediction'], indent=2)
 
         prompt = f"""
         You are an expert in protein structure prediction and understand cellular/cancer pathways.
@@ -175,7 +176,7 @@ class CHAIPromptManager():
         # Serialize input_json and history to formatted strings
         input_json_str = json.dumps(self.input_json, indent=2, default=str)
         history_str = json.dumps(self.history_list[:self.num_history], indent=2, default=str)
-        config_str = json.dumps(config_master['mdagent'], indent=2)
+        config_str = json.dumps(config_master['molecular_dynamics'], indent=2)
 
         prompt = f"""
         You are an expert in evaluating folded structures. Evaluate which structures are the most promising for simulation and which ones should be discarded.
@@ -188,7 +189,7 @@ class CHAIPromptManager():
 
         Please provide your decision and reasoning and include the paths of the structures to keep in the format:
         {config_str}
-        """
+        Also include the root_output_path and steps for the simulation. Right now we are running some short simulations (100000 steps) to test the waters."""
         return prompt
     
 @dataclass
@@ -213,7 +214,7 @@ class MDPromptManager():
             {self.input_json}
             Here is the history (which may include details from hiperrag about the interacting proteins):
             {self.history_list[:self.num_history]}
-            Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['mdagent']}."""
+            Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['hotspot']}."""
         elif self.prompt_type == 'binder_design':
             prompt = f"""
             You are an expert in computational peptide design optimization and md simulations. Evaluate the current optimization progress and decide which step to take next (bindcraft, md_simulation, free energy simulations).
@@ -247,7 +248,7 @@ class FreeEnergyPromptManager():
             {self.input_json}
             Here is the history (which may include details from hiperrag about the interacting proteins):
             {self.history_list[:self.num_history]}
-            Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['mdagent']}."""
+            Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['molecular_dynamics']}."""
         elif self.prompt_type == 'binder_design':
             prompt = f"""
             You are an expert in computational peptide design optimization and md simulations. Evaluate the current optimization progress and decide which step to take next (bindcraft, md_simulation, free energy simulations).
