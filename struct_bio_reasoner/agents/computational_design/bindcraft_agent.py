@@ -310,7 +310,7 @@ class BindCraftAgent:
         energies = [binder['energy'] for binder in top_binders]
         order = np.argsort(energies)
 
-        top_dict = {i: {top_binders[idx]} for i, idx in enumerate(order)}
+        top_dict = {i: top_binders[idx] for i, idx in enumerate(order)}
 
         return top_dict
 
