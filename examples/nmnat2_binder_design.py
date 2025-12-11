@@ -190,6 +190,8 @@ async def nmnat2_agentic_workflow(research_goal):
         logger.info(f"ITERATION {design_it + 1}")
         logger.info(f"{'='*80}")
 
+
+
         # ====================================================================
         # ITERATION 0: Hardcoded to use computational_design (BindCraft)
         # ====================================================================
@@ -204,8 +206,8 @@ async def nmnat2_agentic_workflow(research_goal):
 
             #RAG Results: {json.dumps(rag_result_json, indent=2, default=str)}
             scaffold_selection_prompt = f"""
-            Based on the research goal and RAG results, which binder scaffold should we use for NMNAT-2?
-
+            Based on the research goal and any available clinical evidence, which binder scaffold should we use for NMNAT-2?
+            If there is actual clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/nanobody/affitin provided in the research goal.
             Research Goal: {research_goal}
 
 
@@ -227,8 +229,12 @@ async def nmnat2_agentic_workflow(research_goal):
                 'rationale': 'string'
             }
 
+            scaffold_rag_hypothesis = await system.design_agents['rag'].generate_rag_hypothesis({'prompt': scaffold_selection_prompt})
+            system.append_history(key_items = rag_hypothesis, decision = 'rag')
+
+            logger.info(f"{scaffold_rag_hypothesis=}")
             scaffold_selection = system.prompt_gen_llm.generate_with_json_output(
-                prompt=scaffold_selection_prompt,
+                prompt=scaffold_rag_hypothesis,
                 json_schema=scaffold_schema,
                 temperature=0.3,
                 max_tokens=32678
@@ -239,8 +245,9 @@ async def nmnat2_agentic_workflow(research_goal):
             logger.info(f"Rationale: {scaffold_selection['rationale']}")
             logger.info(f"Starting binder: {starting_binder[:50]}...")
 
+            current_config = system.binder_config.get("agents", {}).get("computational_design", {}).copy()
+            current_config['binder_sequence'] = starting_binder
             # Default configuration for first iteration
-            current_config = system.binder_config.get("agents", {}).get("computational_design", {})
             current_config['target_sequence'] = target_sequence 
             logger.info(f"Using default configuration: {json.dumps(current_config, indent=2)}")
 

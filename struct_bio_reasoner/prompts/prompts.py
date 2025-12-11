@@ -119,42 +119,93 @@ class BindCraftPromptManager():
             self.recommendation = self.input_json.get('recommendation', None)
             self.prompt_r = self.running_prompt()
     def running_prompt(self):
+        # Serialize history for better LLM readability
+        decisions_str = json.dumps(self.history['decisions'], indent=2, default=str) if self.history['decisions'] else 'No history'
+        results_str = json.dumps(self.history['results'], indent=2, default=str) if self.history['results'] else 'No history'
+        configs_str = json.dumps(self.history['configurations'], indent=2, default=str) if self.history['configurations'] else 'No history'
+        key_items_str = json.dumps(self.history['key_items'], indent=2, default=str) if self.history['key_items'] else 'No key items yet'
+        config_schema_str = json.dumps(config_master['computational_design'], indent=2)
+
         prompt = f"""
-        You are an expert in computational peptide design optimization. Evaluate the current optimization progress and decide whether to continue optimization or proceed to validation.
+        You are an expert in computational peptide design optimization. Evaluate the current optimization progress and generate the next configuration.
 
         RECOMMENDATION FROM PREVIOUS RUN ({self.previous_run_type}):
-        run {self.recommendation.metadata['next_task']} for this reason: {self.recommendation.metadata['rationale']}
-        This is the history of decisions (least recent first):
-        {self.history['decisions'] if self.history['decisions'] != [] else 'No history'}
-        and the history of results (least recent first):
-        {self.history['results'] if self.history['results'] != [] else 'No history'}
-        and the history of configurations (least recent first):
-        {self.history['configurations'] if self.history['configurations'] != [] else 'No history'}.
-        There are a few very important items to consider encoded here:
-        {self.history['key_items']}
-        Please provide your decision and reasoning as a json format with the following format: {config_master['computational_design']}"""
+        Task: {self.recommendation.metadata['next_task']}
+        Rationale: {self.recommendation.metadata['rationale']}
+
+        HISTORY OF DECISIONS (least recent first):
+        {decisions_str}
+
+        HISTORY OF RESULTS (least recent first):
+        {results_str}
+
+        HISTORY OF CONFIGURATIONS (least recent first):
+        {configs_str}
+
+        KEY ITEMS TO CONSIDER (best binders from each iteration):
+        {key_items_str}
+
+        IMPORTANT: You MUST provide a complete configuration in JSON format matching this schema:
+        {config_schema_str}
+
+        CRITICAL REQUIREMENTS:
+        1. The 'binder_sequence' field is REQUIRED - you must include a full amino acid sequence
+        2. Choose the binder_sequence from one of these sources:
+           a) A top-performing binder from the key_items above
+           b) A scaffold sequence mentioned in the research goal: {self.research_goal}
+           c) A sequence from previous configurations that showed promise
+        3. All other parameters (num_rounds, batch_size, etc.) should be optimized based on previous results
+        4. Return ONLY the JSON configuration, no additional text
+
+        Generate the configuration now:"""
         return prompt
 
     def conclusion_prompt(self):
+        # Serialize for better LLM readability
+        top_binders_str = json.dumps(self.top_binders, indent=2, default=str) if self.top_binders and self.top_binders != {} else 'No top binders yet'
+        decisions_str = json.dumps(self.history['decisions'], indent=2, default=str) if self.history['decisions'] else 'No history'
+        results_str = json.dumps(self.history['results'], indent=2, default=str) if self.history['results'] else 'No history'
+        configs_str = json.dumps(self.history['configurations'], indent=2, default=str) if self.history['configurations'] else 'No history'
+        key_items_str = json.dumps(self.history['key_items'], indent=2, default=str) if self.history['key_items'] else 'No key items yet'
+
         prompt = f"""
-        You are an expert in computational peptide design optimization. Evaluate the current optimization progress and decide which step to take next (bindcraft, md_simulation).
-        If you choose to take bindcraft, recommend either an already generated binder as the starting (in the rationale) or use a scaffold in the research goal ({self.research_goal})?
+        You are an expert in computational peptide design optimization. Evaluate the current optimization progress and recommend the next task.
+
         BINDCRAFT OPTIMIZATION RESULTS:
         - Total rounds completed: {self.num_rounds}
         - Total sequences generated: {self.total_sequences}
         - Passing sequences: {self.passing_sequences}
         - Passing structures: {self.passing_structures}
-        - Top 5 binders: {self.top_binders}
-        This is the history of decisions (least recent first):
-        {self.history['decisions'] if self.history['decisions'] != [] else 'No history'}
-        and the history of results (least recent first):
-        {self.history['results'] if self.history['results'] != [] else 'No history'}
-        and the history of configurations (least recent first):
-        {self.history['configurations'] if self.history['configurations'] != [] else 'No history'}.
-        There are a few very important items to consider encoded here:
-        {self.history['key_items']}
+        - Top 5 binders:
+        {top_binders_str}
 
-        Please provide your decision and reasoning."""
+        HISTORY OF DECISIONS (least recent first):
+        {decisions_str}
+
+        HISTORY OF RESULTS (least recent first):
+        {results_str}
+
+        HISTORY OF CONFIGURATIONS (least recent first):
+        {configs_str}
+
+        KEY ITEMS TO CONSIDER (best binders from each iteration):
+        {key_items_str}
+
+        AVAILABLE NEXT STEPS:
+        1. computational_design - Run more BindCraft optimization rounds
+        2. molecular_dynamics - Validate binders with MD simulations
+        3. free_energy - Calculate binding free energies
+        4. stop - Sufficient optimization achieved
+
+        Please provide your recommendation in JSON format:
+        {{
+            "next_task": "computational_design|molecular_dynamics|free_energy|stop",
+            "rationale": "detailed explanation of why this is the best next step",
+            "confidence": 0.0-1.0
+        }}
+
+        NOTE: This is a RECOMMENDATION only. The actual configuration will be generated in a separate step.
+        """
         return prompt
 
 
