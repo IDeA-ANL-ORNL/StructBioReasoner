@@ -334,7 +334,7 @@ class BindCraftAgent:
             total_sequences = total_sequences,
             passing_sequences = result['total_sequences_filtered'],
             passing_structures = passing_structures,
-            top_binders = top_binders,
+            top_binders = top_n_binders,
             success_rate = passing_structures  / total_sequences if total_sequences > 0 else 0.0
         )
 
