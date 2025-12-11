@@ -292,7 +292,8 @@ class BindCraftAgent:
         for cycle in cycles:
             evaluated = cycle['evaluated_structures']
             for val in evaluated.values():
-                top_binders.append(val if val['energy'] is not None)
+                if val['energy'] is not None:
+                    top_binders.append(val)
 
                 if len(top_binders) > n:
                     worst_energy = -10000
