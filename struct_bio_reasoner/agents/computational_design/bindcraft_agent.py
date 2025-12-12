@@ -277,7 +277,7 @@ class BindCraftAgent:
             binder_sequence=binder_sequence,
             fasta_base_path=fasta_dir,
             pdb_base_path=folds_dir,
-            remodel_indices=[],  # Interface indices to redesign
+            remodel_indices=None,  # Interface indices to redesign, else measure
             num_rounds=num_rounds
         )
 

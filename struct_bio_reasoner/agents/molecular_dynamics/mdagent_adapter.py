@@ -621,8 +621,6 @@ class MDAgentAdapter:
                                  'solvent': solvent},
         )
 
-        self.logger.info(f'{sim_results=}')
-        
         summary_stats = self.summarize(sim_results)
         
         analysis = SimAnalysis(

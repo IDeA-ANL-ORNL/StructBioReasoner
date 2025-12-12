@@ -229,7 +229,6 @@ class FEAgent:
     async def _unpack_dataclass_config(self,
                                        paths: list[Path]) -> list[dict[str, Any]]:
         """"""
-        sels = self.fe_config['selections']
         fe_kwargss = []
         for path in paths:
             dict_copy = self.fe_config.copy()
