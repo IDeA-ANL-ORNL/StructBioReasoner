@@ -205,8 +205,6 @@ class FEAgent:
                 fe_kwargss=fe_kwargss,
             ) # list of dicts with `path`, `success` and `fe`
 
-            self.logger.debug(f'{results=}')
-
             analysis = {}
             for result in results:
                 if result['fe'] is None:
