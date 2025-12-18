@@ -1,0 +1,658 @@
+================================================================================
+    HIERARCHICAL WORKFLOW - DETAILED FUNCTION CALL DIAGRAM
+    All Functions and Their Connections
+================================================================================
+
+LEGEND:
+  [ClassName.method_name()]  - Function/method
+  ──►                        - Synchronous call
+  ══►                        - Async call
+  ···►                       - Internal helper call
+  @action                    - Academy action decorator
+
+================================================================================
+                        WORKFLOW INITIALIZATION
+================================================================================
+
+[HierarchicalBinderWorkflow.__init__()]
+  │
+  └──► Store: config_path, jnana_config_path, total_nodes, num_managers, max_rounds
+  
+[HierarchicalBinderWorkflow.initialize()] @async
+  │
+  ├══► [BinderDesignSystem.__init__()]
+  │    └──► Initialize: computational_design, molecular_dynamics, rag, structure_prediction agents
+  │
+  ├══► [BinderDesignSystem.start()]
+  │
+  ├══► [Manager.from_exchange_factory()]  # Academy Manager
+  │    └──► LocalExchangeFactory()
+  │
+  └══► [HierarchicalBinderWorkflow._launch_executive()]
+       │
+       ├──► Get: rag_agent from binder_system.design_agents['rag']
+       │
+       └══► [academy_manager.launch(ExecutiveAgent)]
+            └──► [ExecutiveAgent.__init__()]
+                 ├──► Store: rag_handle, llm_interface, total_nodes, config
+                 ├──► Initialize: managers = {}
+                 └──► Initialize: round_history = []
+
+================================================================================
+                        MAIN WORKFLOW EXECUTION
+================================================================================
+
+[HierarchicalBinderWorkflow.run(research_goal)] @async
+  │
+  ├══► [BinderDesignSystem.set_research_goal(research_goal)]
+  │    └──► Returns: session_id
+  │
+  ├══► [ExecutiveAgent.query_hiper_rag(research_goal)] @action
+  │    │
+  │    ├───► Build RAG prompt with:
+  │    │     • Key protein-protein interactions
+  │    │     • Recommended binder scaffolds
+  │    │     • Critical residues/hotspots
+  │    │     • Simulation strategies
+  │    │     • Design strategies
+  │    │
+  │    ├══► [rag_handle.rag_with_model(rag_prompt)]
+  │    │
+  │    └──► Returns: {research_goal, rag_strategy, timestamp}
+  │
+  ├──► Initialize: seed_binder = None
+  ├──► Initialize: active_managers = ["manager_0", ..., "manager_N"]
+  │
+  └──► FOR round_num in range(1, max_rounds + 1):
+       │
+       ├══► [HierarchicalBinderWorkflow.execute_round()]
+       │    │
+       │    │   ┌─────────────────────────────────────────────────────────┐
+       │    │   │         ROUND EXECUTION (Detailed Below)                │
+       │    │   └─────────────────────────────────────────────────────────┘
+       │    │
+       │    └──► Returns: round_results
+       │
+       ├══► [ExecutiveAgent.decide_manager_lifecycle(evaluations, round_num)] @action
+       │    │
+       │    ├───► Sort managers by performance score (descending)
+       │    ├───► Calculate: num_to_keep = max(2, len(managers) // 2)
+       │    │
+       │    └──► Returns: {
+       │         'continue': [top_manager_ids],
+       │         'terminate': [bottom_manager_ids],
+       │         'round': round_num
+       │         }
+       │
+       ├══► [ExecutiveAgent.select_best_binder(manager_results)] @action
+       │    │
+       │    ├───► FOR each manager_result:
+       │    │     ├──► Extract: binder.affinity
+       │    │     └──► Track: best_score, best_binder, best_manager
+       │    │
+       │    └──► Returns: {
+       │         'binder': best_binder,
+       │         'score': best_score,
+       │         'source_manager': best_manager,
+       │         'timestamp': timestamp
+       │         }
+       │
+       ├──► Update: active_managers = lifecycle_decisions['continue']
+       ├──► Update: seed_binder = best_binder_result['binder']
+       └──► Update: best_binder_overall (if better than previous)
+
+================================================================================
+                        ROUND EXECUTION (execute_round)
+================================================================================
+
+[HierarchicalBinderWorkflow.execute_round(round_num, active_managers, seed_binder, research_goal)] @async
+  │
+  ├──► Get: previous_performance from round_history[-1]['evaluations'] (if round > 1)
+  │
+  ├══► [ExecutiveAgent.allocate_resources(active_managers, round_num, previous_performance)] @action
+  │    │
+  │    ├──► IF round_num == 1:
+  │    │    ├───► nodes_per_manager = total_nodes // len(manager_ids)
+  │    │    └───► allocation = {mid: nodes_per_manager for mid in manager_ids}
+  │    │
+  │    ├══► ELSE:
+  │    │    └══► [ExecutiveAgent._performance_based_allocation(manager_ids, performance)]
+  │    │         │
+  │    │         ├───► Calculate: scores = {mid: performance[mid]['score']}
+  │    │         ├───► Calculate: total_score = sum(scores.values())
+  │    │         │
+  │    │         └───► FOR each manager:
+  │    │              ├──► nodes = int((score / total_score) * total_nodes)
+  │    │              └──► allocation[mid] = max(1, nodes)
+  │    │
+  │    ├──► FOR each manager_id:
+  │    │    ├──► managers[manager_id]['allocated_nodes'] = nodes
+  │    │    └──► managers[manager_id]['round'] = round_num
+  │    │
+  │    └──► Returns: allocation {manager_id: num_nodes}
+  │
+  ├══► [HierarchicalBinderWorkflow._launch_managers(active_managers, resource_allocation)]
+  │    │
+  │    └──► FOR each manager_id:
+  │         │
+  │         ├══► [HierarchicalBinderWorkflow._prepare_worker_handles()]
+  │         │    │
+  │         │    └──► Returns: {
+  │         │         'folding': structure_prediction_agent,
+  │         │         'simulation': molecular_dynamics_agent,
+  │         │         'binder_design': computational_design_agent
+  │         │         }
+  │         │
+  │         └══► [academy_manager.launch(ManagerAgent)]
+  │              └──► [ManagerAgent.__init__(manager_id, allocated_nodes, worker_handles, llm, config)]
+  │                   ├──► Store: manager_id, allocated_nodes, workers, llm, config
+  │                   ├──► Initialize: task_history = []
+  │                   ├──► Initialize: current_structures = []
+  │                   ├──► Initialize: simulation_results = []
+  │                   ├──► Initialize: cluster_results = None
+  │                   ├──► Initialize: hotspot_results = None
+  │                   ├──► Initialize: binder_designs = []
+  │                   └──► Store: start_time = datetime.now()
+  │
+  ├──► FOR each manager_id in active_managers:
+  │    └──► Create task: _execute_manager_campaign(manager_id, seed_binder, research_goal)
+  │
+  ├══► [asyncio.gather(*manager_tasks)]  # Execute all Manager campaigns in parallel
+  │    │
+  │    │   ┌─────────────────────────────────────────────────────────┐
+  │    │   │    MANAGER CAMPAIGN EXECUTION (Detailed Below)          │
+  │    │   └─────────────────────────────────────────────────────────┘
+  │    │
+  │    └──► Returns: manager_results_list
+  │
+  ├══► [ExecutiveAgent.evaluate_managers(manager_results)] @action
+  │    │
+  │    └──► FOR each manager_id, results:
+  │         │
+  │         ├──► Extract: best_binder, tasks_executed
+  │         │
+  │         ├───► [ExecutiveAgent._calculate_performance_score(results)]
+  │         │     │
+  │         │     ├──► Extract: affinity, tasks
+  │         │     ├──► Calculate: affinity_score = (affinity + 20) / 20  # Normalize
+  │         │     ├──► Calculate: task_score = len(tasks) / 10.0
+  │         │     └──► Calculate: score = 0.7 * affinity_score + 0.3 * task_score
+  │         │
+  │         └──► evaluations[manager_id] = {
+  │              'score': score,
+  │              'best_binder_affinity': affinity,
+  │              'num_tasks': len(tasks),
+  │              'efficiency': score / len(tasks),
+  │              'recommendation': 'continue' if score > 0.5 else 'terminate'
+  │              }
+  │
+  └──► Returns: {
+       'round_num': round_num,
+       'resource_allocation': resource_allocation,
+       'manager_results': manager_results,
+       'evaluations': evaluations,
+       'timestamp': timestamp
+       }
+
+================================================================================
+                    MANAGER CAMPAIGN EXECUTION
+================================================================================
+
+[HierarchicalBinderWorkflow._execute_manager_campaign(manager_id, seed_binder, research_goal)] @async
+  │
+  ├──► Get: manager_handle = manager_handles[manager_id]
+  │
+  ├──► Initialize: current_state = {
+  │    'seed_binder': seed_binder,
+  │    'research_goal': research_goal
+  │    }
+  │
+  └──► WHILE True:  # Task execution loop
+       │
+       ├══► [ManagerAgent.decide_next_task(current_state)] @action
+       │    │
+       │    ├───► [ManagerAgent._build_task_decision_prompt(current_state)]
+       │    │     │
+       │    │     └──► Build prompt with:
+       │    │          • Structures generated: len(current_structures)
+       │    │          • Simulations completed: len(simulation_results)
+       │    │          • Clustering done: cluster_results is not None
+       │    │          • Hotspots identified: hotspot_results is not None
+       │    │          • Binders designed: len(binder_designs)
+       │    │          • Tasks completed: tasks_completed
+       │    │          • Task history (last 5 tasks)
+       │    │
+       │    ├══► [llm.generate(prompt, temperature, max_tokens)]
+       │    │
+       │    ├───► [ManagerAgent._parse_task_decision(llm_response)]
+       │    │     │
+       │    │     └──► Parse response for: 'folding', 'simulation', 'clustering',
+       │    │          'hotspot_analysis', 'binder_design', or 'stop'
+       │    │
+       │    └──► Returns: task_type (str)
+       │
+       ├──► IF task_type == 'stop':
+       │    └──► BREAK
+       │
+       ├══► [HierarchicalBinderWorkflow._execute_manager_task(manager_handle, task_type, current_state)]
+       │    │
+       │    ├───► [HierarchicalBinderWorkflow._build_task_params(task_type, current_state)]
+       │    │     │
+       │    │     ├──► IF task_type == 'folding':
+       │    │     │    └──► Returns: {sequence, target_sequence}
+       │    │     │
+       │    │     ├──► IF task_type == 'simulation':
+       │    │     │    └──► Returns: {pdb_path, timesteps}
+       │    │     │
+       │    │     ├──► IF task_type == 'clustering':
+       │    │     │    └──► Returns: {trajectory_paths, n_clusters}
+       │    │     │
+       │    │     ├──► IF task_type == 'hotspot_analysis':
+       │    │     │    └──► Returns: {simulation_results, cluster_results}
+       │    │     │
+       │    │     └──► IF task_type == 'binder_design':
+       │    │          └──► Returns: {target_sequence, hotspot_residues, num_designs}
+       │    │
+       │    └──► EXECUTE TASK (see detailed task execution below)
+       │
+       ├──► Update: current_state[task_type] = task_result
+       │
+       ├══► [HierarchicalBinderWorkflow._get_manager_history(manager_handle)]
+       │
+       ├══► [ManagerAgent.should_stop(task_history)] @action
+       │    │
+       │    ├──► Get: max_tasks from config
+       │    ├──► Get: min_affinity from config
+       │    │
+       │    ├──► IF len(history) >= max_tasks:
+       │    │    └──► Returns: True
+       │    │
+       │    ├──► IF binder_designs exists:
+       │    │    ├──► Calculate: best_affinity = max(d.affinity for d in binder_designs)
+       │    │    └──► IF best_affinity <= min_affinity:
+       │    │         └──► Returns: True
+       │    │
+       │    └──► Returns: False
+       │
+       ├──► IF should_stop:
+       │    └──► BREAK
+       │
+       └──► CONTINUE LOOP
+
+  ├══► [ManagerAgent.summarize_campaign()] @action
+  │    │
+  │    ├──► FOR each design in binder_designs:
+  │    │    └──► Track: best_binder, best_affinity
+  │    │
+  │    ├──► Calculate: duration = (now - start_time).total_seconds()
+  │    │
+  │    └──► Returns: {
+  │         'manager_id': manager_id,
+  │         'allocated_nodes': allocated_nodes,
+  │         'tasks_executed': task_history,
+  │         'num_tasks': len(task_history),
+  │         'duration_seconds': duration,
+  │         'best_binder': best_binder,
+  │         'all_binders': binder_designs,
+  │         'structures_generated': len(current_structures),
+  │         'simulations_run': len(simulation_results),
+  │         'hotspots_identified': hotspot_results,
+  │         'timestamp': timestamp
+  │         }
+  │
+  └──► Returns: summary
+
+================================================================================
+                    DETAILED TASK EXECUTION
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         FOLDING TASK                                     │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ManagerAgent.execute_folding(params)] @action
+  │
+  ├──► Get: folding_handle = workers['folding']
+  │
+  ├══► [folding_handle.fold_protein(sequence, target_sequence, device)]
+  │    │
+  │    │   (ChaiAgent - existing agent)
+  │    │
+  │    └──► Returns: {pdb_path, confidence, structure_data, ...}
+  │
+  ├──► Append: current_structures.append(result)
+  │
+  ├───► [ManagerAgent._record_task('folding', params, result)]
+  │     │
+  │     ├──► Append to task_history: {
+  │     │    'task_type': 'folding',
+  │     │    'params': params,
+  │     │    'result': result,
+  │     │    'timestamp': timestamp
+  │     │    }
+  │     │
+  │     └──► Increment: tasks_completed += 1
+  │
+  └──► Returns: result
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         SIMULATION TASK                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ManagerAgent.execute_simulation(params)] @action
+  │
+  ├──► Get: md_handle = workers['simulation']
+  │
+  ├══► [md_handle.run_simulation(pdb_path, timesteps, temperature, solvent)]
+  │    │
+  │    │   (MDAgentAdapter - existing agent)
+  │    │
+  │    └──► Returns: {trajectory_path, energy, rmsd, ...}
+  │
+  ├──► Append: simulation_results.append(result)
+  │
+  ├───► [ManagerAgent._record_task('simulation', params, result)]
+  │
+  └──► Returns: result
+
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         CLUSTERING TASK                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ManagerAgent.execute_clustering(params)] @action
+  │
+  ├──► Get: cluster_handle = workers['clustering']
+  │
+  ├══► [cluster_handle.cluster_trajectories(trajectory_paths, n_clusters, algorithm)]
+  │    │
+  │    │   (ClusteringAgent - NEW COMPONENT NEEDED)
+  │    │
+  │    └──► Returns: {
+  │         'clusters': [...],
+  │         'representatives': [...],
+  │         'cluster_sizes': [...],
+  │         ...
+  │         }
+  │
+  ├──► Store: cluster_results = result
+  │
+  ├───► [ManagerAgent._record_task('clustering', params, result)]
+  │
+  └──► Returns: result
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         HOTSPOT ANALYSIS TASK                            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ManagerAgent.execute_hotspot_analysis(params)] @action
+  │
+  ├──► Get: hotspot_handle = workers['hotspot']
+  │
+  ├══► [hotspot_handle.analyze_hotspots(simulation_results, cluster_results, threshold)]
+  │    │
+  │    │   (HotspotAgent - wrapper around existing hotspot.py)
+  │    │
+  │    └──► Returns: {
+  │         'hotspots': [residue_ids],
+  │         'scores': [...],
+  │         'interaction_map': {...},
+  │         ...
+  │         }
+  │
+  ├──► Store: hotspot_results = result
+  │
+  ├───► [ManagerAgent._record_task('hotspot_analysis', params, result)]
+  │
+  └──► Returns: result
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         BINDER DESIGN TASK                               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ManagerAgent.execute_binder_design(params)] @action
+  │
+  ├──► Get: design_handle = workers['binder_design']
+  │
+  ├══► [design_handle.design_binder(target_sequence, hotspot_residues, scaffold_type, num_designs)]
+  │    │
+  │    │   (BindCraftAgent - existing agent)
+  │    │
+  │    └──► Returns: {
+  │         'designs': [...],
+  │         'affinity': -12.5,
+  │         'sequence': 'MKQH...',
+  │         'pdb_path': '...',
+  │         ...
+  │         }
+  │
+  ├──► Append: binder_designs.append(result)
+  │
+  ├───► [ManagerAgent._record_task('binder_design', params, result)]
+  │
+  └──► Returns: result
+
+================================================================================
+                    COMPLETE FUNCTION CALL HIERARCHY
+================================================================================
+
+HierarchicalBinderWorkflow
+├── __init__()
+├── initialize() @async
+│   ├── BinderDesignSystem.__init__()
+│   ├── BinderDesignSystem.start()
+│   ├── Manager.from_exchange_factory()
+│   └── _launch_executive() @async
+│       └── academy_manager.launch(ExecutiveAgent)
+│           └── ExecutiveAgent.__init__()
+│
+├── run(research_goal) @async
+│   ├── BinderDesignSystem.set_research_goal()
+│   ├── ExecutiveAgent.query_hiper_rag() @action
+│   │   └── rag_handle.rag_with_model()
+│   │
+│   └── FOR each round:
+│       ├── execute_round() @async
+│       │   ├── ExecutiveAgent.allocate_resources() @action
+│       │   │   └── _performance_based_allocation() @async
+│       │   │
+│       │   ├── _launch_managers() @async
+│       │   │   ├── _prepare_worker_handles() @async
+│       │   │   └── academy_manager.launch(ManagerAgent)
+│       │   │       └── ManagerAgent.__init__()
+│       │   │
+│       │   ├── asyncio.gather(*manager_campaigns)
+│       │   │   └── _execute_manager_campaign() @async
+│       │   │       ├── ManagerAgent.decide_next_task() @action
+│       │   │       │   ├── _build_task_decision_prompt()
+│       │   │       │   ├── llm.generate()
+│       │   │       │   └── _parse_task_decision()
+│       │   │       │
+│       │   │       ├── _execute_manager_task() @async
+│       │   │       │   ├── _build_task_params()
+│       │   │       │   └── [Task-specific execution]:
+│       │   │       │       ├── ManagerAgent.execute_folding() @action
+│       │   │       │       │   ├── folding_handle.fold_protein()
+│       │   │       │       │   └── _record_task()
+│       │   │       │       │
+│       │   │       │       ├── ManagerAgent.execute_simulation() @action
+│       │   │       │       │   ├── md_handle.run_simulation()
+│       │   │       │       │   └── _record_task()
+│       │   │       │       │
+│       │   │       │       ├── ManagerAgent.execute_clustering() @action
+│       │   │       │       │   ├── cluster_handle.cluster_trajectories()
+│       │   │       │       │   └── _record_task()
+│       │   │       │       │
+│       │   │       │       ├── ManagerAgent.execute_hotspot_analysis() @action
+│       │   │       │       │   ├── hotspot_handle.analyze_hotspots()
+│       │   │       │       │   └── _record_task()
+│       │   │       │       │
+│       │   │       │       └── ManagerAgent.execute_binder_design() @action
+│       │   │       │           ├── design_handle.design_binder()
+│       │   │       │           └── _record_task()
+│       │   │       │
+│       │   │       ├── ManagerAgent.should_stop() @action
+│       │   │       └── ManagerAgent.summarize_campaign() @action
+│       │   │
+│       │   └── ExecutiveAgent.evaluate_managers() @action
+│       │       └── _calculate_performance_score()
+│       │
+│       ├── ExecutiveAgent.decide_manager_lifecycle() @action
+│       └── ExecutiveAgent.select_best_binder() @action
+│
+└── cleanup() @async
+    ├── academy_manager.__aexit__()
+    └── BinderDesignSystem.cleanup()
+
+================================================================================
+                    FUNCTION SUMMARY BY COMPONENT
+================================================================================
+
+HIERARCHICAL WORKFLOW (12 functions):
+  • __init__()
+  • initialize() @async
+  • run() @async
+  • execute_round() @async
+  • _execute_manager_campaign() @async
+  • _execute_manager_task() @async
+  • _launch_executive() @async
+  • _launch_managers() @async
+  • _prepare_worker_handles() @async
+  • _build_task_params()
+  • _get_manager_history() @async
+  • cleanup() @async
+
+EXECUTIVE AGENT (8 functions):
+  • __init__()
+  • query_hiper_rag() @action @async
+  • allocate_resources() @action @async
+  • evaluate_managers() @action @async
+  • decide_manager_lifecycle() @action @async
+  • select_best_binder() @action @async
+  • _performance_based_allocation() @async
+  • _calculate_performance_score()
+
+MANAGER AGENT (13 functions):
+  • __init__()
+  • decide_next_task() @action @async
+  • execute_folding() @action @async
+  • execute_simulation() @action @async
+  • execute_clustering() @action @async
+  • execute_hotspot_analysis() @action @async
+  • execute_binder_design() @action @async
+  • should_stop() @action @async
+  • summarize_campaign() @action @async
+  • _record_task()
+  • _build_task_decision_prompt()
+  • _format_task_history()
+  • _parse_task_decision()
+
+TOTAL: 33 functions across 3 main components
+
+================================================================================
+                    EXTERNAL DEPENDENCIES (Worker Agents)
+================================================================================
+
+EXISTING AGENTS (reused):
+  • ChaiAgent.fold_protein()                    - Protein folding
+  • MDAgentAdapter.run_simulation()             - MD simulations
+  • BindCraftAgent.design_binder()              - Binder design
+  • RAGWrapper.rag_with_model()                 - HiPerRAG queries
+
+NEW AGENTS NEEDED:
+  • ClusteringAgent.cluster_trajectories()      - Trajectory clustering
+  • HotspotAgent.analyze_hotspots()             - Hotspot analysis
+
+================================================================================
+                    DATA FLOW SUMMARY
+================================================================================
+
+INPUT:
+  research_goal (str) → HierarchicalBinderWorkflow.run()
+
+FLOW:
+  research_goal
+    → ExecutiveAgent.query_hiper_rag()
+    → rag_strategy
+    → ExecutiveAgent.allocate_resources()
+    → resource_allocation
+    → ManagerAgent (multiple instances)
+    → Task execution loop:
+        folding → simulation → clustering → hotspot → binder_design
+    → ManagerAgent.summarize_campaign()
+    → manager_results
+    → ExecutiveAgent.evaluate_managers()
+    → evaluations
+    → ExecutiveAgent.decide_manager_lifecycle()
+    → lifecycle_decisions
+    → ExecutiveAgent.select_best_binder()
+    → best_binder
+    → Next round (with updated resources and seed binder)
+
+OUTPUT:
+  {
+    'research_goal': str,
+    'rag_strategy': dict,
+    'total_rounds': int,
+    'round_history': list[dict],
+    'best_binder_overall': dict,
+    'timestamp': str
+  }
+
+================================================================================
+                    FUNCTION CALL SEQUENCE EXAMPLE
+================================================================================
+
+Example: Round 1, Manager 1 Campaign
+
+1.  HierarchicalBinderWorkflow.run("Design binder for NMNAT-2")
+2.    ExecutiveAgent.query_hiper_rag("Design binder for NMNAT-2")
+3.      rag_handle.rag_with_model(prompt)
+4.    ExecutiveAgent.allocate_resources(["manager_0", ...], 1, None)
+5.    HierarchicalBinderWorkflow._launch_managers(["manager_0", ...], {manager_0: 10})
+6.      HierarchicalBinderWorkflow._prepare_worker_handles()
+7.      academy_manager.launch(ManagerAgent, args=(...))
+8.        ManagerAgent.__init__("manager_0", 10, worker_handles, llm, config)
+9.    HierarchicalBinderWorkflow._execute_manager_campaign("manager_0", None, "...")
+10.     ManagerAgent.decide_next_task(current_state)
+11.       ManagerAgent._build_task_decision_prompt(current_state)
+12.       llm.generate(prompt)
+13.       ManagerAgent._parse_task_decision(response)  → "folding"
+14.     HierarchicalBinderWorkflow._execute_manager_task(handle, "folding", state)
+15.       HierarchicalBinderWorkflow._build_task_params("folding", state)
+16.       ManagerAgent.execute_folding(params)
+17.         folding_handle.fold_protein(sequence, target_sequence, device)
+18.         ManagerAgent._record_task("folding", params, result)
+19.     ManagerAgent.decide_next_task(current_state)  → "simulation"
+20.     HierarchicalBinderWorkflow._execute_manager_task(handle, "simulation", state)
+21.       ManagerAgent.execute_simulation(params)
+22.         md_handle.run_simulation(pdb_path, timesteps, ...)
+23.         ManagerAgent._record_task("simulation", params, result)
+24.     ManagerAgent.decide_next_task(current_state)  → "clustering"
+25.     HierarchicalBinderWorkflow._execute_manager_task(handle, "clustering", state)
+26.       ManagerAgent.execute_clustering(params)
+27.         cluster_handle.cluster_trajectories(trajectory_paths, ...)
+28.         ManagerAgent._record_task("clustering", params, result)
+29.     ManagerAgent.decide_next_task(current_state)  → "hotspot_analysis"
+30.     HierarchicalBinderWorkflow._execute_manager_task(handle, "hotspot_analysis", state)
+31.       ManagerAgent.execute_hotspot_analysis(params)
+32.         hotspot_handle.analyze_hotspots(simulation_results, ...)
+33.         ManagerAgent._record_task("hotspot_analysis", params, result)
+34.     ManagerAgent.decide_next_task(current_state)  → "binder_design"
+35.     HierarchicalBinderWorkflow._execute_manager_task(handle, "binder_design", state)
+36.       ManagerAgent.execute_binder_design(params)
+37.         design_handle.design_binder(target_sequence, hotspot_residues, ...)
+38.         ManagerAgent._record_task("binder_design", params, result)
+39.     ManagerAgent.should_stop(task_history)  → True
+40.     ManagerAgent.summarize_campaign()
+41.   ExecutiveAgent.evaluate_managers(manager_results)
+42.     ExecutiveAgent._calculate_performance_score(results)
+43.   ExecutiveAgent.decide_manager_lifecycle(evaluations, 1)
+44.   ExecutiveAgent.select_best_binder(manager_results)
+
+Total function calls in this example: 44
+
+================================================================================
+                            END OF DIAGRAM
+================================================================================
