@@ -36,7 +36,8 @@ class ChaiAgent:
         self.parsl_config = parsl_config #self.config.get('parsl', {})
         self.manager = None
 
-    async def initialize(self):
+    async def initialize(self,
+                         data: dict[str, Any]):
         """
         Initialize Chai components.
 
@@ -50,16 +51,24 @@ class ChaiAgent:
             from ...utils.parsl_settings import LocalSettings
 
             self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
+            
+            cwd = data.get('cwd', None)
+            if cwd is None:
+                fasta_dir = self.fasta_dir
+                fold_dir = self.fold_dir
+            else:
+                fasta_dir = Path(cwd) / 'fastas'
+                fold_dir = Path(cwd) / 'folds'
 
-            self.fasta_dir.mkdir(exist_ok=True, parents=True)
-            self.fold_dir.mkdir(exist_ok=True, parents=True)
+            fasta_dir.mkdir(exist_ok=True, parents=True)
+            fold_dir.mkdir(exist_ok=True, parents=True)
 
             device = self.config.get('device', 'cuda:0')
 
             # Initialize algorithm instances with required parameters
             chai = Chai(
-                fasta_dir=self.fasta_dir,
-                out=self.fold_dir,
+                fasta_dir=fasta_dir,
+                out=fold_dir,
                 diffusion_steps=100,
                 device=device  # or 'cpu' if GPU not available
             )
@@ -94,10 +103,11 @@ class ChaiAgent:
         
         return True
 
-    async def is_ready(self) -> bool:
+    async def is_ready(self,
+                       data: dict[str, Any]) -> bool:
         self.logger.info('Checking if we are initialized')
         if not hasattr(self, 'initialized'):
-            await self.initialize()
+            await self.initialize(data)
         return self.initialized
 
     async def cleanup(self):
@@ -117,17 +127,13 @@ class ChaiAgent:
         except Exception as e:
             self.logger.error(f'Chai agent cleanup failed: {e}')
 
-    async def generate_hypotheses(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """"""
-        pass
-
     def get_capabilities(self) -> list[str]:
         return self.capabilities
 
     async def generate_binder_hypothesis(self, 
                                          data: dict[str, Any]) -> Optional[ProteinHypothesis]:
         """"""
-        if not await self.is_ready():
+        if not await self.is_ready(data):
             self.logger.error('Chai agent not ready')
             return None
 
