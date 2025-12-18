@@ -1,0 +1,86 @@
+graph TD
+    Start([Start Workflow]) --> Executive[Executive Agent]
+    
+    Executive --> RAG[Query HiPerRAG]
+    RAG --> Strategy[Get Literature Strategy]
+    
+    Strategy --> Allocate[Allocate Resources to Managers]
+    Allocate --> M1[Manager 1<br/>15 nodes]
+    Allocate --> M2[Manager 2<br/>12 nodes]
+    Allocate --> M3[Manager 3<br/>10 nodes]
+    Allocate --> M4[Manager 4<br/>8 nodes]
+    Allocate --> M5[Manager 5<br/>5 nodes]
+    
+    M1 --> C1[Campaign 1]
+    M2 --> C2[Campaign 2]
+    M3 --> C3[Campaign 3]
+    M4 --> C4[Campaign 4]
+    M5 --> C5[Campaign 5]
+    
+    C1 --> D1{Decide Next Task}
+    D1 -->|Folding| F1[Execute Folding]
+    F1 --> D1
+    D1 -->|Simulation| S1[Execute Simulation]
+    S1 --> D1
+    D1 -->|Clustering| CL1[Execute Clustering]
+    CL1 --> D1
+    D1 -->|Hotspot| H1[Execute Hotspot Analysis]
+    H1 --> D1
+    D1 -->|Binder Design| B1[Execute Binder Design]
+    B1 --> D1
+    D1 -->|Stop| Sum1[Summarize Campaign]
+    
+    C2 --> D2{Decide Next Task}
+    D2 -->|Tasks| T2[Execute Tasks]
+    T2 --> D2
+    D2 -->|Stop| Sum2[Summarize Campaign]
+    
+    C3 --> D3{Decide Next Task}
+    D3 -->|Tasks| T3[Execute Tasks]
+    T3 --> D3
+    D3 -->|Stop| Sum3[Summarize Campaign]
+    
+    C4 --> D4{Decide Next Task}
+    D4 -->|Tasks| T4[Execute Tasks]
+    T4 --> D4
+    D4 -->|Stop| Sum4[Summarize Campaign]
+    
+    C5 --> D5{Decide Next Task}
+    D5 -->|Tasks| T5[Execute Tasks]
+    T5 --> D5
+    D5 -->|Stop| Sum5[Summarize Campaign]
+    
+    Sum1 --> Results[Collect All Results]
+    Sum2 --> Results
+    Sum3 --> Results
+    Sum4 --> Results
+    Sum5 --> Results
+    
+    Results --> Evaluate[Executive Evaluates Managers]
+    Evaluate --> Scores[Calculate Performance Scores]
+    
+    Scores --> Lifecycle{Manager Lifecycle Decision}
+    Lifecycle -->|High Performers| Continue[Continue Managers]
+    Lifecycle -->|Low Performers| Terminate[Terminate Managers]
+    
+    Continue --> SelectBest[Select Best Binder]
+    Terminate --> SelectBest
+    
+    SelectBest --> Reallocate[Reallocate Resources]
+    
+    Reallocate --> NextRound{More Rounds?}
+    NextRound -->|Yes| Allocate
+    NextRound -->|No| Final[Final Results]
+    
+    Final --> End([End Workflow])
+    
+    style Executive fill:#ff9999
+    style M1 fill:#99ccff
+    style M2 fill:#99ccff
+    style M3 fill:#99ccff
+    style M4 fill:#99ccff
+    style M5 fill:#99ccff
+    style RAG fill:#ffcc99
+    style Evaluate fill:#ff9999
+    style Final fill:#99ff99
+
