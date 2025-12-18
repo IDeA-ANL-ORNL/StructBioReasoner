@@ -106,14 +106,15 @@ class BindCraftPromptManager():
         self.prompt_c = None
 
         if self.prompt_type == 'conclusion':
-            self.num_rounds = self.input_json.get('rounds_completed', 1)
-            self.total_sequences = self.input_json.get('total_sequences_generated', 100)
-            self.passing_sequences = self.input_json.get('total_sequences_filtered', 0)
-            self.passing_structures = self.input_json.get('total_sequences_filtered', 0)
+            self.num_rounds = self.input_json.get('num_rounds', 1)
+            self.total_sequences = self.input_json.get('total_sequences', 100)
+            self.passing_sequences = self.input_json.get('passing_sequences', 0)
+            self.passing_structures = self.input_json.get('passing_structures', 0)
             self.top_binders = self.input_json.get('top_binders', {})#dict(sorted(self.input_json['all_cycles'][self.num_rounds].items(), key=lambda x: x[1]['energy'])[:5])
             if self.top_binders == {}:
                 self.top_binders == 'No top binders'
             self.prompt_c = self.conclusion_prompt()
+
         elif self.prompt_type == 'running':
             self.previous_run_type = self.input_json.get('previous_run_type', 'bindcraft')
             self.recommendation = self.input_json.get('recommendation', None)
@@ -188,7 +189,7 @@ class BindCraftPromptManager():
         HISTORY OF CONFIGURATIONS (least recent first):
         {configs_str}
 
-        KEY ITEMS TO CONSIDER (best binders from each iteration):
+        KEY ITEMS TO CONSIDER (best binders from each iteration) disregard rmsd column for now since it is not being measured accurately:
         {key_items_str}
 
         AVAILABLE NEXT STEPS:
@@ -351,11 +352,11 @@ class FreeEnergyPromptManager():
 def get_prompt_manager(agent_type: str, research_goal: str, input_json: dict[str, Any] | list[dict], target_prot: str, prompt_type: str, history: dict, num_history: int = 3):
     if agent_type == 'rag':
         return RAGPromptManager(research_goal, input_json, target_prot, prompt_type)
-    elif agent_type == 'bindcraft':
+    elif agent_type == 'computational_design':
         return BindCraftPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
-    elif agent_type == 'chai':
+    elif agent_type == 'structure_prediction':
         return CHAIPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
-    elif agent_type == 'mdagent':
+    elif agent_type == 'molecular_dynamics':
         return MDPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
 
         

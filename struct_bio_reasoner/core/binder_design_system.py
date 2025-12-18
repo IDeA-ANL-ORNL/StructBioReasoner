@@ -106,6 +106,7 @@ class BinderDesignSystem(JnanaSystem):
         # Load protein-specific configuration
         self.memory_binder = ContextMemory()
         self.memory_binder.set_research_goal(research_goal)
+        self.research_goal = research_goal
         self.binder_config = load_binder_config(config_path)
         self.parsl_config = self.binder_config['parsl']
         
@@ -141,6 +142,7 @@ class BinderDesignSystem(JnanaSystem):
         self.history['decisions'] = []
         self.history['configurations'] = []
         self.history['results'] = []
+        self.history['recommendations'] = []
         self.num_history = self.binder_config['history']['num_history']
         #self.start()
         self.logger.info("BinderDesignSystem initialized")
@@ -148,10 +150,12 @@ class BinderDesignSystem(JnanaSystem):
     def append_history(self, key_items: object| None = None,
                              decision: str|None = None,
                              configuration: dict[str, Any] | None = None, 
-                             results: dict[str, Any]|None = None):
+                             results: dict[str, Any]|None = None,
+                             recommendations: dict[str, Any]|object|None = None):
         if key_items is not None:
             self.history['key_items'].append(key_items)
-
+        if recommendations is not None:
+            self.history['recommendations'].append(recommendations)
         if decision is not None:
             self.history['decisions'].append(decision)
         elif key_items is None:
@@ -455,6 +459,7 @@ class BinderDesignSystem(JnanaSystem):
         if match:
             seq = match.group(1).strip()
             self.logger.info(f"Extracted target sequence (pattern 1): {seq[:50]}... ({len(seq)} residues)")
+            self.target_prot=seq
             return seq
 
         # Pattern 2: Just "target:" followed by sequence
@@ -463,6 +468,7 @@ class BinderDesignSystem(JnanaSystem):
         if match:
             seq = match.group(1).strip()
             self.logger.info(f"Extracted target sequence (pattern 2): {seq[:50]}... ({len(seq)} residues)")
+            self.target_prot=seq
             return seq
 
         # Pattern 3: Any long amino acid sequence (20+ residues)
@@ -472,10 +478,12 @@ class BinderDesignSystem(JnanaSystem):
         if match:
             seq = match.group(1).strip()
             self.logger.info(f"Extracted target sequence (pattern 3): {seq[:50]}... ({len(seq)} residues)")
+            self.target_prot=seq
             return seq
 
         # If no sequence found, log warning
         self.logger.warning("No target sequence found in research goal")
+        self.target_prot=""
         return ""
 
     def _extract_binder_sequence(self, research_goal: str) -> str:
@@ -671,7 +679,7 @@ class BinderDesignSystem(JnanaSystem):
                 input_json=results,
                 target_prot=self.target_prot,
                 prompt_type='conclusion',
-                history_list=self.history,
+                history=self.history,
                 num_history=self.num_history
                 )
 
@@ -681,9 +689,9 @@ class BinderDesignSystem(JnanaSystem):
                         'run_conc': prompt_manager.prompt_c}
         recommendation = await self.generate_single_recommendation(results_pass)
         self.logger.info(f"Here is the protein recommendation: \n {[rec.to_dict() for rec in recommendation]}")
-        self.history_list.extend(list(recommendation[0]))
-        recommendation.metadata['history_list'] = self.history_list
-        recommendation.metadata['num_history'] = self.num_history
+        self.append_history(recommendations=recommendation)
+        #recommendation.metadata['history_list'] = self.history_list
+        #recommendation.metadata['num_history'] = self.num_history
         #protein_recommendation = ProteinHypothesis.from_unified_hypothesis(
         #    recommendation,
         #    #biological_context=biological_context # this goes into `protein_metadata`
