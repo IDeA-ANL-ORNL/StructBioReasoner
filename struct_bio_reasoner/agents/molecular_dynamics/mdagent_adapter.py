@@ -104,7 +104,8 @@ class MDAgentAdapter:
             self.logger.warning("MDAgentAdapter deleted without proper cleanup - manager still active")
             # We can't call async cleanup from __del__, so just log a warning
 
-    async def initialize(self) -> bool:
+    async def initialize(self,
+                         parsl: Optional[dict] = None) -> bool:
         """
         Initialize MDAgent components.
 
@@ -117,7 +118,6 @@ class MDAgentAdapter:
             return False
 
         try:
-            self.logger.info('trying to import MDAgent package')
             # Import MDAgent components
             # Note: MDAgent should be installed and available in Python path
             # The agents are defined in agents.py at the root of MDAgent repo
@@ -133,7 +133,6 @@ class MDAgentAdapter:
                 self.initialized = False
                 return False
 
-            self.logger.info('survived import')
             # Create Academy manager using async context manager pattern
             # This ensures the exchange client is properly initialized
             self.manager = await Manager.from_exchange_factory(
@@ -143,8 +142,11 @@ class MDAgentAdapter:
 
             # Enter the manager context to initialize exchange client
             await self.manager.__aenter__()
-
-            self.logger.info('launching handles')
+            
+            parsl_config = self.parsl_config
+            if parsl is not None:
+                for k, v in parsl.values():
+                    parsl_config[k] = v
 
             # Launch MDAgent components
             self.builder_handle = await self.manager.launch(
@@ -157,7 +159,7 @@ class MDAgentAdapter:
                     ImplicitSimulator, Simulator
                 )
             )
-            self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
+            self.parsl_settings = LocalSettings(parsl_config).config_factory(Path.cwd())
 
             self.logger.info('launching coordinator')
             self.coordinator_handle = await self.manager.launch(

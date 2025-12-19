@@ -49,8 +49,15 @@ class ChaiAgent:
             from bindcraft.core.folding import Chai
             from parsl import Config
             from ...utils.parsl_settings import LocalSettings
+            
+            parsl_config = self.parsl_config
 
-            self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
+            if 'parsl' in data:
+                parsl = data.pop('parsl')
+                for k, v in parsl.values():
+                    parsl_config[k] = v
+            
+            parsl_settings = LocalSettings(**parsl_config).config_factory(Path.cwd())
             
             cwd = data.get('cwd', None)
             if cwd is None:
@@ -85,7 +92,7 @@ class ChaiAgent:
                 self.coordinator = await self.manager.launch(
                     ForwardFoldingAgent,
                     args=(chai,
-                          self.parsl_settings,
+                          parsl_settings,
                          ),
                 )
 

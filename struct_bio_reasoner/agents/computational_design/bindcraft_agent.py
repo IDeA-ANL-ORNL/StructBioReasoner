@@ -53,7 +53,8 @@ class BindCraftAgent:
         #if 'target_sequence' not in self.bindcraft_config:
         #    raise AttributeError('`target_sequence` not defined in config!')
 
-    async def initialize(self):
+    async def initialize(self,
+                         parsl: Optional[dict] = None):
         """
         Initialize BindCraft components.
 
@@ -68,8 +69,14 @@ class BindCraftAgent:
             from bindcraft.util.quality_control import SequenceQualityControl
             from parsl import Config
             from ...utils.parsl_settings import LocalSettings
+            
+            parsl_config = self.parsl_config
+            
+            if parsl is not None:
+                for k, v in parsl.values():
+                    parsl_config[k] = v
 
-            self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
+            parsl_settings = LocalSettings(parsl_config).config_factory(Path.cwd())
 
             cwd = Path(self.config.get('cwd', os.getcwd()))
             cwd.mkdir(exist_ok=True)
@@ -141,7 +148,7 @@ class BindCraftAgent:
                           proteinmpnn,
                           energy_alg,
                           qc_alg,
-                          self.parsl_settings,
+                          parsl_settings,
                           if_kwargs['num_seq'], 
                           if_kwargs['max_retries'],
                           -10.,
@@ -162,9 +169,10 @@ class BindCraftAgent:
         
         return True
 
-    async def is_ready(self) -> bool:
+    async def is_ready(self,
+                       parsl: Optional[dict] = None) -> bool:
         if not hasattr(self, 'initialized'):
-            await self.initialize()
+            await self.initialize(parsl)
         return self.initialized
 
     async def cleanup(self):
@@ -203,7 +211,12 @@ class BindCraftAgent:
     async def generate_binder_hypothesis(self, 
                                          data: dict[str, Any]) -> Optional[ProteinHypothesis]:
         """"""
-        if not await self.is_ready():
+        if 'parsl' in data:
+            parsl = data.pop('parsl')
+        else:
+            parsl = None
+
+        if not await self.is_ready(parsl):
             self.logger.error('BindCraft agent not ready')
             return None
 

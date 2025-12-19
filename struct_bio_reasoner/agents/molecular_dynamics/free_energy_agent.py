@@ -102,7 +102,8 @@ class FEAgent:
         
         self.logger.info(f"FEAgent initialized")
 
-    async def initialize(self) -> bool:
+    async def initialize(self,
+                         parsl: Optional[dict] = None) -> bool:
         """
         Initialize FEAgent components.
 
@@ -143,12 +144,17 @@ class FEAgent:
             # Enter the manager context to initialize exchange client
             await self.manager.__aenter__()
 
+            parsl_config = self.parsl_config
+            if parsl is not None:
+                for k, v in parsl.values():
+                    parsl_config[k] = v
+
             # worker_init, nodes, max_workers_per_node, cores_per_worker
-            self.parsl_settings = LocalCPUSettings(**self.parsl_config).config_factory(Path.cwd())
+            parsl_settings = LocalCPUSettings(parsl_config).config_factory(Path.cwd())
 
             self.coordinator_handle = await self.manager.launch(
                 FECoordinator,
-                args=(self.parsl_settings,),
+                args=(parsl_settings,),
             )
 
             self.initialized = True
@@ -170,7 +176,8 @@ class FEAgent:
     async def run_calculations(self,
                                sim_path: Union[Path, list[Path]],
                                protein_name: str = "unknown",
-                               custom_sim_kwargs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                               custom_sim_kwargs: Optional[Dict[str, Any]] = None,
+                               parsl: Optional[dict] = None) -> Dict[str, Any]:
         """
         Run complete MD simulation using FEAgent coordinator.
 
@@ -183,7 +190,7 @@ class FEAgent:
         Returns:
             Simulation results dictionary
         """
-        if not await self.is_ready():
+        if not await self.is_ready(parsl):
             self.logger.error("FEAgent adapter not ready")
             return {}
         
@@ -250,9 +257,10 @@ class FEAgent:
 
         return fe_kwargss
 
-    async def is_ready(self) -> bool:
+    async def is_ready(self,
+                       parsl: Optional[dict] = None) -> bool:
         if not hasattr(self, 'initialized'):
-            await self.initialize()
+            await self.initialize(parsl)
         return self.initialized
 
     def format_for_cpptraj(self,
@@ -354,10 +362,16 @@ class FEAgent:
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> EnergeticAnalysis:
         paths = task_params['simulation_paths']
+        if 'parsl' in task_params:
+            parsl = task_params.pop('parsl')
+        else:
+            parsl = None
+
         energies = await self.run_calculations( 
-                               sim_path = paths,
-                               protein_name = "unknown",
-                            )
+            sim_path = paths,
+            protein_name = "unknown",
+            parsl = parsl
+        )
 
         analysis = EnergeticAnalysis(
             protein_id='',
