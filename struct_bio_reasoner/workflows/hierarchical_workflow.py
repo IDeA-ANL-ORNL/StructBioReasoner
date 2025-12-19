@@ -126,9 +126,10 @@ class HierarchicalBinderWorkflow:
         logger.info("✓ HiPerRAG strategy obtained")
         
         # Initialize workflow state
-        seed_binder = None
+        #seed_binder = None
         active_managers = [f"manager_{i}" for i in range(self.num_managers)]
-        
+        # I want a seed binder for each manager in a dictionry
+        seed_binders = {f"manager_{i}": None for i in range(self.num_managers)}
         # Execute rounds
         for round_num in range(1, self.max_rounds + 1):
             self.current_round = round_num
@@ -157,9 +158,11 @@ class HierarchicalBinderWorkflow:
             active_managers = lifecycle_decisions['continue']
             
             # Select best binder for next round
+            # Need a separate seed binder for each manager, dont want a global best binder
             best_binder_result = await self.executive_handle.select_best_binder(
                 round_results['manager_results']
             )
+            # update this!!!!!
             seed_binder = best_binder_result['binder']
             
             # Update overall best
