@@ -354,6 +354,7 @@ class BinderDesignSystem(JnanaSystem):
                         config=rag_config,
                         model_manager = self.model_manager
                     )
+                    await self.design_agents['rag'].initialize()
                     self.logger.info("RAG agent initialized")
                 except Exception as e:
                     self.logger.warning(f"Failed to initialize RAG agent: {e}")
