@@ -51,8 +51,9 @@ class RAGPromptManager():
     target_prot: str
     prompt_type: str
     def __post_init__(self):
-        self.prompt_r = self.running_prompt()
-        self.prompt_c = self.conclusion_prompt()
+        pass
+        #self.prompt_r = self.running_prompt()
+        #self.prompt_c = self.conclusion_prompt()
     def running_prompt(self):
     # Use Jnana's LLM to generate optimal prompt for HiPerRAG
         if self.prompt_type == 'interactome':
@@ -115,12 +116,12 @@ class BindCraftPromptManager():
             self.top_binders = self.input_json.get('top_binders', {})#dict(sorted(self.input_json['all_cycles'][self.num_rounds].items(), key=lambda x: x[1]['energy'])[:5])
             if self.top_binders == {}:
                 self.top_binders == 'No top binders'
-            self.prompt_c = self.conclusion_prompt()
+            #self.prompt_c = self.conclusion_prompt()
 
         elif self.prompt_type == 'running':
             self.previous_run_type = self.input_json.get('previous_run_type', 'bindcraft')
             self.recommendation = self.input_json.get('recommendation', None)
-            self.prompt_r = self.running_prompt()
+            #self.prompt_r = self.running_prompt()
     def running_prompt(self):
         # Serialize history for better LLM readability
         decisions_str = json.dumps(self.history['decisions'], indent=2, default=str) if self.history['decisions'] else 'No history'
@@ -225,10 +226,10 @@ class CHAIPromptManager():
     def __post_init__(self):
         self.prompt_c = None
         self.prompt_r = None
-        if self.prompt_type == 'conclusion':
-            self.prompt_c = self.conclusion_prompt()
-        elif self.prompt_type == 'running':
-            self.prompt_r = self.running_prompt()
+        #if self.prompt_type == 'conclusion':
+        #    self.prompt_c = self.conclusion_prompt()
+        #elif self.prompt_type == 'running':
+        #    self.prompt_r = self.running_prompt()
 
     def running_prompt(self):
         # Serialize input_json to a formatted string for better LLM readability
@@ -285,7 +286,7 @@ class MDPromptManager():
     history : dict
     num_history: int = 3
     def __post_init__(self):
-        self.prompt_c = self.conclusion_prompt()
+        self.prompt_c = None #self.conclusion_prompt()
         self.prompt_r = None
     def running_prompt(self):
         pass

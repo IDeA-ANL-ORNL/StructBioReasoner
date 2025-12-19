@@ -365,7 +365,7 @@ class HierarchicalBinderWorkflow:
         folding_agent = self.binder_system.design_agents.get('structure_prediction')
         md_agent = self.binder_system.design_agents.get('molecular_dynamics')
         self.target_name = self.binder_system._extract_target_name(self.research_goal)
-        self.target_seq = self.binder_system._extract_target_seq(self.research_goal)
+        self.target_seq = self.binder_system._extract_target_sequence(self.research_goal)
         if not rag_agent:
             raise ValueError("RAG agent not available in binder system")
 

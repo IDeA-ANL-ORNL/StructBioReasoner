@@ -86,6 +86,7 @@ class ExecutiveAgent(Agent):
         logger.info("Querying HiPerRAG for initial strategy...")
         
         # Construct RAG prompt for strategic guidance
+        self.rag_prompt_manager.running_prompt()
         rag_prompt = self.llm.generate(prompt = self.rag_prompt_manager.prompt_r,
                                     temperature = 0.3,
                                     max_tokens = 32678)
