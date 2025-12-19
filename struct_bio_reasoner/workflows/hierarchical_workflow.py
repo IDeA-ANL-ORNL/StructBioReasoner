@@ -25,6 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 from ..agents.executive.executive_agent import ExecutiveAgent
 from ..agents.manager.manager_agent import ManagerAgent
 from ..core.binder_design_system import BinderDesignSystem
+from ..utils.llm_interface import alcfLLM
 
 logger = logging.getLogger(__name__)
 
@@ -360,7 +361,7 @@ class HierarchicalBinderWorkflow:
             ExecutiveAgent,
             args=(
                 rag_agent.rag_coord,  # RAG handle
-                self.binder_system.prompt_gen_llm,  # LLM interface
+                alcfLLM(),  # LLM interface
                 self.total_nodes,  # Total compute nodes
                 {}  # Config
             )
@@ -388,7 +389,7 @@ class HierarchicalBinderWorkflow:
                         manager_id,
                         resource_allocation[manager_id],
                         worker_handles,
-                        self.binder_system.prompt_gen_llm,
+                        alcfLLM(),
                         {}  # Config
                     )
                 )
