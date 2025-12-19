@@ -113,11 +113,13 @@ class ManagerAgent(Agent):
             raise ValueError("Folding worker not available")
         
         # Execute folding (assuming Chai agent has a fold_protein action)
-        # TODO: what agent is this going to? 
-        result = await folding_handle.fold_protein(  
-            sequence=params['sequence'],
-            target_sequence=params.get('target_sequence'),
-            device=params.get('device', 'cuda:0')
+        # TODO: what agent is this going to? ForwardFoldingAgent? 
+        result = await folding_handle.fold_sequences(
+            sequences=params['sequences'],
+            names=params['names']
+            constraints=params['constraints']
+            #target_sequence=params.get('target_sequence'),
+            #device=params.get('device', 'cuda:0')
         )
         
         # Store results
@@ -155,10 +157,10 @@ class ManagerAgent(Agent):
             #   simulation_paths: list[str]
             #   root_output_path: str
 
-            pdb_path=params['pdb_path'],
-            timesteps=params.get('timesteps', 1000000),
-            temperature=params.get('temperature', 300),
-            solvent=params.get('solvent', 'implicit')
+            #pdb_path=params['pdb_path'],
+            #timesteps=params.get('timesteps', 1000000),
+            #temperature=params.get('temperature', 300),
+            #solvent=params.get('solvent', 'implicit')
         )
         
         # Store results
