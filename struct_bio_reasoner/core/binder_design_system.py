@@ -126,7 +126,7 @@ class BinderDesignSystem(JnanaSystem):
         
         # Protein-specific configuration
         self.enable_tools = enable_tools or []
-        self.enable_agents = enable_agents or ['computational_design', 'molecular_dynamics', 'structure_prediction']
+        self.enable_agents = enable_agents or ['computational_design', 'molecular_dynamics', 'structure_prediction', 'rag', 'free_energy']
         self.knowledge_graph_enabled = knowledge_graph
         self.literature_processing_enabled = literature_processing
         
