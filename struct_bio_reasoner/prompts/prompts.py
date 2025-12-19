@@ -82,6 +82,7 @@ class RAGPromptManager():
                  - binder_sequence: string
                   - rationale: string """ 
 
+        self.prompt_r = prompt_optimization_request
         return prompt_optimization_request
     def conclusion_prompt(self):
        prompt =f""" Using hiper-rag output {self.input_json} clean up and return as json with the following information cleanly: 
@@ -90,6 +91,7 @@ class RAGPromptManager():
        - cancer_pathway: string
        - interaction_type: string (e.g., "direct binding", "complex formation")
        - therapeutic_rationale: string""" 
+       self.prompt_c = prompt
        return prompt
 
 @dataclass
@@ -159,6 +161,7 @@ class BindCraftPromptManager():
         4. Return ONLY the JSON configuration, no additional text
 
         Generate the configuration now:"""
+        self.prompt_r = prompt
         return prompt
 
     def conclusion_prompt(self):
@@ -207,6 +210,7 @@ class BindCraftPromptManager():
 
         NOTE: This is a RECOMMENDATION only. The actual configuration will be generated in a separate step.
         """
+        self.prompt_c = prompt
         return prompt
 
 
@@ -248,6 +252,7 @@ class CHAIPromptManager():
         {config_str}
 
         Include only sequence for target {self.target_prot} and sequence for interacting partner."""
+        self.prompt_r = prompt
         return prompt
 
     def conclusion_prompt(self):
@@ -268,6 +273,7 @@ class CHAIPromptManager():
         Please provide your decision and reasoning and include the paths of the structures to keep in the format:
         {config_str}
         Also include the root_output_path and steps for the simulation. Right now we are running some short simulations (100000 steps) to test the waters."""
+        self.prompt_c = prompt
         return prompt
     
 @dataclass
@@ -312,6 +318,8 @@ class MDPromptManager():
         There are a few very important items to consider encoded here:
             {self.history['key_items']}
             Please provide your decision and reasoning."""
+        self.prompt_c = prompt
+        return prompt
 
 @dataclass
 class FreeEnergyPromptManager():

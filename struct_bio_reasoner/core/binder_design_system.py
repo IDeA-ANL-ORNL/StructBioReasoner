@@ -487,6 +487,56 @@ class BinderDesignSystem(JnanaSystem):
         self.target_prot=""
         return ""
 
+    def _extract_target_name(self, research_goal: str) -> str:
+        """
+        Extract target name from research goal text.
+
+        Looks for patterns like:
+        - "Target name: NMNAT-2"
+        - "target: MKTAYIAK..."
+        - Amino acid sequences in the text
+
+        Args:
+            research_goal: The research goal text
+
+        Returns:
+            Extracted target name or empty string if not found
+        """
+        import re
+
+        # Pattern 1: Explicit "Target sequence:" or "target sequence:"
+        pattern1 = r'[Tt]arget\s+[Nn]ame:\s*([A-Z]{26,})'
+        match = re.search(pattern1, research_goal)
+        if match:
+            seq = match.group(1).strip()
+            self.logger.info(f"Extracted target name (pattern 1): {seq[:50]}...")
+            self.target_prot_name=seq
+            return seq
+
+        # Pattern 2: Just "target:" followed by sequence
+        pattern2 = r'[Tt]arget:\s*([A-Z]{20,})'
+        match = re.search(pattern2, research_goal)
+        if match:
+            seq = match.group(1).strip()
+            self.logger.info(f"Extracted target sequence (pattern 2): {seq[:50]}... ({len(seq)} residues)")
+            self.target_prot_name=seq
+            return seq
+
+        # Pattern 3: Any long amino acid sequence (20+ residues)
+        # Only use standard amino acid letters
+        pattern3 = r'\b([ABCDEFGHIJKLMNOPQRSTUVWXYZ]{20,})\b'
+        match = re.search(pattern3, research_goal)
+        if match:
+            seq = match.group(1).strip()
+            self.logger.info(f"Extracted target sequence (pattern 3): {seq[:50]}... ({len(seq)} residues)")
+            self.target_prot_name=seq
+            return seq
+
+        # If no sequence found, log warning
+        self.logger.warning("No target name found in research goal")
+        self.target_prot_name=""
+        return ""
+
     def _extract_binder_sequence(self, research_goal: str) -> str:
         """
         Extract binder sequence from research goal text (optional).

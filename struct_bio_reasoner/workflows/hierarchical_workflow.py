@@ -43,6 +43,7 @@ class HierarchicalBinderWorkflow:
     def __init__(self,
                  config_path: str,
                  jnana_config_path: str,
+                 research_goal: str,
                  total_compute_nodes: int = 50,
                  num_managers: int = 5,
                  max_rounds: int = 3):
@@ -61,7 +62,7 @@ class HierarchicalBinderWorkflow:
         self.total_nodes = total_compute_nodes
         self.num_managers = num_managers
         self.max_rounds = max_rounds
-        
+        self.research_goal = research_goal
         # System components
         self.binder_system: Optional[BinderDesignSystem] = None
         self.academy_manager: Optional[Manager] = None
@@ -119,6 +120,7 @@ class HierarchicalBinderWorkflow:
         logger.info("="*80)
         
         # Set research goal in binder system
+        self.research_goal = research_goal
         session_id = await self.binder_system.set_research_goal(research_goal)
         logger.info(f"Research goal set (session: {session_id})")
         
@@ -126,8 +128,15 @@ class HierarchicalBinderWorkflow:
         rag_strategy = await self.executive_handle.query_hiper_rag(research_goal)
         logger.info("✓ HiPerRAG strategy obtained")
         
+        fold_results = await self.executive_handle.fold_interactome()
+        logger.info(f'Interactome Folding obtained')
+        sim_results = await self.executive_handle.sim_interactome()
+        logger.info(f'Interactome Simulations obtained')
         # Initialize workflow state
         #seed_binder = None
+        '''
+        We want an initial run for all managers to fold + simulate the interactome results from hiper-rag
+        '''
         active_managers = [f"manager_{i}" for i in range(self.num_managers)]
         # I want a seed binder for each manager in a dictionry
         seed_binders = {f"manager_{i}": None for i in range(self.num_managers)}
@@ -353,6 +362,10 @@ class HierarchicalBinderWorkflow:
         """Launch the Executive Agent."""
         # Get RAG handle from binder system
         rag_agent = self.binder_system.design_agents.get('rag')
+        folding_agent = self.binder_system.design_agents.get('structure_prediction')
+        md_agent = self.binder_system.design_agents.get('molecular_dynamics')
+        self.target_name = self.binder_system._extract_target_name(self.research_goal)
+        self.target_seq = self.binder_system._extract_target_seq(self.research_goal)
         if not rag_agent:
             raise ValueError("RAG agent not available in binder system")
 
@@ -360,7 +373,12 @@ class HierarchicalBinderWorkflow:
         self.executive_handle = await self.academy_manager.launch(
             ExecutiveAgent,
             args=(
+                self.research_goal,
+                self.target_name,
+                self.target_seq,
                 rag_agent,#.rag_coord,  # RAG handle
+                folding_agent,
+                md_agent,
                 alcfLLM(),  # LLM interface
                 self.total_nodes,  # Total compute nodes
                 {}  # Config

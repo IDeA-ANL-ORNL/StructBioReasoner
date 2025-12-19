@@ -20,6 +20,8 @@ from academy.handle import Handle
 from academy.exchange import LocalExchangeFactory
 from academy.manager import Manager
 from concurrent.futures import ThreadPoolExecutor
+from struct_bio_reasoner.prompts.prompts import get_prompt_manager, config_master
+from struct_bio_reasoner.utils.uniprot_api import fetch_uniprot_sequence
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,12 @@ class ExecutiveAgent(Agent):
     """
     
     def __init__(self, 
+                 research_goal: str,
+                 target_name: str,
+                 target_seq: str,
                  rag_handle: Handle,
+                 fold_handle: Handle,
+                 sim_handle: Handle,
                  llm_interface,
                  total_compute_nodes: int,
                  config: Dict[str, Any]):
@@ -47,10 +54,18 @@ class ExecutiveAgent(Agent):
             config: Executive configuration
         """
         self.rag_handle = rag_handle
+        self.fold_handle = fold_handle
+        self.sim_handle = sim_handle
         self.llm = llm_interface
         self.total_nodes = total_compute_nodes
         self.config = config
+        self.target_name = target_name
+        self.target_seq = target_seq
+        self.rag_prompt_manager = get_prompt_manager('rag', research_goal, {}, target_prot = self.target_name, prompt_type = 'interactome', history = [], num_history = 3) 
         
+        self.folding_prompt_manager = get_prompt_manager('structure_prediction', research_goal, {}, target_prot = self.target_seq, prompt_type = 'running', history = [], num_history = 3)
+
+        self.md_prompt_manager = get_prompt_manager('molecular_dynamics', research_goal, {}, target_prot = self.target_seq, prompt_type = 'interactome_simulation', history = [], num_history = 3)
         # Track managers and their allocations
         self.managers: Dict[str, Dict[str, Any]] = {}
         self.round_history: List[Dict[str, Any]] = []
@@ -71,28 +86,53 @@ class ExecutiveAgent(Agent):
         logger.info("Querying HiPerRAG for initial strategy...")
         
         # Construct RAG prompt for strategic guidance
-        rag_prompt = f"""
-        Research Goal: {research_goal}
-        
-        Based on the scientific literature, provide strategic guidance for:
-        1. Key protein-protein interactions to target
-        2. Recommended binder scaffolds (affibody, nanobody, etc.)
-        3. Critical residues or hotspots to focus on
-        4. Simulation strategies for validation
-        5. Design strategies that have worked for similar targets
-        
-        Provide specific, actionable recommendations."""
-        
-        # Query RAG agent
-        #rag_response = await self.rag_handle.rag_with_model(rag_prompt)
+        rag_prompt = self.llm.generate(prompt = self.rag_prompt_manager.prompt_r,
+                                    temperature = 0.3,
+                                    max_tokens = 32678)
+
         rag_response = await self.rag_handle.generate_rag_hypothesis({'prompt': rag_prompt})
-        logger.info("RAG strategy received")
+        logger.info(f"RAG strategy received: {rag_response}")
+        self.rag_prompt_manager.input_json = rag_response
+        rag_conclusion = self.rag_prompt_manager.conclusion_prompt()
+        rag_result_json = self.llm.generate_with_json_output(
+                            prompt = rag_conclusion,
+                            json_schema = config_master['rag_output'],
+                            temperature = 0.3,
+                            max_tokens = 32678)
+        sequences = [await fetch_uniprot_sequence(id) for id in rag_result_json['interacting_protein_uniprot_ids']]
+        rag_result_json['sequences'] = [s['sequence'] for s in sequences]
+        self.folding_prompt_manager.input_json = rag_result_json 
+        self.folding_prompt_manager.running_prompt()
         return {
             "research_goal": research_goal,
-            "rag_strategy": rag_response,
+            "rag_strategy": rag_result_json,
             "timestamp": datetime.now().isoformat()
         }
     
+    @action
+    async def fold_interactome(self):
+        folding_input = self.llm.generate_with_json_output(
+                            prompt = self.folding_prompt_manager.prompt_r,
+                            json_schema = config_master['structure_prediction'],
+                            temperature = 0.3,
+                            max_tokens = 32678) [0]
+        folding_output = await self.fold_handle.analyze_hypothesis({}, folding_input) 
+        self.folding_prompt_manager.input_json = folding_output
+        self.folding_prompt_manager.conclusion_prompt()
+        return folding_output
+    @action
+    async def sim_interactome(self):
+        mdinput = self.llm.generate_with_json_output(
+                        prompt = self.folding_prompt_manager.prompt_c,
+                        json_schema = config_master['molecular_dynamics'],
+                        temperature = 0.3,
+                        max_tokens = 32678)[0]
+        if True:
+            md_output = await self.fold_handle.analyze_hypothesis({}, mdinput)
+        self.md_prompt_manager.input_json = md_output
+        self.md_prompt_manager.conclusion_prompt()
+        self.logger.info(self.md_prompt_manager.prompt_c)
+        return md_output
     @action
     async def allocate_resources(self, 
                                  manager_ids: List[str],
