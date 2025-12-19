@@ -168,19 +168,10 @@ class TrajectoryAnalysisAgent:
         return {
             "agent_type": self.agent_type,
             "specialization": self.specialization,
-            "supported_solvent_models": ["implicit", "explicit"],
-            "supported_force_fields": ["amber14", "charmm36"],
-            "supported_water_models": ["tip3p", "tip4p", "spce"],
             "capabilities": [
-                "system_building",
-                "md_simulation",
-                "implicit_solvent",
-                "explicit_solvent",
-                "equilibration",
-                "production_runs"
+                "analysis"
             ],
             "integration_features": [
-                "hypothesis_generation",
                 "result_analysis",
                 "trajectory_processing"
             ]
@@ -198,8 +189,6 @@ class TrajectoryAnalysisAgent:
                     self.logger.warning(f"Error exiting manager context: {e}")
                 finally:
                     self.manager = None
-                    self.builder_handle = None
-                    self.simulator_handle = None
                     self.coordinator_handle = None
                     delattr(self, 'initialized')
 

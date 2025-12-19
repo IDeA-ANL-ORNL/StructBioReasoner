@@ -17,7 +17,7 @@ from .structural.structural_agent import StructuralAnalysisAgent
 from .evolutionary.conservation_agent import EvolutionaryConservationAgent
 from .energetic.energy_agent import EnergeticAnalysisAgent
 from .design.mutation_agent import MutationDesignAgent
-from .molecular_dynamics.md_agent import MolecularDynamicsAgent
+from .molecular_dynamics.mdagent_adapter import MDAgentAdapter
 from .generative_design.rfdiffusion_agent import RFDiffusionAgent
 from .computational_design.rosetta_agent import RosettaAgent
 from .structure_prediction.alphafold_agent import AlphaFoldAgent

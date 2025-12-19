@@ -19,7 +19,7 @@ from .agents.structural.structural_agent import StructuralAnalysisAgent
 from .agents.evolutionary.conservation_agent import EvolutionaryConservationAgent
 from .agents.energetic.energy_agent import EnergeticAnalysisAgent
 from .agents.design.mutation_agent import MutationDesignAgent
-from .agents.molecular_dynamics.md_agent import MolecularDynamicsAgent
+from .agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
 
 # Tool imports
 from .tools.pymol_wrapper import PyMOLWrapper
