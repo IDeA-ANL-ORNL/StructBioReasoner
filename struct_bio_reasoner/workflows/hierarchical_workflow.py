@@ -360,7 +360,7 @@ class HierarchicalBinderWorkflow:
         self.executive_handle = await self.academy_manager.launch(
             ExecutiveAgent,
             args=(
-                rag_agent.rag_coord,  # RAG handle
+                rag_agent,#.rag_coord,  # RAG handle
                 alcfLLM(),  # LLM interface
                 self.total_nodes,  # Total compute nodes
                 {}  # Config

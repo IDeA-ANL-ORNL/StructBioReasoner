@@ -84,8 +84,8 @@ class ExecutiveAgent(Agent):
         Provide specific, actionable recommendations."""
         
         # Query RAG agent
-        rag_response = await self.rag_handle.rag_with_model(rag_prompt)
-        
+        #rag_response = await self.rag_handle.rag_with_model(rag_prompt)
+        rag_response = await self.rag_handle.generate_rag_hypothesis({'prompt': rag_prompt})
         logger.info("RAG strategy received")
         return {
             "research_goal": research_goal,
