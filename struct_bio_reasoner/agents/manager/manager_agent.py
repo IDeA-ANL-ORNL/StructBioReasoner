@@ -343,7 +343,6 @@ You are a Manager agent coordinating a binder design campaign.
 Current State:
 - Structures generated: {len(self.current_structures)}
 - Simulations completed: {len(self.simulation_results)}
-- Clustering done: {self.cluster_results is not None}
 - Hotspots identified: {self.hotspot_results is not None}
 - Binders designed: {len(self.binder_designs)}
 - Tasks completed: {self.tasks_completed}

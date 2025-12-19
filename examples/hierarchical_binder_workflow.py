@@ -60,8 +60,8 @@ async def main():
     workflow = HierarchicalBinderWorkflow(
         config_path="config/binder_config.yaml",
         jnana_config_path="config/jnana_config.yaml",
-        total_compute_nodes=50,  # Total nodes available
-        num_managers=5,          # Number of parallel campaigns
+        total_compute_nodes=6,  # Total nodes available
+        num_managers=3,          # Number of parallel campaigns
         max_rounds=3             # Maximum rounds to execute
     )
     

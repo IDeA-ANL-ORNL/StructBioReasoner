@@ -208,3 +208,31 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **🧬 Ready to revolutionize protein engineering with AI? Get started with StructBioReasoner today!** 🚀
+
+Ideas
+- Hierarchical reasoner workflow
+- Sub agents going off at the same time:
+e.g. the reasoner can spawn off a 'naive design' task while it also begins hiper-rag to introduce the interactome
+and then we need to compare the interactome stuff to the naive design to see if we need to add constraints to bias towards certain binding sites
+    - constraints not tested yet
+
+- Run an initial interactome screen with 1 reasoner
+    - Folding -> simulations -> clustering -> hotspots
+- Main reasoner spins out sub-reasoner for each hotspot
+so like this:
+Executor -> Hotspot determination -> List of sub reasoners based on # of hotspots -> Decide biner design workflow step by step, give number of nodes per task needed with the reasoner 
+- Test academy integration for the reasoner
+- Executor -> academy -> parsl -> sub-reasoners -> any task -> -> 
+    - sub-reasoner -> message -> executor -> executive decision
+- CEO -> managerr -> worker
+- message passing: worker -> manager -> CEO
+- CEO and manager are the same api but have different prompts to direct what to do
+- one new directory:
+reasoner/...
+- reasoner file
+prompts/
+- prompts
+    executive
+    manager
+
+while 
