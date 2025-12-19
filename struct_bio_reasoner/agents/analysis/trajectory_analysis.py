@@ -46,7 +46,8 @@ class TrajectoryAnalysisAgent:
         # Load parsl kwargs
         self.parsl_config = parsl_config
         
-    async def initialize(self) -> bool:
+    async def initialize(self,
+                         parsl: Optional[dict] = None) -> bool:
         """
         Initialize MDAgent components.
 
@@ -65,7 +66,12 @@ class TrajectoryAnalysisAgent:
         # Enter the manager context to initialize exchange client
         await self.manager.__aenter__()
 
-        self.parsl_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
+        parsl_config = self.parsl_config
+        if parsl is not None:
+            for k, v in parsl.values():
+                parsl_config[k] = v
+
+        self.parsl_settings = LocalSettings(**parsl_config).config_factory(Path.cwd())
 
         self.coordinator_handle = await self.manager.launch(
             AnalysisCoordinator,
@@ -91,7 +97,12 @@ class TrajectoryAnalysisAgent:
         Returns:
             Simulation results dictionary
         """
-        if not await self.is_ready():
+        if 'parsl' in analysis_schedule:
+            parsl = analysis_schedule.pop('parsl')
+        else:
+            parsl = None
+
+        if not await self.is_ready(parsl):
             self.logger.error("Analysis agent not ready")
             return {}
         
@@ -229,9 +240,10 @@ class TrajectoryAnalysisAgent:
 
         return analysis
 
-    async def is_ready(self) -> bool:
+    async def is_ready(self,
+                       parsl: Optional[dict[str, Any]]=None) -> bool:
         if not hasattr(self, 'initialized'):
-            await self.initialize()
+            await self.initialize(parsl)
         return self.initialized
 
     def _calculate_confidence(self,
