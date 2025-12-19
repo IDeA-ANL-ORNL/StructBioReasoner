@@ -113,7 +113,8 @@ class ManagerAgent(Agent):
             raise ValueError("Folding worker not available")
         
         # Execute folding (assuming Chai agent has a fold_protein action)
-        result = await folding_handle.fold_protein(
+        # TODO: what agent is this going to? 
+        result = await folding_handle.fold_protein(  
             sequence=params['sequence'],
             target_sequence=params.get('target_sequence'),
             device=params.get('device', 'cuda:0')
@@ -144,7 +145,16 @@ class ManagerAgent(Agent):
             raise ValueError("Simulation worker not available")
         
         # Execute simulation
-        result = await md_handle.run_simulation(
+        result = await md_handle.analyze_hypothesis(
+            None,
+            params
+            # params should contain these keys:
+            #   simulation_time: int
+            #   solvent: 'implicit' or 'explicit'
+            #   steps: int (number of prod steps)
+            #   simulation_paths: list[str]
+            #   root_output_path: str
+
             pdb_path=params['pdb_path'],
             timesteps=params.get('timesteps', 1000000),
             temperature=params.get('temperature', 300),
@@ -176,10 +186,11 @@ class ManagerAgent(Agent):
             raise ValueError("Clustering worker not available")
 
         # Execute clustering
-        result = await cluster_handle.cluster_trajectories(
-            trajectory_paths=params['trajectory_paths'],
-            n_clusters=params.get('n_clusters', 5),
-            algorithm=params.get('algorithm', 'kmeans')
+        result = await cluster_handle.analyze_hypothesis(
+            None,
+            params
+            # params should contain these keys:
+            #   TODO: agent in dev
         )
 
         # Store results
@@ -207,10 +218,12 @@ class ManagerAgent(Agent):
             raise ValueError("Hotspot worker not available")
 
         # Execute hotspot analysis
-        result = await hotspot_handle.analyze_hotspots(
-            simulation_results=params['simulation_results'],
-            cluster_results=params.get('cluster_results'),
-            threshold=params.get('threshold', 0.7)
+        result = await hotspot_handle.analyze_hypothesis(
+            None,
+            params
+            # params should contain these keys:
+            #   TODO: agent in dev
+            #   
         )
 
         # Store results
@@ -238,11 +251,14 @@ class ManagerAgent(Agent):
             raise ValueError("Binder design worker not available")
 
         # Execute binder design
-        result = await design_handle.design_binder(
-            target_sequence=params['target_sequence'],
-            hotspot_residues=params.get('hotspot_residues', []),
-            scaffold_type=params.get('scaffold_type', 'affibody'),
-            num_designs=params.get('num_designs', 25)
+        result = await design_handle.analyze_hypothesis(
+            None, # no hypothesis
+            params
+            # params should contain these keys:
+            #   cwd,
+            #   target_sequence,
+            #   binder_sequence,
+            #   num_rounds
         )
 
         # Store results
