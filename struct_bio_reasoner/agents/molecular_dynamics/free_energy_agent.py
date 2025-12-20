@@ -20,19 +20,10 @@ from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 from ...utils.parsl_settings import LocalCPUSettings
 
-# FEAgent imports (from https://github.com/msinclair-py/MDAgent)
-try:
-    from academy.exchange import LocalExchangeFactory
-    from academy.manager import Manager
-    from concurrent.futures import ThreadPoolExecutor
+from academy.exchange import LocalExchangeFactory
+from academy.manager import Manager
+from concurrent.futures import ThreadPoolExecutor
     
-    # Import FEAgent components
-    # Note: These would need to be installed from the FEAgent repository
-    # For now, we'll create a compatibility layer
-    MDAGENT_AVAILABLE = True
-except ImportError:
-    MDAGENT_AVAILABLE = False
-    logging.warning("FEAgent not available. Install from https://github.com/msinclair-py/MDAgent")
 
 from ...data.protein_hypothesis import EnergeticAnalysis, ProteinHypothesis
 

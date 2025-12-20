@@ -1,7 +1,6 @@
 """
 Analysis agent for StructBioReasoner
 """
-
 import dill as pickle
 import asyncio
 import logging
@@ -36,8 +35,8 @@ class TrajectoryAnalysisAgent:
         self.agent_id = agent_id
         self.config = config.get('analysis', {})
 
-        self.agent_type = "analysis"
-        self.specialization = ""
+        self.agent_type = 'analysis'
+        self.specialization = ''
         self.logger = logging.getLogger(__name__)
         
         # MDAgent components (initialized in initialize())
