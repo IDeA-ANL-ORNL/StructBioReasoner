@@ -733,7 +733,7 @@ class BinderDesignSystem(JnanaSystem):
                 history=self.history,
                 num_history=self.num_history
                 )
-
+        prompt_manager.conclusion_prompt()
         #conclusion = f"After running bindcraft {results.num_rounds} rounds and generating {results.total_sequences} sequences total, {results.passing_structures} structures pass sequence and structure quality control. I want at least 200 passing structures before going to md simulations"
         self.logger.info(f"Conclusion after running {runtype}: {prompt_manager.prompt_c}")
         results_pass = {'run_type': runtype,

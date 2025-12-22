@@ -211,6 +211,8 @@ class BindCraftPromptManager():
 
         NOTE: This is a RECOMMENDATION only. The actual configuration will be generated in a separate step.
         """
+        logger.info('Bindcraft conclusion prompt')
+        logger.info(f'{prompt=}')
         self.prompt_c = prompt
         return prompt
 
