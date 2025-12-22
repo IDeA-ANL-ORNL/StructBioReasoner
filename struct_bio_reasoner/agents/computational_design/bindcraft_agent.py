@@ -15,8 +15,6 @@ from datetime import datetime
 
 from jnana.core.model_manager import UnifiedModelManager
 
-from ...data.protein_hypothesis import BinderAnalysis, ProteinHypothesis
-from ...core.base_agent import BaseAgent
 from bindcraft.core.coordinators import ParslDesignCoordinator
 from bindcraft.core.folding import ChaiBinder
 from bindcraft.core.inverse_folding import ProteinMPNN
@@ -64,6 +62,7 @@ class BindCraftAgent:
         """
         try:
             parsl_settings = AuroraSettings(**self.parsl_config).config_factory(Path.cwd())
+            local_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
 
             cwd = Path(self.config.get('cwd', os.getcwd()))
             cwd.mkdir(exist_ok=True)
@@ -136,7 +135,7 @@ class BindCraftAgent:
                           proteinmpnn,
                           energy_alg,
                           qc_alg,
-                          parsl_settings,
+                          local_settings,
                           if_kwargs['num_seq'], 
                           if_kwargs['max_retries'],
                           -10.,
@@ -149,12 +148,9 @@ class BindCraftAgent:
             self.logger.error(f'Cannot import BindCraft components: {e}')
             self.logger.info('Make sure BindCraft is installed and in PYTHONPATH')
             self.logger.info('Install from: https://github.com/msinclair-py/bindcraft/tree/agent_acad')
-            self.initialized = False
             return False
 
         self.logger.info(f'Successfully imported BindCraft components.')
-        self.initialized = True
-        
         return True
 
     async def cleanup(self):
@@ -167,7 +163,6 @@ class BindCraftAgent:
                     self.logger.warning(f'Error exiting manager context: {e}')
                 finally:
                     self.manager = None
-                    delattr(self, 'initialized')
 
             self.logger.info('BindCraft agent cleanup completed')
 
@@ -232,33 +227,36 @@ class BindCraftAgent:
         return top_dict
 
     async def run(self) -> dict:
-        result = await self.generate_binders()
+        if not await self.initialize():
+            return {}
+        else:
+            result = await self.generate_binders()
 
-        # Write result to file
-        all_cycles = result['all_cycles']
-        passing_structures = sum(
-            [len(all_cycles[i]['passing_structures']) for i in range(len(all_cycles))]
-        )
-        
-        total_sequences = result['total_sequences_generated']
+            # Write result to file
+            all_cycles = result['all_cycles']
+            passing_structures = sum(
+                [len(all_cycles[i]['passing_structures']) for i in range(len(all_cycles))]
+            )
+            
+            total_sequences = result['total_sequences_generated']
 
-        top_n_binders = await self.get_top_binders(all_cycles, n=5)
+            top_n_binders = await self.get_top_binders(all_cycles, n=5)
 
-        analysis = {
-            'protein_id': self.protein_id,
-            'num_rounds': result['rounds_completed'],
-            'total_sequences': total_sequences,
-            'passing_sequences': result['total_sequences_filtered'],
-            'top_binders': top_n_binders,
-            'success_rate': passing_structures  / total_sequences if total_sequences > 0 else 0.0
+            analysis = {
+                'protein_id': self.protein_id,
+                'num_rounds': result['rounds_completed'],
+                'total_sequences': total_sequences,
+                'passing_sequences': result['total_sequences_filtered'],
+                'top_binders': top_n_binders,
+                'success_rate': passing_structures  / total_sequences if total_sequences > 0 else 0.0
 
-        }
+            }
 
-        analysis['checkpoint_file'] = self.write_checkpoint(result) 
-        analysis['confidence_score'] = self._calculate_confidence(result)
-        analysis['tools_used'] = self._get_tools_used()
+            analysis['checkpoint_file'] = self.write_checkpoint(result) 
+            analysis['confidence_score'] = self._calculate_confidence(result)
+            analysis['tools_used'] = self._get_tools_used()
 
-        return analysis
+            return analysis
 
     def _calculate_confidence(self,
                               analysis: dict) -> float:

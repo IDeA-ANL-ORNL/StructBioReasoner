@@ -10,13 +10,12 @@ from typing import Dict, List, Optional, Any, Union
 import numpy as np
 from datetime import datetime
 
-from academy.exchange import LocalExchangeFactory
+from academy.exchange import LocalExchangeFactory, RedisExchangeFactory
 from academy.manager import Manager
+from academy.concurrent import ParslPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
+from MDAgent.analysis.analyzer_agent import AnalysisCoordinator
     
-from ...core.base_agent import BaseAgent
-from ...data.protein_hypothesis import SimAnalysis, ProteinHypothesis
-
 
 class TrajectoryAnalysisAgent:
     """
@@ -45,39 +44,33 @@ class TrajectoryAnalysisAgent:
         # Load parsl kwargs
         self.parsl_config = parsl_config
         
-    async def initialize(self,
-                         parsl: Optional[dict] = None) -> bool:
+    async def initialize(self):
         """
         Initialize MDAgent components.
 
         Returns:
             True if initialization successful, False otherwise
         """
-        from MDAgent.analysis.analyzer_agent import AnalysisCoordinator
+        parsl_settings = AuroraSettings(**self.parsl_config).config_factory(Path.cwd())
+        local_settings = LocalCPUSettings(**self.parsl_config).config_factory(Path.cwd())
 
+        executor = ParslPoolExecutor(parsl_settings)
         # Create Academy manager using async context manager pattern
         # This ensures the exchange client is properly initialized
         self.manager = await Manager.from_exchange_factory(
-            factory=LocalExchangeFactory(),
-            executors=ThreadPoolExecutor(),
+            factory=RedisExchangeFactory('localhost', 6379),
+            executors=executor,
         )
 
         # Enter the manager context to initialize exchange client
         await self.manager.__aenter__()
 
-        parsl_config = self.parsl_config
-        if parsl is not None:
-            for k, v in parsl.values():
-                parsl_config[k] = v
-
-        self.parsl_settings = LocalSettings(**parsl_config).config_factory(Path.cwd())
 
         self.coordinator_handle = await self.manager.launch(
             AnalysisCoordinator,
-            args=(self.parsl_settings)
+            args=(local_settings,),
         )
 
-        self.initialized = True
         self.logger.info("MDAgent components initialized successfully")
 
         return True
@@ -96,15 +89,6 @@ class TrajectoryAnalysisAgent:
         Returns:
             Simulation results dictionary
         """
-        if 'parsl' in analysis_schedule:
-            parsl = analysis_schedule.pop('parsl')
-        else:
-            parsl = None
-
-        if not await self.is_ready(parsl):
-            self.logger.error("Analysis agent not ready")
-            return {}
-        
         try:
             self.logger.info('Analyzing simulation results')
             # Analyze results and create structured output
@@ -189,50 +173,42 @@ class TrajectoryAnalysisAgent:
                 finally:
                     self.manager = None
                     self.coordinator_handle = None
-                    delattr(self, 'initialized')
 
             self.logger.info("Analysis agent cleanup completed")
 
         except Exception as e:
             self.logger.error(f"Analysis agent cleanup failed: {e}")
 
-    async def analyze_hypothesis(self,
-                                 hypothesis: ProteinHypothesis,
-                                 task_params: dict[str, Any]) -> SimAnalysis:
-        sim_results = await self.perform_analysis(
-            task_params
-        )
+    async def run(self) -> dict:
+        if not await self.initialize():
+            return {}
+        else:
+            sim_results = await self.perform_analysis()
 
-        confidence_score = self._calculate_confidence(sim_results)
-        tools_used = self._get_tools_used()
-        protein_id = task_params.get('protein_id', '')
+            confidence_score = self._calculate_confidence(sim_results)
+            tools_used = self._get_tools_used()
+            protein_id = task_params.get('protein_id', '')
 
-        if sim_results['static'] is not None:
-            analysis = StructureAnalysis()
+            if sim_results['static']  is not None:
+                analysis = {}
 
-        if sim_results['dynamic'] is not None:
-            if 'basic_simulation_analysis' in sim_results['dynamic'].keys():
-                summary = sim_results['dynamic']['basic_simulation_analysis']['summary']
-                analysis = SimAnalysis(
-                    protein_id=protein_id,
-                    simulation_time_in_ns=self.prod_steps * 4 / 1000000,
-                    rmsd=summary['rmsd'],
-                    rmsf=summary['rmsf'],
-                    rog=summary['rog']
-                )
-            if 'advanced_simulation_analysis' in sim_results['dynamic'].keys():
-                analysis = StructuralAnalysis(
-                    protein_id=protein_id,
-                    binding_sites=[],
-                )
+            if sim_results['dynamic'] is not None:
+                if 'basic_simulation_analysis' in sim_results['dynamic'].keys():
+                    summary = sim_results['dynamic']['basic_simulation_analysis']['summary']
+                    analysis = {
+                        'protein_id': protein_id,
+                        'simulation_time_in_ns': self.prod_steps * 4 / 1000000,
+                        'rmsd': summary['rmsd'],
+                        'rmsf': summary['rmsf'],
+                        'rog': summary['rog']
+                    }
+                if 'advanced_simulation_analysis' in sim_results['dynamic'].keys():
+                    analysis = {
+                        'protein_id': protein_id,
+                        'binding_sites': [],
+                    }
 
-        return analysis
-
-    async def is_ready(self,
-                       parsl: Optional[dict[str, Any]]=None) -> bool:
-        if not hasattr(self, 'initialized'):
-            await self.initialize(parsl)
-        return self.initialized
+            return analysis
 
     def _calculate_confidence(self,
                               analysis: SimAnalysis) -> float:

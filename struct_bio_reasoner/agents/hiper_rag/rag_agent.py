@@ -18,7 +18,7 @@ from parsl.launchers import MpiExecLauncher
 
 from academy.agent import Agent, action
 from academy.handle import Handle
-from academy.exchange import LocalExchangeFactory
+from academy.exchange import LocalExchangeFactory, RedisExchangeFactory
 from academy.manager import Manager
 from concurrent.futures import ThreadPoolExecutor
 

@@ -18,15 +18,15 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 import numpy as np
 from datetime import datetime
+from MDAgent.core.agents_no_FE import Builder, MDSimulator, MDCoordinator
+from molecular_simulations.build import ImplicitSolvent, ExplicitSolvent
+from molecular_simulations.simulate import ImplicitSimulator, Simulator
 
 from academy.exchange import LocalExchangeFactory, RedisExchangeFactory
 from academy.manager import Manager
 from academy.concurrent import ParslPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
     
-from ...core.base_agent import BaseAgent
-from ...data.protein_hypothesis import SimAnalysis, ProteinHypothesis
-
 
 class MDAgentAdapter:
     """
@@ -97,15 +97,11 @@ class MDAgentAdapter:
         Returns:
             True if initialization successful, False otherwise
         """
-        from MDAgent.core.agents_no_FE import Builder, MDSimulator, MDCoordinator
-        from molecular_simulations.build import ImplicitSolvent, ExplicitSolvent
-        from molecular_simulations.simulate import ImplicitSimulator, Simulator
-
         try:
             parsl_settings = AuroraSettings(**self.parsl_config).config_factory(Path.cwd())
+            local_settings = LocalSettings(**self.parsl_config).config_factory(Path.cwd())
 
             executor = ParslPoolExecutor(parsl_settings)
-
             # Create Academy manager using async context manager pattern
             # This ensures the exchange client is properly initialized
             self.manager = await Manager.from_exchange_factory(
@@ -130,7 +126,7 @@ class MDAgentAdapter:
 
             self.coordinator_handle = await self.manager.launch(
                 MDCoordinator,
-                args=(self.builder_handle, self.simulator_handle, parsl_settings)
+                args=(self.builder_handle, self.simulator_handle, local_settings)
             )
 
             self.initialized = True
@@ -259,11 +255,11 @@ class MDAgentAdapter:
             self.logger.error(f"MDAgent adapter cleanup failed: {e}")
 
     async def run(self) -> dict:
-        await self.initialize()
-
-        sim_results = await self.run_md_simulation()
-
-        return sim_results
+        if not await self.initialize():
+            return {}
+        else:
+            sim_results = await self.run_md_simulation()
+            return sim_results
 
     def _calculate_confidence(self,
                               analysis: SimAnalysis) -> float:

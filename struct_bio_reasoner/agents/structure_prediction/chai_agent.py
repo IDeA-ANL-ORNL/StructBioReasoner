@@ -1,5 +1,6 @@
-from academy.exchange import LocalExchangeFactory
+from academy.exchange import LocalExchangeFactory, RedisExchangeFactory
 from academy.manager import Manager
+from academy.concurrent import ParslPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
 import dill as pickle
 import asyncio
@@ -11,33 +12,42 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
-from ...data.protein_hypothesis import ProteinHypothesis, FoldAnalysis
+from bindcraft.core.agentic_parsl import ForwardFoldingAgent
+from bindcraft.core.folding import Chai
+from parsl import Config
+from ...utils.parsl_settings import AuroraSettings, LocalSettings
 from ...core.base_agent import BaseAgent
 
 class ChaiAgent:
     """"""
     def __init__(self, 
                  agent_id: str,
+                 experiment: dict[str, Any],
                  config: dict[str, Any],
                  parsl_config: dict[str, Any]):
         """"""
         self.agent_id = agent_id
+        
+        self.sequences = experiment['sequences']
+        self.names = experiment['names']
+        self.constraints = experiment['constraints']
+        
         self.config = config
         self.logger = logging.getLogger(__name__)
 
-        self.fasta_dir = Path(self.config.get('fasta_dir', 'fastas'))
-        self.fold_dir = Path(self.config.get('fold_dir', 'folds'))
+        self.cwd = Path(self.config.get('cwd', '.'))
+        self.fasta_dir = self.cwd / self.config.get('fasta_dir', 'fastas')
+        self.fold_dir = self.cwd / self.config.get('fold_dir', 'folds')
 
         self.capabilities = [
             'structure_prediction',
             'cofolding'
         ]
 
-        self.parsl_config = parsl_config #self.config.get('parsl', {})
+        self.parsl_config = parsl_config
         self.manager = None
 
-    async def initialize(self,
-                         data: dict[str, Any]):
+    async def initialize(self):
         """
         Initialize Chai components.
 
@@ -45,44 +55,26 @@ class ChaiAgent:
             True if initialization successful, False otherwise
         """
         try:
-            from bindcraft.core.agentic_parsl import ForwardFoldingAgent
-            from bindcraft.core.folding import Chai
-            from parsl import Config
-            from ...utils.parsl_settings import LocalSettings
+            parsl_settings = AuroraSettings(**self.parsl_config).config_factory(Path.cwd())
+            local_settings = LocalSettings(**self.parsl_config).config_facory(Path.cwd())
             
-            parsl_config = self.parsl_config
-
-            if 'parsl' in data:
-                parsl = data.pop('parsl')
-                for k, v in parsl.values():
-                    parsl_config[k] = v
-            
-            parsl_settings = LocalSettings(**parsl_config).config_factory(Path.cwd())
-            
-            cwd = data.get('cwd', None)
-            if cwd is None:
-                fasta_dir = self.fasta_dir
-                fold_dir = self.fold_dir
-            else:
-                fasta_dir = Path(cwd) / 'fastas'
-                fold_dir = Path(cwd) / 'folds'
-
-            fasta_dir.mkdir(exist_ok=True, parents=True)
-            fold_dir.mkdir(exist_ok=True, parents=True)
+            self.fasta_dir.mkdir(exist_ok=True, parents=True)
+            self.fold_dir.mkdir(exist_ok=True, parents=True)
 
             device = self.config.get('device', 'cuda:0')
 
             # Initialize algorithm instances with required parameters
             chai = Chai(
-                fasta_dir=fasta_dir,
-                out=fold_dir,
+                fasta_dir=self.fasta_dir,
+                out=self.fold_dir,
                 diffusion_steps=100,
                 device=device  # or 'cpu' if GPU not available
             )
-
+            
+            executor = ParslPoolExecutor(parsl_settings)
             self.manager = await Manager.from_exchange_factory(
-                factory=LocalExchangeFactory(),
-                executors=ThreadPoolExecutor(),
+                factory=RedisExchangeFactory('localhost', 6379),
+                executors=executor,
             )
 
             await self.manager.__aenter__()
@@ -92,30 +84,22 @@ class ChaiAgent:
                 self.coordinator = await self.manager.launch(
                     ForwardFoldingAgent,
                     args=(chai,
-                          parsl_settings,
+                          local_settings,
                          ),
                 )
 
             except Exception as e:
                 self.logger.exception("An error occurred with the ForwardFoldingAgent")
+
         except ImportError as e:
             self.logger.error(f'Cannot import Chai components: {e}')
             self.logger.info('Make sure Chai is installed and in PYTHONPATH')
             self.logger.info('Install from: https://github.com/msinclair-py/bindcraft/tree/agent_acad')
-            self.initialized = False
             return False
 
         self.logger.info(f'Successfully imported Chai components.')
-        self.initialized = True
         
         return True
-
-    async def is_ready(self,
-                       data: dict[str, Any]) -> bool:
-        self.logger.info('Checking if we are initialized')
-        if not hasattr(self, 'initialized'):
-            await self.initialize(data)
-        return self.initialized
 
     async def cleanup(self):
         try:
@@ -127,7 +111,6 @@ class ChaiAgent:
                     self.logger.warning(f'Error exiting manager context: {e}')
                 finally:
                     self.manager = None
-                    delattr(self, 'initialized')
 
             self.logger.info('Chai agent cleanup completed')
 
@@ -137,25 +120,13 @@ class ChaiAgent:
     def get_capabilities(self) -> list[str]:
         return self.capabilities
 
-    async def generate_binder_hypothesis(self, 
-                                         data: dict[str, Any]) -> Optional[ProteinHypothesis]:
+    async def generate_binder_hypothesis(self) -> dict:
         """"""
-        if not await self.is_ready(data):
-            self.logger.error('Chai agent not ready')
-            return None
-
-        return await self._generate_binder_hypothesis(data)
-
-    async def _generate_binder_hypothesis(self,
-                                          data: dict[str, Any]) -> Optional[ProteinHypothesis]:
-        """"""
-        constraints = data.get('constraints', [None] * len(data['sequences']))
-
         # Run the workflow
         results = await self.coordinator.fold_sequences(
-            sequences=data['sequences'],
-            names=data['names'],
-            constraints=constraints,
+            sequences=self.sequences,
+            names=self.names,
+            constraints=self.constraints,
         )
 
         analysis = await self.collate_results(results)
@@ -189,28 +160,29 @@ class ChaiAgent:
 
         return analysis
 
-    async def analyze_hypothesis(self,
-                                 hypothesis: ProteinHypothesis,
-                                 task_params: dict[str, Any]) -> FoldAnalysis:
-        result = await self.generate_binder_hypothesis(task_params)
+    async def run(self) -> dict:
+        if not await self.initialize():
+            return {}
+        else:
+            result = await self.generate_binder_hypothesis()
 
-        # Write result to file
-        analysis = FoldAnalysis(
-            folding_algorithm='Chai-1',
-            unique_models=result['unique_models'], # integer
-            total_models=result['total_models'],   # integer
-            best_models=result['best_models'],     # list[Path]
-            scores=result['scores']                # dict[int, dict[str, float]]
-        )                                          # {0: {'aggregate_score': 0.82, ...},
-                                                   #  1: {..., 'ptm': 0.92, ...}}
+            # Write result to file
+            analysis = {
+                'folding_algorithm': 'Chai-1',
+                'unique_models': result['unique_models'], # integer
+                'total_models': result['total_models'],   # integer
+                'best_models': result['best_models'],     # list[Path]
+                'scores': result['scores']                # dict[int, dict[str, float]]
+            }                                             # {0: {'aggregate_score': 0.82, ...},
+                                                          #  1: {..., 'ptm': 0.92, ...}}
 
-        analysis.confidence_score = self._calculate_confidence(analysis)
-        analysis.tools_used = self._get_tools_used()
+            analysis['confidence_score'] = self._calculate_confidence(analysis)
+            analysis['tools_used'] = self._get_tools_used()
 
-        return analysis
+            return analysis
 
     def _calculate_confidence(self,
-                              analysis: FoldAnalysis) -> float:
+                              analysis: dict[str, Any]) -> float:
         return 0.75
 
     def _get_tools_used(self) -> list[str]:
