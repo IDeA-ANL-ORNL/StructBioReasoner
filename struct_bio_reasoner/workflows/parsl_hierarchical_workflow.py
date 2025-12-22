@@ -706,6 +706,23 @@ class ParslHierarchicalWorkflow:
         """Build parameters for a task based on current state."""
         target = manager_state.target
 
+        # Helper to normalize results to a list
+        def as_list(key: str) -> List[Dict[str, Any]]:
+            val = current_state.get(key)
+            if val is None:
+                return []
+            if isinstance(val, list):
+                return val
+            return [val]
+
+        # Helper to safely get nested value
+        def safe_get(obj: Any, key: str, default: Any = None) -> Any:
+            if obj is None:
+                return default
+            if isinstance(obj, dict):
+                return obj.get(key, default)
+            return default
+
         param_builders = {
             'folding': lambda: {
                 'sequences': [target.target_sequence],
@@ -713,27 +730,29 @@ class ParslHierarchicalWorkflow:
                 'constraints': {},
             },
             'simulation': lambda: {
-                'pdb_path': current_state.get('folding', {}).get('pdb_path', ''),
+                'pdb_path': safe_get(current_state.get('folding'), 'pdb_path', ''),
                 'timesteps': 1000000,
                 'solvent': 'implicit',
             },
             'clustering': lambda: {
                 'trajectory_paths': [
-                    r.get('trajectory_path')
-                    for r in current_state.get('simulation', [])
+                    safe_get(r, 'trajectory_path')
+                    for r in as_list('simulation')
                     if r
                 ],
                 'n_clusters': 5
             },
             'hotspot_analysis': lambda: {
-                'simulation_results': current_state.get('simulation', []),
+                'simulation_results': as_list('simulation'),
                 'cluster_results': current_state.get('clustering')
             },
             'binder_design': lambda: {
                 'target_sequence': target.target_sequence,
-                'hotspot_residues': current_state.get(
-                    'hotspot_analysis', {}
-                ).get('hotspots', []),
+                'hotspot_residues': safe_get(
+                    current_state.get('hotspot_analysis'),
+                    'hotspots',
+                    []
+                ),
                 'num_designs': 25
             },
         }
