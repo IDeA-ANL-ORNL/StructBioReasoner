@@ -78,7 +78,7 @@ class RAGPromptManager():
             prompt_optimization_request = f""" Given this research goal:
             {self.research_goal}
             Generate an optimal prompt for literature mining using HiPerRAG to identify:
-                starting binders for bindcraft optimization. If clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/nanobody/affitin provided in the research goal.
+                starting binders for bindcraft optimization. If clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/nanobody/affitin provided in the research goal or best binders in the input_json {input_json}.
                 Focus on returning a single peptide amino acid sequence and rationale for this in a json with these keys:
                  - binder_sequence: string
                   - rationale: string """ 
@@ -322,6 +322,77 @@ class MDPromptManager():
         self.prompt_c = prompt
         return prompt
 
+
+@dataclass
+class AnalysisPromptManager():
+    research_goal: str
+    input_json: list[dict]
+    target_prot: str
+    prompt_type: str
+    history : dict
+    num_history: int = 3
+    def __post_init__(self):
+        self.prompt_c = None
+        self.prompt_r = None
+        #if self.prompt_type == 'conclusion':
+        #    self.prompt_c = self.conclusion_prompt()
+        #elif self.prompt_type == 'running':
+        #    self.prompt_r = self.running_prompt()
+
+    def running_prompt(self):
+        # Serialize input_json to a formatted string for better LLM readability
+        input_json_str = json.dumps(self.input_json, indent=2, default=str)
+        config_str = json.dumps(config_master['structure_prediction'], indent=2)
+
+        prompt = f"""
+        You are an expert in protein structure prediction and understand cellular/cancer pathways.
+        Evaluate the output from hiperrag and decide which protein complexes: ({self.target_prot} and interacting partners) are the most promising to fold.
+        The results will be a dictionary with multiple keys. The elements of each key will be a list and each value in each list is related to each other via index.
+        Try to focus on folding the most relevant and smallest proteins possible. The length of partner + target sequencehas to be <1500 or folding will fail. 
+        Output from hiperrag:
+        {input_json_str}
+
+        Make your decision based on this data:
+        - cancer_pathway: string
+        - interaction_type: string (e.g., "direct binding", "complex formation")
+        - therapeutic_rationale: string
+        - sequence length: string
+        Focus on returning multiple pairs of sequences (target,partner) and multiple names as a json with the following format:
+        {config_str}
+
+        Include only sequence for target {self.target_prot} and sequence for interacting partner."""
+        self.prompt_r = prompt
+        return prompt
+
+    def conclusion_prompt(self):
+        # Serialize input_json and history to formatted strings
+        input_json_str = json.dumps(self.input_json, indent=2, default=str)
+        history_str = json.dumps(self.history, indent=2, default=str)
+        config_str = json.dumps(config_master['molecular_dynamics'], indent=2)
+
+        prompt = f"""
+        You are an expert in evaluating folded structures. Evaluate which structures are the most promising for simulation and which ones should be discarded.
+
+        The following structures have been generated including path (which describes the interacting protein name + chai score):
+        {input_json_str}
+
+        Here is the history (which may include details from hiperrag about the interacting proteins):
+        {history_str}
+
+        Please provide your decision and reasoning and include the paths of the structures to keep in the format:
+        {config_str}
+        Also include the root_output_path and steps for the simulation. Right now we are running some short simulations (100000 steps) to test the waters."""
+        self.prompt_c = prompt
+        return prompt
+
+
+
+
+
+
+
+
+
 @dataclass
 class FreeEnergyPromptManager():
     research_goal: str
@@ -362,6 +433,8 @@ def get_prompt_manager(agent_type: str, research_goal: str, input_json: dict[str
     if agent_type == 'rag':
         return RAGPromptManager(research_goal, input_json, target_prot, prompt_type)
     elif agent_type == 'computational_design':
+        if history == []:
+            history = {'key_items': [], 'decisions': [], 'results': [], 'configurations': []}
         return BindCraftPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
     elif agent_type == 'structure_prediction':
         return CHAIPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)

@@ -76,7 +76,9 @@ class BindCraftAgent:
                 for k, v in parsl.values():
                     parsl_config[k] = v
 
-            parsl_settings = LocalSettings(parsl_config).config_factory(Path.cwd())
+            self.logger.info(parsl_config)
+            self.logger.info(Path.cwd())
+            parsl_settings = LocalSettings(**parsl_config).config_factory(Path.cwd())
 
             cwd = Path(self.config.get('cwd', os.getcwd()))
             cwd.mkdir(exist_ok=True)
