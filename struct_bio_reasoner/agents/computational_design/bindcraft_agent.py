@@ -241,57 +241,16 @@ class BindCraftAgent:
         print(f"BindCraft _generate_binder_hypothesis - SEQUENCES BEING USED:")
         print(f"  target_sequence: {target_sequence[:50]}... ({len(target_sequence)} residues)")
         binder_sequence = data.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
+        constraints = data.get('constraints', None)
         num_rounds = data.get('num_rounds', 3)
         
-        if False:
-            # these need to be somehow passed into the call
-            device = data.get('device', 'cuda:0')
-
-            if_kwargs = data.get('if_kwargs', {
-                'num_seq': data.get('num_seq', 25),
-                'batch_size': data.get('batch_size', 250),
-                'max_retries': data.get('retries', 5),
-                'sampling_temp': data.get('temp', '0.1'),
-                'model_name': data.get('mpnn_model', 'v_48_020'),
-                'model_weights': data.get('mpnn_weights', 'soluble_model_weights'),
-                'proteinmpnn_path': data.get('proteinmpnn_path', '/eagle/FoundEpidem/avasan/Softwares/ProteinMPNN'),
-                'device': device
-            })
-
-            qc_kwargs = data.get('qc_kwargs', {
-                'max_repeat': 4,
-                'max_appearance_ratio': 0.33,
-                'max_charge': 5,
-                'max_charge_ratio': 0.5,
-                'max_hydrophobic_ratio': 0.8,
-                'min_diversity': 8,
-                'bad_motifs': None,
-                'bad_n_termini': None # use defaults
-            })
-
-            # Initialize algorithm instances with required parameters
-            chai = Chai(
-                fasta_dir=fasta_dir,
-                out=folds_dir,
-                diffusion_steps=100,
-                device=device  # or 'cpu' if GPU not available
-            )
-
-            proteinmpnn = ProteinMPNN(**if_kwargs)
-
-            self.manager = await Manager.from_exchange_factory(
-                factory=LocalExchangeFactory(),
-                executors=ThreadPoolExecutor(),
-            )
-
-            await self.manager.__aenter__()
-
         # Run the workflow
         results = await self.coordinator.run_full_workflow(
             target_sequence=target_sequence,
             binder_sequence=binder_sequence,
             fasta_base_path=fasta_dir,
             pdb_base_path=folds_dir,
+            constraints=constraints,
             remodel_indices=None,  # Interface indices to redesign, else measure
             num_rounds=num_rounds
         )
