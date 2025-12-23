@@ -159,7 +159,7 @@ class MDAgentAdapter:
                     ImplicitSimulator, Simulator
                 )
             )
-            self.parsl_settings = LocalSettings(parsl_config).config_factory(Path.cwd())
+            self.parsl_settings = LocalSettings(**parsl_config).config_factory(Path.cwd())
 
             self.logger.info('launching coordinator')
             self.coordinator_handle = await self.manager.launch(

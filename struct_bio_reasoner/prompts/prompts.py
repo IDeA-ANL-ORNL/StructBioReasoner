@@ -310,7 +310,7 @@ class MDPromptManager():
             Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['hotspot']}."""
         elif self.prompt_type == 'binder_design':
             prompt = f"""
-            You are an expert in computational peptide design optimization and md simulations. Evaluate the current optimization progress and decide which step to take next (bindcraft, md_simulation, free energy simulations).
+            You are an expert in computational peptide design optimization and md simulations. Evaluate the current optimization progress and decide which step to take next ('computational_design', 'molecular_dynamics', 'analysis', 'free_energy'). 
             Previous round results: {self.input_json}
             This is the history of decisions (least recent first):
             {self.history['decisions'] if self.history['decisions'] != [] else 'No history'}

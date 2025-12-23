@@ -724,12 +724,16 @@ class BinderDesignSystem(JnanaSystem):
             Generated recommendation
         """
         #self.logger.info(f"Generating protein hypothesis with strategy: {strategy}")
+        if runtype == 'molecular_dynamics':
+            prompt_type = 'binder_design'
+        else:
+            prompt_type = 'conclusion'
         prompt_manager = get_prompt_manager(
                 agent_type=runtype,
                 research_goal=self.research_goal,
                 input_json=results,
                 target_prot=self.target_prot,
-                prompt_type='conclusion',
+                prompt_type=prompt_type,
                 history=self.history,
                 num_history=self.num_history
                 )
