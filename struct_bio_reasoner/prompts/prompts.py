@@ -28,7 +28,10 @@ config_master = {
                                    'max_charge': 'int', 
                                    'max_charge_ratio': 'float', 
                                    'max_hydrophobic_ratio': 'float', 
-                                   'min_diversity': 'int'}},
+                                   'min_diversity': 'int'},
+
+                    'constraint': {'residues_bind': 'list[string]'}
+                    },
 
     'structure_prediction': {'sequences': 'list[list[str]]', 'names': 'list[str]'},
 
@@ -145,6 +148,7 @@ class BindCraftPromptManager():
             self.previous_run_type = self.input_json.get('previous_run_type', 'bindcraft')
             self.recommendation = self.input_json.get('recommendation', None)
             #self.prompt_r = self.running_prompt()
+
     def running_prompt(self):
         # Serialize history for better LLM readability
         decisions_str = json.dumps(self.history['decisions'], indent=2, default=str) if self.history['decisions'] else 'No history'
@@ -153,9 +157,11 @@ class BindCraftPromptManager():
         key_items_str = json.dumps(self.history['key_items'], indent=2, default=str) if self.history['key_items'] else 'No key items yet'
         config_schema_str = json.dumps(config_master['computational_design'], indent=2)
 
+        logger.info(self.recommendation.metadata['next_task'])
+        logger.info(self.recommendation.metadata['rationale'])
+        logger.info(self.previous_run_type)
         prompt = f"""
         You are an expert in computational peptide design optimization. Evaluate the current optimization progress and generate the next configuration.
-
         RECOMMENDATION FROM PREVIOUS RUN ({self.previous_run_type}):
         Task: {self.recommendation.metadata['next_task']}
         Rationale: {self.recommendation.metadata['rationale']}
@@ -169,7 +175,7 @@ class BindCraftPromptManager():
         HISTORY OF CONFIGURATIONS (least recent first):
         {configs_str}
 
-        KEY ITEMS TO CONSIDER (best binders from each iteration):
+        KEY ITEMS TO CONSIDER (including best binders from each iteration + hotspot residues):
         {key_items_str}
 
         IMPORTANT: You MUST provide a complete configuration in JSON format matching this schema:
@@ -181,6 +187,7 @@ class BindCraftPromptManager():
            a) A top-performing binder from the key_items above
            b) A scaffold sequence mentioned in the research goal: {self.research_goal}
            c) A sequence from previous configurations that showed promise
+        2. The 'constraint': {{'residues_bind': 'list[string]'}} indicates residues for the target protein identified based on interactome simulations/literature. Fill this if it is included in the key items to consider otherwise list as 'None' 
         3. All other parameters (num_rounds, batch_size, etc.) should be optimized based on previous results
         4. Return ONLY the JSON configuration, no additional text
 
@@ -232,8 +239,7 @@ class BindCraftPromptManager():
             "confidence": 0.0-1.0
         }}
 
-        NOTE: This is a RECOMMENDATION only. The actual configuration will be generated in a separate step.
-        """
+        NOTE: This is a RECOMMENDATION only. The actual configuration will be generated in a separate step."""
         logger.info('Bindcraft conclusion prompt')
         logger.info(f'{prompt=}')
         self.prompt_c = prompt

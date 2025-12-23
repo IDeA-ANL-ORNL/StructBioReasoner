@@ -35,6 +35,9 @@ from jnana.protognosis.core.llm_interface import alcfLLM
 from struct_bio_reasoner.prompts.prompts import get_prompt_manager, config_master
 from struct_bio_reasoner.data.protein_hypothesis import ProteinHypothesis
 from struct_bio_reasoner.utils.hotspot import get_hotspot_resids_from_simulations
+from types import SimpleNamespace
+import uuid
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,7 +68,7 @@ async def nmnat2_agentic_workflow(research_goal):
     from struct_bio_reasoner.core.binder_design_system import BinderDesignSystem
     
     system = BinderDesignSystem(
-        config_path="config/binder_config_default.yaml",
+        config_path="config/binder_config.yaml",
         jnana_config_path="config/jnana_config.yaml",
         enable_agents=['computational_design', 'molecular_dynamics', 'rag', 'structure_prediction']
     )
@@ -185,6 +188,18 @@ async def nmnat2_agentic_workflow(research_goal):
     all_binders = []
     best_binders = []
 
+    # Create hypothesis for this iteration
+    hypothesis_loop = ProteinHypothesis(
+        content=f"tasks in order:",
+        summary=f"tasks in order:",
+        metadata={
+            'iterations': [],
+            'tasks':[],
+            'target_sequence': target_sequence,
+            'hotspot_residues': hotspot_output['hotspot_residues']
+        }
+        )
+
     while next_task != 'stop' and design_it < max_iterations:
         logger.info(f"\n{'='*80}")
         logger.info(f"ITERATION {design_it + 1}")
@@ -201,51 +216,55 @@ async def nmnat2_agentic_workflow(research_goal):
             # Hardcode task
             next_task = 'computational_design'
 
-            # Use HiPerRAG to decide which binder scaffold to use
-            logger.info("Using HiPerRAG to select optimal binder scaffold...")
 
-            #RAG Results: {json.dumps(rag_result_json, indent=2, default=str)}
-            scaffold_selection_prompt = f"""
-            Based on the research goal and any available clinical evidence, which binder scaffold should we use for NMNAT-2?
-            If there is actual clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/nanobody/affitin provided in the research goal.
-            Research Goal: {research_goal}
+            if False:
+                # Use HiPerRAG to decide which binder scaffold to use
+                logger.info("Using HiPerRAG to select optimal binder scaffold...")
+
+                #RAG Results: {json.dumps(rag_result_json, indent=2, default=str)}
+                scaffold_selection_prompt = f"""
+                Based on the research goal and any available clinical evidence, which binder scaffold should we use for NMNAT-2?
+                If there is actual clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/nanobody/affitin provided in the research goal.
+                Research Goal: {research_goal}
 
 
-            Available scaffolds:
-            - affibody: VDNKFNKEQQNAFYEILHLPNLNEEQRNAFIQSLKDDPSQSANLLAEAKKLNDAQAPK
-            - affitin: MGSWAEFKQRLAAIKTRLQALGGSEAELAAFEKEIAAFESELQAYKGKGNPEVEALRKEAAAIRDELQAYRHN
-            - nanobody: QVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAA
+                Available scaffolds:
+                - affibody: VDNKFNKEQQNAFYEILHLPNLNEEQRNAFIQSLKDDPSQSANLLAEAKKLNDAQAPK
+                - affitin: MGSWAEFKQRLAAIKTRLQALGGSEAELAAFEKEIAAFESELQAYKGKGNPEVEALRKEAAAIRDELQAYRHN
+                - nanobody: QVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAA
 
-            Please provide your recommendation in JSON format:
-            {{
-                "scaffold_type": "affibody|affitin|nanobody",
-                "scaffold_sequence": "full sequence",
-                "rationale": "explanation"
-            }}"""
+                Please provide your recommendation in JSON format:
+                {{
+                    "scaffold_type": "affibody|affitin|nanobody",
+                    "scaffold_sequence": "full sequence",
+                    "rationale": "explanation"
+                }}"""
 
-            scaffold_schema = {
-                'scaffold_type': 'string',
-                'scaffold_sequence': 'string',
-                'rationale': 'string'
-            }
+                scaffold_schema = {
+                    'scaffold_type': 'string',
+                    'scaffold_sequence': 'string',
+                    'rationale': 'string'
+                }
 
-            scaffold_rag_hypothesis = await system.design_agents['rag'].generate_rag_hypothesis({'prompt': scaffold_selection_prompt})
-            system.append_history(key_items = rag_hypothesis, decision = 'rag')
+                scaffold_rag_hypothesis = await system.design_agents['rag'].generate_rag_hypothesis({'prompt': scaffold_selection_prompt})
+                system.append_history(key_items = scaffold_rag_hypothesis, decision = 'rag')
 
-            logger.info(f"{scaffold_rag_hypothesis=}")
-            scaffold_selection = system.prompt_gen_llm.generate_with_json_output(
-                prompt=scaffold_rag_hypothesis,
-                json_schema=scaffold_schema,
-                temperature=0.3,
-                max_tokens=32678
-            )[0]
-            logger.info(scaffold_selection)
-            starting_binder = scaffold_selection['scaffold_sequence']
-            logger.info(f"Selected {scaffold_selection['scaffold_type']} scaffold")
-            logger.info(f"Rationale: {scaffold_selection['rationale']}")
-            logger.info(f"Starting binder: {starting_binder[:50]}...")
+                logger.info(f"{scaffold_rag_hypothesis=}")
+                scaffold_selection = system.prompt_gen_llm.generate_with_json_output(
+                    prompt=scaffold_rag_hypothesis,
+                    json_schema=scaffold_schema,
+                    temperature=0.3,
+                    max_tokens=32678
+                )[0]
 
-            current_config = system.binder_config.get("agents", {}).get("computational_design", {}).copy()
+                logger.info(scaffold_selection)
+                starting_binder = scaffold_selection['scaffold_sequence']
+                logger.info(f"Selected {scaffold_selection['scaffold_type']} scaffold")
+                logger.info(f"Rationale: {scaffold_selection['rationale']}")
+                logger.info(f"Starting binder: {starting_binder[:50]}...")
+
+            starting_binder = 'VDNKFNKEQQNAFYEILHLPNLNEEQRNAFIQSLKDDPSQSANLLAEAKKLNDAQAPK'
+            current_config = system.binder_config.get("agents", {}).get("computational_design", {}).get("bindcraft", {}).copy()
             current_config['binder_sequence'] = starting_binder
             # Default configuration for first iteration
             current_config['target_sequence'] = target_sequence 
@@ -254,9 +273,34 @@ async def nmnat2_agentic_workflow(research_goal):
             # Create mock recommendation for iteration 0
             recommendation = {
                 'next_task': 'computational_design',
-                'rationale': f"Initial iteration - starting with BindCraft using {scaffold_selection['scaffold_type']} scaffold",
+                'rationale': f"Initial iteration - starting with BindCraft using affibody scaffold and using {json.dumps(current_config, indent=2)} but you can add potential hotspot residues as constraints.",#{scaffold_selection['scaffold_type']} scaffold",
                 'confidence': 1.0
             }
+
+            
+            previous_task = 'computational_design'
+            previous_config = current_config
+            previous_results = {'results': 'none'}
+            recommendation_list = await system.generate_recommendation(
+                results=previous_results,
+                runtype=previous_task
+            )
+
+
+
+            recommendation = recommendation_list[0]
+
+            recommendation_obj = SimpleNamespace(**recommendation)
+            recommended_config_list = await system.generate_recommendedconfig(
+                previous_run_type=previous_task,
+                previous_run_config=previous_config,
+                recommendation=recommendation_obj
+            )
+
+            logger.info(f'{recommended_config_list=}')
+            current_config = recommended_config_list[1]['metadata']['new_config'] if recommended_config_list else current_config
+            logger.info(f'{current_config=}')
+
 
         # ====================================================================
         # ITERATION 1+: Use LLM reasoner to decide next task and config
@@ -271,26 +315,43 @@ async def nmnat2_agentic_workflow(research_goal):
                 runtype=previous_task
             )
             recommendation = recommendation_list[0] if recommendation_list else {}
-
-            next_task = recommendation.get('next_task', 'stop')
+            logger.info(recommendation)
+            logger.info(recommendation_list)
+            #recommendation = SimpleNamespace(**recommendation)
+            next_task = recommendation['metadata']['next_task']#, 'stop')
             logger.info(f"✓ Recommended next task: {next_task}")
-            logger.info(f"  Rationale: {recommendation.get('rationale', 'N/A')}")
+            #logger.info(f"  Rationale: {recommendation.get('metadata', {}).get('rationale', 'N/A')}")
 
             # If stop, break the loop
             if next_task == 'stop':
-                logger.info("Reasoner recommends stopping. Finalizing results...")
-                break
+                logger.info("Reasoner recommends stopping. We are going to try again with the design loop to see how things change")
+                next_task = 'computational_design'
+                current_config = system.binder_config.get("agents", {}).get("computational_design", {}).get("bindcraft", {}).copy()                
+                continue
 
             # Step 2: Generate recommended configuration
             logger.info("Step 2: Generating recommended configuration...")
+            recommendation_obj = SimpleNamespace(**recommendation)
+
             recommended_config_list = await system.generate_recommendedconfig(
                 previous_run_type=previous_task,
                 previous_run_config=previous_config,
-                recommendation=recommendation
+                recommendation=recommendation_obj
             )
-            current_config = recommended_config_list[0] if recommended_config_list else {}
+            logger.info(f'{recommended_config_list=}')
+            current_config = recommended_config_list[1]['metadata']['new_config'] if recommended_config_list else {}
+            logger.info(f'{current_config=}')
+            if next_task == 'molecular_dynamics':
+                checkpoint_file = hypothesis_loop.binder_analysis.checkpoint_file
+                checkpoint_data = pickle.load(open(checkpoint_file, 'rb'))
+                all_cycles = checkpoint_data['all_cycles']
+                passing = [all_cycles[i]['passing_structures'] for i in range(len(all_cycles))]
+                passing = [Path(item).resolve() for sublist in passing for item in sublist]
 
-            logger.info(f"✓ Recommended configuration: {json.dumps(current_config, indent=2)}")
+                current_config['simulation_paths'] = passing
+                current_config['root_output_path'] = f'simulations/{design_it}'
+
+            #logger.info(f"✓ Recommended configuration: {json.dumps(current_config, indent=2)}")
 
         # ====================================================================
         # EXECUTE THE RECOMMENDED TASK
@@ -301,17 +362,6 @@ async def nmnat2_agentic_workflow(research_goal):
         previous_task = next_task
         previous_config = current_config
 
-        # Create hypothesis for this iteration
-        hypothesis_loop = ProteinHypothesis(
-            content=f"{next_task} for iteration {design_it}",
-            summary=f"Iteration {design_it}: {next_task}",
-            metadata={
-                'iteration': design_it,
-                'task': next_task,
-                'target_sequence': target_sequence,
-                'hotspot_residues': hotspot_output['hotspot_residues']
-            }
-        )
 
         logger.info(f'{next_task=}')
         with open('hypothesis.pkl', 'wb') as f:
@@ -322,51 +372,48 @@ async def nmnat2_agentic_workflow(research_goal):
 
         # Execute task using unified interface
         logger.info(f"Running {next_task}...")
+        if next_task == 'computational_design':
+            current_config['cwd'] = f'{system.binder_config.get("agents").get("computational_design").get("bindcraft").get("cwd")}/binder_design/{design_it}' #current_config['cwd']  
+            current_config['target_sequence'] = target_sequence 
+            logger.info(current_config)
+            system.design_agents[next_task].config['cwd'] = current_config['cwd']
+
+            await system.design_agents[next_task].initialize()
         results = await system.design_agents[next_task].analyze_hypothesis(
             hypothesis_loop,
             current_config
         )
+        #logger.info(f"{results=}")
 
-        previous_results = results
+        hypothesis_loop.content = str(hypothesis_loop.content) + str(next_task)
+
+        previous_results = results.__dict__
+        logger.info(f'{previous_results=}')
         logger.info(f"✓ {next_task} completed")
 
         # Extract best binder from this iteration for key_items
-        best_binder_this_iteration = None
 
         if next_task == 'computational_design':
             # Extract best binder from BindCraft results
-            logger.info(f"  Sequences generated: {results.get('total_sequences_generated', 0)}")
+            #logger.info(f"  Sequences generated: {results.get('total_sequences_generated', 0)}")
 
-            # Track all binders
-            if 'all_cycles' in results:
-                for cycle_data in results['all_cycles'].values():
-                    all_binders.extend(cycle_data.keys())
-
-                # Get best binder (lowest energy) from last cycle
-                last_cycle = max(results['all_cycles'].keys())
-                cycle_data = results['all_cycles'][last_cycle]
-                if cycle_data:
-                    best_binder_seq = min(cycle_data.items(), key=lambda x: x[1].get('energy', float('inf')))
-                    best_binder_this_iteration = {
-                        'iteration': design_it,
-                        'task': next_task,
-                        'sequence': best_binder_seq[0],
-                        'energy': best_binder_seq[1].get('energy'),
-                        'metrics': best_binder_seq[1]
-                    }
-                    logger.info(f"  Best binder energy: {best_binder_seq[1].get('energy')}")
+            hypothesis_loop.add_binder_analysis(results)
+            best_binders_this_iteration = results.top_binders #[results.top_binders[i]['sequence'] for i in len(results.top_binders)]
+            logger.info(f'{best_binders_this_iteration=}')
+        elif next_task == 'molecular_dynamics':
+            hypothesis_loop.add_md_analysis(results)
 
         # Append to history with best binder as key_items
         system.append_history(
-            key_items=best_binder_this_iteration if best_binder_this_iteration else None,
+            key_items=best_binders_this_iteration if best_binders_this_iteration else None,
             decision=next_task,
             configuration=current_config,
             results=results
         )
 
         # Track best binders
-        if best_binder_this_iteration:
-            best_binders.append(best_binder_this_iteration)
+        if best_binders_this_iteration:
+            best_binders.append(best_binders_this_iteration)
 
         # Increment iteration counter
         design_it += 1
