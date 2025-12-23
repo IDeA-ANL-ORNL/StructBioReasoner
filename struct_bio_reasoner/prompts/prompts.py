@@ -34,9 +34,32 @@ config_master = {
 
     'molecular_dynamics': {'simulation_paths': 'list[str]', 'root_output_path': 'str', 'steps': 'int'},
 
-    'hotspot': {'paths_to_analyze': 'list[int]'},
+    'analysis': {
+        'static': {
+            'basic': {
+                'paths': 'list[str]',
+                'kwargs': {'distance_cutoff': 'float'}
+            },
+            'advanced': {
+                'paths': 'list[str]',
+                'kwargs': {'placeholder': 'None'}
+            },
+        },
+        'dynamic': {
+            'basic': {
+                'paths': 'list[str]',
+                'kwargs': {'placeholder': 'None'}
+            },
+            'advanced': {
+                'paths': 'list[str]',
+                'kwargs': {'distance_cutoff': 'float', 'n_top': 'int'}
+            },
+        }
+    },
 
-    'free_energy': {''}
+    'free_energy': {
+        'simulation_paths': 'list[str]',
+    }
 }
 
 # Create empty PromptManager class as a template and define other classes to inherit from it
@@ -279,6 +302,7 @@ class CHAIPromptManager():
         self.prompt_c = prompt
         return prompt
     
+
 @dataclass
 class MDPromptManager():
     research_goal: str
@@ -355,11 +379,23 @@ class AnalysisPromptManager():
         RECOMMENDATION FROM PREVIOUS RUN ({self.previous_run_type}):
         Task: analyze
         Rationale: {self.recommendation.metadata['rationale']}.
-        Evaluate the recommendation and decide which analysis to perform. You can choose to do both analyses here.
-        basic: rmsd, rmsf, radius of gyration
-        advanced: hotspot analysis (which residues do the binders interact with the most) 
-        The results will be a dictionary with one key: 'analysis_type'. The elements of this key should be 'basic', 'advanced' or ['basic', 'advanced'].
-        The specific output format is: {config_str}"""
+        Evaluate the recommendation and decide which analysis to perform.
+        Analyses are structured by input type (static vs dynamic) and rigor (basic vs advanced.
+        Input types: 
+          static: to be performed on PDBs 
+          dynamic: to be performed on simulation trajectories
+        
+        Rigor:
+          static, basic: interface contacts
+          static, advanced: not currently supported
+          dynamic, basic: rmsd, rmsf, radius of gyration
+          dynamic, advanced: hotspot analysis (which residues do the binders interact with the most) 
+
+        The results will be a dictionary with two keys: 'data_type', 'analysis_type'. 
+        The elements of the 'data_type' key should be 'static', 'dynamic' or both, depending on if the input is a trajectory or static model. 
+        The elements of 'analysis_type' should be 'basic', 'advanced' or both. Any keys in the present in this dictionary will correspond to analyses that will be run.
+        The specific output format is: {config_str}.
+        Currently all distance_cutoffs refer to distances between alpha carbons, and have a default value of 8.0 angstroms."""
         self.prompt_r = prompt
         return prompt
 
@@ -367,7 +403,7 @@ class AnalysisPromptManager():
         # Serialize input_json and history to formatted strings
         input_json_str = json.dumps(self.input_json, indent=2, default=str)
         history_str = json.dumps(self.history, indent=2, default=str)
-        #config_str = json.dumps(config_master['molecular_dynamics'], indent=2)
+        config_str = json.dumps(config_master['molecular_dynamics'], indent=2)
 
         prompt = f"""
         You are an expert in evaluating md simulation analyses. Evaluate the analyses here and decide what step should be taken next.
@@ -383,13 +419,6 @@ class AnalysisPromptManager():
         Also include the root_output_path and steps for the simulation. Right now we are running some short simulations (100000 steps) to test the waters."""
         self.prompt_c = prompt
         return prompt
-
-
-
-
-
-
-
 
 @dataclass
 class FreeEnergyPromptManager():
@@ -416,7 +445,7 @@ class FreeEnergyPromptManager():
             {self.input_json}
             Here is the history (which may include details from hiperrag about the interacting proteins):
             {self.history_list[:self.num_history]}
-            Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['molecular_dynamics']}."""
+            Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['free_energy']} where the list of paths is a list of root paths (e.g. root0/mdagent_0/prod.dcd, root1/mdagent_0/prod.dcd would be [root0, root1])."""
         elif self.prompt_type == 'binder_design':
             prompt = f"""
             You are an expert in computational peptide design optimization and md simulations. Evaluate the current optimization progress and decide which step to take next (bindcraft, md_simulation, free energy simulations).
