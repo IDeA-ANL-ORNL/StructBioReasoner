@@ -30,7 +30,7 @@ config_master = {
                                    'max_hydrophobic_ratio': 'float', 
                                    'min_diversity': 'int'}},
 
-    'structure_prediction': {'sequences': 'list[list[str]', 'names': 'list[str]'},
+    'structure_prediction': {'sequences': 'list[list[str]]', 'names': 'list[str]'},
 
     'molecular_dynamics': {'simulation_paths': 'list[str]', 'root_output_path': 'str', 'steps': 'int'},
 
@@ -452,7 +452,7 @@ class FreeEnergyPromptManager():
             Previous round results: {self.input_json}
             This is the history of decisions (least recent first):
             {self.history_list[:self.num_history]}
-            Please provide your decision and reasoning."""
+            Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['free_energy']} where the list of paths is a list of root paths (e.g. root0/mdagent_0/prod.dcd, root1/mdagent_0/prod.dcd would be [root0, root1])."""
 
 
 # I want to make a factory class that can generate the right prompt manager based on the agent type
