@@ -20,8 +20,9 @@ from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 from ...utils.parsl_settings import LocalCPUSettings
 
-from academy.exchange import LocalExchangeFactory
+from academy.exchange import LocalExchangeFactory, RedisExchangeFactory
 from academy.manager import Manager
+from parsl.concurrent import ParslPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
     
 

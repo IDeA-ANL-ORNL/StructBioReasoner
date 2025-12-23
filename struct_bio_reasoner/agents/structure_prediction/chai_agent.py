@@ -1,6 +1,6 @@
 from academy.exchange import LocalExchangeFactory, RedisExchangeFactory
 from academy.manager import Manager
-from academy.concurrent import ParslPoolExecutor
+from parsl.concurrent import ParslPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
 import dill as pickle
 import asyncio

@@ -27,6 +27,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
+import yaml
 
 from parsl import Config, HighThroughputExecutor
 from parsl.concurrent import ParslPoolExecutor
@@ -40,6 +41,7 @@ from ..agents.executive.executive_agent import ExecutiveAgent
 from ..agents.manager.manager_agent import ManagerAgent
 from ..core.binder_design_system import BinderDesignSystem
 from ..utils.llm_interface import alcfLLM
+from ..utils.parsl_settings import LocalSettings, LocalCPUSettings, AuroraSettings
 
 logger = logging.getLogger(__name__)
 
@@ -98,9 +100,9 @@ class WorkflowConfig:
     redis_port: int = 6379
 
     # Parsl configuration
+    parsl_config: str = 'config/parsl.yaml'
     worker_init_cmd: str = ""
-    conda_env: Optional[str] = None
-
+    python_env: Optional[str] = None
 
 @dataclass
 class RAGHit:
@@ -128,7 +130,7 @@ class ManagerState:
     tasks_completed: int = 0
     designs_generated: int = 0
     best_binder: Optional[Dict[str, Any]] = None
-    best_score: float = float('-inf')
+    best_score: float = float('inf')
 
     # History
     task_history: List[Dict[str, Any]] = field(default_factory=list)
@@ -144,7 +146,7 @@ class ManagerState:
 
     def update_best_binder(self, binder: Dict[str, Any], score: float) -> bool:
         """Update best binder if this one is better."""
-        if score > self.best_score:
+        if score < self.best_score:
             self.best_score = score
             self.best_binder = binder
             return True
@@ -218,7 +220,7 @@ class WorkflowState:
 
     def update_global_best(self, binder: Dict[str, Any], score: float, manager_id: str) -> bool:
         """Update global best binder if this one is better."""
-        if score > self.best_score_overall:
+        if score < self.best_score_overall:
             self.best_score_overall = score
             self.best_binder_overall = binder
             self.best_manager_id = manager_id
@@ -242,6 +244,7 @@ class ParslHierarchicalWorkflow:
             config: Workflow configuration
         """
         self.config = config
+        self.base_parsl_settings = yaml.safe_load(open(config.parsl_config))
         self.state = WorkflowState()
 
         # System components (initialized in start())
@@ -262,22 +265,16 @@ class ParslHierarchicalWorkflow:
 
         logger.info(f"ParslHierarchicalWorkflow initialized")
 
-    def _create_parsl_config(self) -> Config:
+    def _create_distributed_parsl_config(self,
+                                         parsl_settings: dict[str, Any],
+                                         run_dir: Path) -> Config:
         """Create Parsl configuration for HPC execution."""
         worker_init = self.config.worker_init_cmd
         if self.config.conda_env:
-            worker_init = f"cd {os.getcwd()}; conda activate {self.config.conda_env}; {worker_init}"
-
-        return Config(
-            executors=[
-                HighThroughputExecutor(
-                    provider=LocalProvider(
-                        worker_init=worker_init if worker_init else None,
-                    ),
-                    max_workers_per_node=self.config.max_workers_per_node,
-                ),
-            ],
-        )
+            worker_init = f"cd {os.getcwd()}; source {self.config.python_env}/bin/activate; {worker_init}"
+        
+        parsl_config = AuroraSettings(**parsl_settings).config_factory(run_dir)
+        return parsl_config
 
     def _create_exchange_factory(self):
         """Create the appropriate exchange factory."""
@@ -307,7 +304,8 @@ class ParslHierarchicalWorkflow:
                 'computational_design',
                 'molecular_dynamics',
                 'rag',
-                'structure_prediction'
+                'structure_prediction',
+                'free_energy'
             ]
         )
         await self.binder_system.start()
@@ -315,7 +313,7 @@ class ParslHierarchicalWorkflow:
 
         # Step 2: Initialize Parsl executor
         logger.info("Step 2: Initializing Parsl executor...")
-        parsl_config = self._create_parsl_config()
+        parsl_config = self._create_distributed_parsl_config(self.base_parsl_settings, Path('.'))
         self.parsl_executor = ParslPoolExecutor(parsl_config)
         logger.info(f"Parsl executor initialized with {self.config.max_workers_per_node} workers/node")
 
@@ -441,7 +439,7 @@ class ParslHierarchicalWorkflow:
                 target_name=name,
                 target_sequence=sequence,
                 uniprot_id=uniprot_id,
-                confidence_score=1.0 - (i * 0.1),  # Higher rank = higher confidence
+                confidence_score=1.0 - (i * 0.025),  # Higher rank = higher confidence
                 rationale=rationale,
                 metadata={'rag_rank': i}
             )
@@ -1174,7 +1172,7 @@ if __name__ == '__main__':
     import asyncio
 
     config = WorkflowConfig(
-        research_goal="Design a binder for SARS-CoV-2 spike protein RBD.",
+        research_goal="Design a binder for protein NMNAT2.",
         config_path="config/binder_config.yaml",
         max_managers=5,
         total_compute_nodes=50,

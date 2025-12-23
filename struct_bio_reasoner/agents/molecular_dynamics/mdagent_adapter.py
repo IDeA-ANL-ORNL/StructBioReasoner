@@ -24,7 +24,7 @@ from molecular_simulations.simulate import ImplicitSimulator, Simulator
 
 from academy.exchange import LocalExchangeFactory, RedisExchangeFactory
 from academy.manager import Manager
-from academy.concurrent import ParslPoolExecutor
+from parsl.concurrent import ParslPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
     
 
@@ -262,7 +262,7 @@ class MDAgentAdapter:
             return sim_results
 
     def _calculate_confidence(self,
-                              analysis: SimAnalysis) -> float:
+                              analysis: dict) -> float:
         # TODO: compute this based on RMSD/RMSF threshholds
         return 0.75
 

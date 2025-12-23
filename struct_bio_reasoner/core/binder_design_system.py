@@ -12,10 +12,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 
-# Import Jnana components
-import sys
-sys.path.append(str(Path(__file__).parent.parent.parent.parent / "Jnana"))
-
 from jnana.core.jnana_system import JnanaSystem
 from jnana.protognosis.core.agent_core import ContextMemory 
 from jnana.protognosis.core.llm_interface import alcfLLM
@@ -25,7 +21,6 @@ from ..agents.computational_design.bindcraft_agent import BindCraftAgent
 from ..agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
 from ..agents.molecular_dynamics.free_energy_agent import FEAgent
 from ..agents.structure_prediction.chai_agent import ChaiAgent
-from ..agents.energetic.energy_agent import EnergeticAnalysisAgent
 from ..prompts.prompts import get_prompt_manager
 try:
     from ..agents.hiper_rag.rag_agent import RAGWrapper 
@@ -37,10 +32,7 @@ except Exception as e:
     traceback.print_exc()
     RAG_EXISTS=False
 
-from ..tools.pymol_wrapper import PyMOLWrapper
-from ..tools.biopython_utils import BioPythonUtils
 from ..utils.config_loader import load_binder_config
-from .knowledge_foundation import ProteinKnowledgeFoundation
 
 from dataclasses import dataclass, asdict, field
 
@@ -229,18 +221,6 @@ class BinderDesignSystem(JnanaSystem):
         # Start base Jnana system
         await super().start()
 
-        # Initialize design-specific components
-        
-        await self._initialize_design_tools()
-        await self._initialize_design_agents()
-
-        ### If we want the llm to directly use tool calling then initialize the tool registry.
-        ### Otherwise keep it false
-        if False:
-            await self._initialize_tool_registry()  # NEW: Initialize tool registry
-
-        await self._initialize_knowledge_foundation()
-
         self.design_system_ready = True
         self.logger.info("BinderDesignSystem started successfully")
     
@@ -374,68 +354,6 @@ class BinderDesignSystem(JnanaSystem):
                 self.logger.warning(f'Failed to initialize structure prediction agent: {e}')
         
         self.logger.info(f"Initialized {len(self.design_agents)} protein agents")
-
-    async def _initialize_tool_registry(self):
-        """
-        Initialize tool registry and register BindCraft tool.
-
-        This makes BindCraft available as a tool that LLM agents can call
-        during hypothesis generation.
-        """
-        try:
-            from jnana.tools import ToolRegistry, BindCraftTool
-
-            # Create tool registry
-            self.tool_registry = ToolRegistry()
-            self.logger.info("Tool registry created")
-
-            # Register BindCraft tool if agent is available
-            if 'computational_design' in self.design_agents:
-                bindcraft_agent = self.design_agents['computational_design']
-                bindcraft_tool = BindCraftTool(bindcraft_agent)
-                self.tool_registry.register_tool(bindcraft_tool)
-                self.logger.info("✓ BindCraft tool registered for LLM use")
-
-                # Inject tool registry into ProtoGnosis agents
-                if hasattr(self, 'protognosis_adapter') and self.protognosis_adapter:
-                    if hasattr(self.protognosis_adapter, 'coscientist'):
-                        coscientist = self.protognosis_adapter.coscientist
-                        # Agents are stored in supervisor.agents, not coscientist.agents
-                        if hasattr(coscientist, 'supervisor') and hasattr(coscientist.supervisor, 'agents'):
-                            # Inject into all generation agents
-                            for agent_id, agent in coscientist.supervisor.agents.items():
-                                if agent_id.startswith('generation'):
-                                    agent.tool_registry = self.tool_registry
-                                    self.logger.info(f"  - Injected tool registry into {agent_id}")
-
-                            self.logger.info("✓ Tool registry injected into CoScientist generation agents")
-            else:
-                self.logger.info("BindCraft agent not available, skipping tool registration")
-
-        except Exception as e:
-            self.logger.warning(f"Failed to initialize tool registry: {e}")
-            import traceback
-            traceback.print_exc()
-
-    async def _initialize_knowledge_foundation(self):
-        """Initialize protein knowledge foundation."""
-        if not (self.knowledge_graph_enabled or self.literature_processing_enabled):
-            return
-
-        self.logger.info("Initializing protein knowledge foundation...")
-
-        try:
-            knowledge_config = self.binder_config.get("knowledge_sources", {})
-            self.knowledge_foundation = ProteinKnowledgeFoundation(
-                config=knowledge_config,
-                enable_knowledge_graph=self.knowledge_graph_enabled,
-                enable_literature_processing=self.literature_processing_enabled
-            )
-            await self.knowledge_foundation.initialize()
-            self.logger.info("Protein knowledge foundation initialized")
-        except Exception as e:
-            self.logger.warning(f"Failed to initialize knowledge foundation: {e}")
-            self.knowledge_foundation = None
 
     def _extract_target_sequence(self, research_goal: str) -> str:
         """
