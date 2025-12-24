@@ -55,7 +55,7 @@ class AgenticBinderPipeline:
         self,
         config_path: str = "config/binder_config.yaml",
         jnana_config_path: str = "config/jnana_config.yaml",
-        max_iterations: int = 10,
+        max_iterations: int = 1_000_000_000,
         enable_agents: Optional[List[str]] = None
     ):
         """
@@ -74,7 +74,9 @@ class AgenticBinderPipeline:
             'computational_design',
             'molecular_dynamics',
             'rag',
-            'structure_prediction'
+            'structure_prediction',
+            'analysis',
+            'free_energy'
         ]
         
         self.system: Optional[BinderDesignSystem] = None
@@ -86,6 +88,7 @@ class AgenticBinderPipeline:
         self.all_binders = []
         self.best_binders = []
         self.iteration_count = 0
+        self.comp_design_it = 0
     
     async def initialize(self, research_goal: str) -> None:
         """
@@ -110,6 +113,7 @@ class AgenticBinderPipeline:
         await self.system.start()
         
         # Set research goal
+        self.research_goal = research_goal
         self.session_id = await self.system.set_research_goal(research_goal)
         self.target_sequence = self.system._extract_target_sequence(research_goal)
         
@@ -405,15 +409,15 @@ class AgenticBinderPipeline:
         )
 
         recommendation = recommendation_list[-1] if recommendation_list else {}
-        next_task = recommendation.get('metadata', {}).get('next_task', 'stop')
+        next_task = recommendation.get('metadata', {}).get('next_task', 'computational_design')
 
         logger.info(f"✓ Recommended next task: {next_task}")
 
         # Check if we should stop
         if next_task == 'stop':
-            logger.info("Reasoner recommends stopping.")
+            logger.info("Reasoner recommends stopping but we will continue anyways.")
             return {
-                'task': 'stop',
+                'task': '',
                 'config': None,
                 'results': None
             }
@@ -478,8 +482,40 @@ class AgenticBinderPipeline:
         passing = [Path(item).resolve() for sublist in passing for item in sublist]
 
         config['simulation_paths'] = passing
-        config['root_output_path'] = f'{self.global_cwd}/molecular_dynamics/{iteration}'
+        config['root_output_path'] = f'{self.global_cwd}/molecular_dynamics/{self.comp_design_it}'
+        config['steps'] = 1000
+        return config
 
+    def _prepare_analysis_config(
+        self,
+        config: Dict[str, Any],
+        hypothesis: ProteinHypothesis,
+        iteration: int
+    ) -> Dict[str, Any]:
+        """
+        Prepare configuration for molecular dynamics task.
+
+        Args:
+            config: Base configuration
+            hypothesis: The protein hypothesis object
+            iteration: Current iteration number
+
+        Returns:
+            Updated configuration for MD task
+        """
+        checkpoint_file = hypothesis.binder_analysis.checkpoint_file
+        checkpoint_data = pickle.load(open(checkpoint_file, 'rb'))
+        all_cycles = checkpoint_data['all_cycles']
+
+        passing = [
+            all_cycles[i]['passing_structures']
+            for i in range(len(all_cycles))
+        ]
+        passing = [Path(item).resolve() for sublist in passing for item in sublist]
+
+        config['simulation_paths'] = passing
+        config['root_output_path'] = f'{self.global_cwd}/molecular_dynamics/{self.comp_design_it}'
+        config['steps'] = 1000
         return config
 
     async def _execute_task(
@@ -505,9 +541,9 @@ class AgenticBinderPipeline:
 
         # Handle computational design specific setup
         if task_name == 'computational_design':
-            config['cwd'] = f'{self.global_cwd}/computational_design/{iteration}'
+            config['cwd'] = f'{self.global_cwd}/computational_design/{self.comp_design_it}'
             config['target_sequence'] = self.target_sequence
-
+            self.comp_design_it +=1
             # Set up constraints if specified
             if 'constraint' in config and 'residues_bind' in config['constraint']:
                 config['constraints'] = {
@@ -648,6 +684,7 @@ class AgenticBinderPipeline:
 
         self.iteration_count = 1
 
+        self.comp_design_it = 1
         # Run subsequent iterations
         while self.iteration_count < self.max_iterations:
             iteration_result = await self.run_iteration(
