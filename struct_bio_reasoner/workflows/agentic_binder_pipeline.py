@@ -357,7 +357,7 @@ class AgenticBinderPipeline:
         logger.info(f'Recommended config list: {recommended_config_list}')
 
         if recommended_config_list:
-            current_config = recommended_config_list[1]['metadata']['new_config']
+            current_config = recommended_config_list[-1]['metadata']['new_config']
 
         current_config['num_rounds'] = 1
 
@@ -434,12 +434,14 @@ class AgenticBinderPipeline:
 
         logger.info(f'Recommended config list: {recommended_config_list}')
 
-        current_config = recommended_config_list[1]['metadata']['new_config'] if recommended_config_list else {}
+        current_config = recommended_config_list[-1]['metadata']['new_config'] if recommended_config_list else {}
 
         # Handle task-specific configuration
         if next_task == 'molecular_dynamics':
             current_config = self._prepare_md_config(current_config, hypothesis, iteration)
 
+        if next_task == 'analysis':
+            current_config = self._prepare_analysis_config(current_config, hypothesis, iteration)
         # Execute the task
         results = await self._execute_task(
             task_name=next_task,
@@ -564,6 +566,7 @@ class AgenticBinderPipeline:
             await self.system.design_agents[task_name].initialize()
 
         # Execute the task
+        logger.info(f'Before running {task_name}, {config=}')
         results = await self.system.design_agents[task_name].analyze_hypothesis(
             hypothesis,
             config

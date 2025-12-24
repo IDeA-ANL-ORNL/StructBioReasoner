@@ -549,6 +549,9 @@ class MDAgentAdapter:
         structures = [Path(p) for p in task_params['simulation_paths']]
         out = Path(task_params['root_output_path'])
         prod_steps = task_params.get('steps', self.prod_steps)
+        
+        self.logger.info(f'{prod_steps=}')
+        self.logger.info(f'{task_params["steps"]=}')
         solvent = task_params.get('solvent', 'explicit')
 
         # TODO: get kwargs for build/sim from task_params
