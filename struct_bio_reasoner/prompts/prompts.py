@@ -339,6 +339,20 @@ class MDPromptManager():
             {self.history['key_items']}
             Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['hotspot']}."""
         elif self.prompt_type == 'binder_design':
+            test_prompt = f"""
+            You are an expert in computational peptide design optimization and md simulations. Evaluate the current optimization progress and decide which step to take next ('analysis', 'free_energy'). 
+            Previous round results: {self.input_json}
+            This is the history of decisions (least recent first):
+            {self.history['decisions'] if self.history['decisions'] != [] else 'No history'}
+        and the history of results (least recent first):
+            {self.history['results'] if self.history['results'] != [] else 'No history'}
+        and the history of configurations (least recent first):
+            {self.history['configurations'] if self.history['configurations'] != [] else 'No history'}.
+        There are a few very important items to consider encoded here:
+            {self.history['key_items']}
+            Please provide your decision and reasoning. Orient your decision process with this logic:
+            - if sufficient timesteps have been run but analysis has not been suggested in the past few steps, suggest 'analysis' to measure rmsd, rmsf, radius of gyration and interacting residues.
+            - if sufficient timesteps have been run and analysis has been suggested recently, suggest 'free_energy' to run MM-PBSA to evalute free energies of binding"""
             prompt = f"""
             You are an expert in computational peptide design optimization and md simulations. Evaluate the current optimization progress and decide which step to take next ('molecular_dynamics', 'analysis', 'free_energy'). 
             Previous round results: {self.input_json}
@@ -354,8 +368,8 @@ class MDPromptManager():
             - if only a few simulation timesteps have been run, suggest 'molecular_dynamics' and to increase timesteps
             - if sufficient timesteps have been run but analysis has not been suggested in the past few steps, suggest 'analysis' to measure rmsd, rmsf, radius of gyration and interacting residues.
             - if sufficient timesteps have been run and analysis has been suggested recently, suggest 'free_energy' to run MM-PBSA to evalute free energies of binding"""
-        self.prompt_c = prompt
-        return prompt
+        self.prompt_c = test_prompt
+        return test_prompt
 
 
 @dataclass
