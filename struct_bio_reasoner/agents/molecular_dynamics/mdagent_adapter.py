@@ -186,64 +186,6 @@ class MDAgentAdapter:
 
             return False
     
-    async def generate_hypotheses(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Generate MD-based hypotheses using MDAgent backend.
-        
-        Args:
-            context: Analysis context containing protein information
-            
-        Returns:
-            List of hypothesis dictionaries
-        """
-        if not self.initialized:
-            self.logger.error("MDAgent adapter not ready")
-            return []
-        
-        hypotheses = []
-        
-        try:
-            # Extract context
-            protein_sequence = context.get('protein_sequence', '')
-            target_protein = context.get('target_protein', 'unknown')
-            pdb_path = context.get('pdb_path')
-            
-            if not pdb_path:
-                self.logger.error("No PDB path provided in context")
-                return []
-            
-            # Run MD simulation using MDAgent
-            self.logger.info("RUNNNNINNNNG MDDDD")
-            simulation_result = await self.run_md_simulation(
-                pdb_path=Path(pdb_path),
-                protein_name=target_protein
-            )
-            
-            if simulation_result:
-                # Convert to hypothesis format
-                hypothesis = {
-                    'title': f'MDAgent Simulation Analysis for {target_protein}',
-                    'strategy': 'mdagent_simulation',
-                    'approach': f'{self.solvent_model}_solvent_md',
-                    'description': f'MD simulation using MDAgent with {self.solvent_model} solvent',
-                    'confidence': simulation_result.get('confidence', 0.75),
-                    'source': 'MDAgentAdapter',
-                    'simulation_results': simulation_result,
-                    'execution_plan': {
-                        'solvent_model': self.solvent_model,
-                        'equilibration_steps': self.equil_steps,
-                        'production_steps': self.prod_steps,
-                        'force_field': self.force_field
-                    }
-                }
-                hypotheses.append(hypothesis)
-            
-            self.logger.info(f"Generated {len(hypotheses)} MDAgent-based hypotheses")
-            
-        except Exception as e:
-            self.logger.error(f"Error generating MDAgent hypotheses: {e}")
-        
-        return hypotheses
     
     async def run_md_simulation(self,
                                 root_path: Path,

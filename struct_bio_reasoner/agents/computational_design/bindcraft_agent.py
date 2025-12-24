@@ -81,7 +81,7 @@ class BindCraftAgent:
             parsl_settings = LocalSettings(**parsl_config).config_factory(Path.cwd())
 
             cwd = Path(self.config.get('cwd', os.getcwd()))
-            cwd.mkdir(exist_ok=True)
+            cwd.mkdir(exist_ok=True, parents=True)
 
             fasta_dir = cwd / "fastas"
             folds_dir = cwd / "folds"
@@ -229,7 +229,7 @@ class BindCraftAgent:
         """"""
         # prepare output paths
         cwd = Path(data.get('cwd', self.config.get('cwd', os.getcwd())))
-        cwd.mkdir(exist_ok=True)
+        cwd.mkdir(exist_ok=True, parents=True)
 
         fasta_dir = cwd / "fastas"
         folds_dir = cwd / "folds"
@@ -243,7 +243,7 @@ class BindCraftAgent:
         binder_sequence = data.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
         constraints = data.get('constraints', None)
         num_rounds = data.get('num_rounds', 3)
-        
+
         # Run the workflow
         results = await self.coordinator.run_full_workflow(
             target_sequence=target_sequence,

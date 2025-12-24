@@ -25,7 +25,6 @@ from ..agents.computational_design.bindcraft_agent import BindCraftAgent
 from ..agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
 from ..agents.molecular_dynamics.free_energy_agent import FEAgent
 from ..agents.structure_prediction.chai_agent import ChaiAgent
-from ..agents.energetic.energy_agent import EnergeticAnalysisAgent
 from ..prompts.prompts import get_prompt_manager
 try:
     from ..agents.hiper_rag.rag_agent import RAGWrapper 
@@ -37,8 +36,6 @@ except Exception as e:
     traceback.print_exc()
     RAG_EXISTS=False
 
-from ..tools.pymol_wrapper import PyMOLWrapper
-from ..tools.biopython_utils import BioPythonUtils
 from ..utils.config_loader import load_binder_config
 from .knowledge_foundation import ProteinKnowledgeFoundation
 
@@ -231,57 +228,12 @@ class BinderDesignSystem(JnanaSystem):
 
         # Initialize design-specific components
         
-        await self._initialize_design_tools()
         await self._initialize_design_agents()
-
-        ### If we want the llm to directly use tool calling then initialize the tool registry.
-        ### Otherwise keep it false
-        if False:
-            await self._initialize_tool_registry()  # NEW: Initialize tool registry
 
         await self._initialize_knowledge_foundation()
 
         self.design_system_ready = True
         self.logger.info("BinderDesignSystem started successfully")
-    
-    async def _initialize_design_tools(self):
-        """Initialize design-specific tools."""
-        self.logger.info("Initializing design tools...")
-
-        # Initialize PyMOL wrapper
-        if "pymol" in self.enable_tools:
-            try:
-                pymol_config = self.binder_config.get("tools", {}).get("pymol", {})
-                self.design_tools["pymol"] = PyMOLWrapper(pymol_config)
-                await self.design_tools["pymol"].initialize()
-                self.logger.info("PyMOL wrapper initialized")
-            except Exception as e:
-                self.logger.warning(f"Failed to initialize PyMOL: {e}")
-
-        # Initialize BioPython utilities
-        if "biopython" in self.enable_tools:
-            try:
-                biopython_config = self.binder_config.get("tools", {}).get("biopython", {})
-                self.design_tools["biopython"] = BioPythonUtils(biopython_config)
-                await self.design_tools["biopython"].initialize()
-                self.logger.info("BioPython utilities initialized")
-            except Exception as e:
-                self.logger.warning(f"Failed to initialize BioPython: {e}")
-
-        # Initialize OpenMM wrapper
-        if "openmm" in self.enable_tools:
-            try:
-                from ..tools.openmm_wrapper import OpenMMWrapper
-                openmm_config = self.binder_config.get("tools", {}).get("openmm", {})
-                self.design_tools["openmm"] = OpenMMWrapper(openmm_config)
-                await self.design_tools["openmm"].initialize()
-                self.logger.info("OpenMM wrapper initialized")
-            except Exception as e:
-                self.logger.warning(f"Failed to initialize OpenMM: {e}")
-
-        # TODO: Initialize other tools (Rosetta, AlphaFold, ESM, etc.)
-
-        self.logger.info(f"Initialized {len(self.design_tools)} design tools")
     
     async def _initialize_design_agents(self):
         """Initialize protein-specific agents."""
@@ -382,48 +334,6 @@ class BinderDesignSystem(JnanaSystem):
                 self.logger.warning(f'Failed to initialize analysis agent: {e}')
         
         self.logger.info(f"Initialized {len(self.design_agents)} protein agents")
-
-    async def _initialize_tool_registry(self):
-        """
-        Initialize tool registry and register BindCraft tool.
-
-        This makes BindCraft available as a tool that LLM agents can call
-        during hypothesis generation.
-        """
-        try:
-            from jnana.tools import ToolRegistry, BindCraftTool
-
-            # Create tool registry
-            self.tool_registry = ToolRegistry()
-            self.logger.info("Tool registry created")
-
-            # Register BindCraft tool if agent is available
-            if 'computational_design' in self.design_agents:
-                bindcraft_agent = self.design_agents['computational_design']
-                bindcraft_tool = BindCraftTool(bindcraft_agent)
-                self.tool_registry.register_tool(bindcraft_tool)
-                self.logger.info("✓ BindCraft tool registered for LLM use")
-
-                # Inject tool registry into ProtoGnosis agents
-                if hasattr(self, 'protognosis_adapter') and self.protognosis_adapter:
-                    if hasattr(self.protognosis_adapter, 'coscientist'):
-                        coscientist = self.protognosis_adapter.coscientist
-                        # Agents are stored in supervisor.agents, not coscientist.agents
-                        if hasattr(coscientist, 'supervisor') and hasattr(coscientist.supervisor, 'agents'):
-                            # Inject into all generation agents
-                            for agent_id, agent in coscientist.supervisor.agents.items():
-                                if agent_id.startswith('generation'):
-                                    agent.tool_registry = self.tool_registry
-                                    self.logger.info(f"  - Injected tool registry into {agent_id}")
-
-                            self.logger.info("✓ Tool registry injected into CoScientist generation agents")
-            else:
-                self.logger.info("BindCraft agent not available, skipping tool registration")
-
-        except Exception as e:
-            self.logger.warning(f"Failed to initialize tool registry: {e}")
-            import traceback
-            traceback.print_exc()
 
     async def _initialize_knowledge_foundation(self):
         """Initialize protein knowledge foundation."""

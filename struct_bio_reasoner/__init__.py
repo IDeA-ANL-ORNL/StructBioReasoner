@@ -10,21 +10,8 @@ __author__ = "StructBioReasoner Team"
 __description__ = "Jnana-based structural biology reasoning model for protein engineering"
 
 # Core imports
-from .core.protein_system import ProteinEngineeringSystem
 from .data.protein_hypothesis import ProteinHypothesis, MutationHypothesis
 from .data.mutation_model import Mutation, MutationSet, MutationEffect
-
-# Agent imports
-from .agents.structural.structural_agent import StructuralAnalysisAgent
-from .agents.evolutionary.conservation_agent import EvolutionaryConservationAgent
-from .agents.energetic.energy_agent import EnergeticAnalysisAgent
-from .agents.design.mutation_agent import MutationDesignAgent
-from .agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
-
-# Tool imports
-from .tools.pymol_wrapper import PyMOLWrapper
-from .tools.biopython_utils import BioPythonUtils
-from .tools.openmm_wrapper import OpenMMWrapper
 
 # Utility imports
 from .utils.protein_utils import load_protein_structure, analyze_sequence
