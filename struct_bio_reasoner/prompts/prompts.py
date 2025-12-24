@@ -136,12 +136,12 @@ class BindCraftPromptManager():
 
         if self.prompt_type == 'conclusion':
             self.num_rounds = self.input_json.get('num_rounds', 1)
-            self.total_sequences = self.input_json.get('total_sequences', 100)
-            self.passing_sequences = self.input_json.get('passing_sequences', 0)
-            self.passing_structures = self.input_json.get('passing_structures', 0)
+            self.total_sequences = self.input_json.get('total_sequences', 10)
+            self.passing_sequences = self.input_json.get('passing_sequences', 10)
+            self.passing_structures = self.input_json.get('passing_structures', 10)
             self.top_binders = self.input_json.get('top_binders', {})#dict(sorted(self.input_json['all_cycles'][self.num_rounds].items(), key=lambda x: x[1]['energy'])[:5])
             if self.top_binders == {}:
-                self.top_binders == 'No top binders'
+                self.top_binders == 'No top binders since this is the beginning of the workflow... do not change parameters if this is the case'
             #self.prompt_c = self.conclusion_prompt()
 
         elif self.prompt_type == 'running':
@@ -197,7 +197,7 @@ class BindCraftPromptManager():
 
     def conclusion_prompt(self):
         # Serialize for better LLM readability
-        top_binders_str = json.dumps(self.top_binders, indent=2, default=str) if self.top_binders and self.top_binders != {} else 'No top binders yet'
+        top_binders_str = json.dumps(self.top_binders, indent=2, default=str) if self.top_binders and self.top_binders != {} else 'No top binders yet since this is the beginning of the workflow. No need for changing parameters because of this.'
         decisions_str = json.dumps(self.history['decisions'], indent=2, default=str) if self.history['decisions'] else 'No history'
         results_str = json.dumps(self.history['results'], indent=2, default=str) if self.history['results'] else 'No history'
         configs_str = json.dumps(self.history['configurations'], indent=2, default=str) if self.history['configurations'] else 'No history'
@@ -340,7 +340,7 @@ class MDPromptManager():
             Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['hotspot']}."""
         elif self.prompt_type == 'binder_design':
             prompt = f"""
-            You are an expert in computational peptide design optimization and md simulations. Evaluate the current optimization progress and decide which step to take next ('computational_design', 'molecular_dynamics', 'analysis', 'free_energy'). 
+            You are an expert in computational peptide design optimization and md simulations. Evaluate the current optimization progress and decide which step to take next ('molecular_dynamics', 'analysis', 'free_energy'). 
             Previous round results: {self.input_json}
             This is the history of decisions (least recent first):
             {self.history['decisions'] if self.history['decisions'] != [] else 'No history'}
@@ -350,7 +350,10 @@ class MDPromptManager():
             {self.history['configurations'] if self.history['configurations'] != [] else 'No history'}.
         There are a few very important items to consider encoded here:
             {self.history['key_items']}
-            Please provide your decision and reasoning."""
+            Please provide your decision and reasoning. Orient your decision process with this logic:
+            - if only a few simulation timesteps have been run, suggest 'molecular_dynamics' and to increase timesteps
+            - if sufficient timesteps have been run but analysis has not been suggested in the past few steps, suggest 'analysis' to measure rmsd, rmsf, radius of gyration and interacting residues.
+            - if sufficient timesteps have been run and analysis has been suggested recently, suggest 'free_energy' to run MM-PBSA to evalute free energies of binding"""
         self.prompt_c = prompt
         return prompt
 
