@@ -38,6 +38,7 @@ except Exception as e:
 
 from ..utils.config_loader import load_binder_config
 from .knowledge_foundation import ProteinKnowledgeFoundation
+import os
 
 from dataclasses import dataclass, asdict, field
 
@@ -105,6 +106,7 @@ class BinderDesignSystem(JnanaSystem):
         self.memory_binder.set_research_goal(research_goal)
         self.research_goal = research_goal
         self.binder_config = load_binder_config(config_path)
+        self.global_cwd = self.binder_config.get("agents").get("computational_design").get("bindcraft").get("cwd")
         self.parsl_config = self.binder_config['parsl']
         
         # Determine Jnana config path
@@ -246,6 +248,7 @@ class BinderDesignSystem(JnanaSystem):
         if 'computational_design' in self.enable_agents:
             try:
 
+                os.makedirs(f'{self.global_cwd}/computational_design', exist_ok = True)
                 design_config = self.binder_config.get("agents", {}).get("computational_design", asdict(BinderConfig()))
 
                 if 'bindcraft' in design_config:
@@ -273,6 +276,8 @@ class BinderDesignSystem(JnanaSystem):
         if "molecular_dynamics" in self.enable_agents:
             try:
                 md_config = agent_configs.get("molecular_dynamics", {})
+                os.makedirs(f'{self.global_cwd}/molecular_dynamics', exist_ok = True)
+
                 self.design_agents['molecular_dynamics'] = MDAgentAdapter(
                     agent_id="molecular_dynamics",
                     config=md_config,
@@ -284,6 +289,7 @@ class BinderDesignSystem(JnanaSystem):
 
             if 'free_energy' in self.enable_agents:
                 try:
+                    os.makedirs(f'{self.global_cwd}/free_energy', exist_ok = True)
                     self.design_agents['free_energy'] = FEAgent(
                         agent_id='free_energy',
                         config=md_config,
@@ -298,6 +304,7 @@ class BinderDesignSystem(JnanaSystem):
             if RAG_EXISTS:
                 try:
                     rag_config = agent_configs["rag"]#.get("rag", {})
+                    os.makedirs(f'{self.global_cwd}/rag', exist_ok = True)
                     self.logger.info(rag_config)
                     self.design_agents['rag'] = RAGWrapper(
                         agent_id="rag",
@@ -315,6 +322,7 @@ class BinderDesignSystem(JnanaSystem):
         if 'structure_prediction' in self.enable_agents:
             try:
                 pred_config = agent_configs.get('structure_prediction', {})
+                os.makedirs(f'{self.global_cwd}/structure_prediction', exist_ok = True)
                 self.design_agents['structure_prediction'] = ChaiAgent(
                     agent_id='structure_prediction',
                     config=pred_config,
@@ -325,6 +333,7 @@ class BinderDesignSystem(JnanaSystem):
 
         if 'analysis' in self.enable_agents:
             try:
+                os.makedirs(f'{self.global_cwd}/analysis', exist_ok = True)
                 self.design_agents['analysis'] = TrajectoryAnalysisAgent(
                     agent_id='analysis',
                     config={}, # no global config

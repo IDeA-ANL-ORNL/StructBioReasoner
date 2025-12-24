@@ -478,7 +478,7 @@ class AgenticBinderPipeline:
         passing = [Path(item).resolve() for sublist in passing for item in sublist]
 
         config['simulation_paths'] = passing
-        config['root_output_path'] = f'{self.global_cwd}/simulations/{iteration}'
+        config['root_output_path'] = f'{self.global_cwd}/molecular_dynamics/{iteration}'
 
         return config
 
@@ -505,7 +505,7 @@ class AgenticBinderPipeline:
 
         # Handle computational design specific setup
         if task_name == 'computational_design':
-            config['cwd'] = f'{self.global_cwd}/binder_design/{iteration}'
+            config['cwd'] = f'{self.global_cwd}/computational_design/{iteration}'
             config['target_sequence'] = self.target_sequence
 
             # Set up constraints if specified
