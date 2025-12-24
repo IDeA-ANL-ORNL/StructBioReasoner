@@ -344,10 +344,8 @@ class BinderDesignSystem(JnanaSystem):
         # Initialize molecular dynamics agent
         if "rag" in self.enable_agents:
             if RAG_EXISTS:
-                print(f"{agent_configs=}")
                 try:
                     rag_config = agent_configs["rag"]#.get("rag", {})
-                    self.logger.info(f"{rag_config=}")
                     self.logger.info(rag_config)
                     self.design_agents['rag'] = RAGWrapper(
                         agent_id="rag",
@@ -372,6 +370,16 @@ class BinderDesignSystem(JnanaSystem):
                 )
             except Exception as e:
                 self.logger.warning(f'Failed to initialize structure prediction agent: {e}')
+
+        if 'analysis' in self.enable_agents:
+            try:
+                self.design_agents['analysis'] = TrajectoryAnalysisAgent(
+                    agent_id='analysis',
+                    config={}, # no global config
+                    parsl_config=self.parsl_config,
+                )
+            except Exception as e:
+                self.logger.warning(f'Failed to initialize analysis agent: {e}')
         
         self.logger.info(f"Initialized {len(self.design_agents)} protein agents")
 
