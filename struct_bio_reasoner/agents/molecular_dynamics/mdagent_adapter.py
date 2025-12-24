@@ -77,7 +77,7 @@ class MDAgentAdapter:
         
         # Simulation parameters
         self.equil_steps = self.mdagent_config.get("equil_steps", 10_000)
-        self.prod_steps = self.mdagent_config.get("prod_steps", 1_000_000)
+        self.prod_steps = self.mdagent_config.get("prod_steps", 10_000)
         
         p_steps = self.prod_steps * 4 / 1000000
         self.logger.info(f'Will run MD for {p_steps} ns')
