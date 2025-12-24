@@ -728,6 +728,7 @@ class BinderDesignSystem(JnanaSystem):
             prompt_type = 'binder_design'
         else:
             prompt_type = 'conclusion'
+
         prompt_manager = get_prompt_manager(
                 agent_type=runtype,
                 research_goal=self.research_goal,
@@ -745,8 +746,8 @@ class BinderDesignSystem(JnanaSystem):
         recommendation = await self.generate_single_recommendation(results_pass)
         self.logger.info(f"Here is the protein recommendation: \n {[rec.to_dict() for rec in recommendation]}")
         self.append_history(recommendations=recommendation)
-        #recommendation.metadata['history_list'] = self.history_list
-        #recommendation.metadata['num_history'] = self.num_history
+        recommendation[0].metadata['history_list'] = self.history
+        recommendation[0].metadata['num_history'] = self.num_history
         #protein_recommendation = ProteinHypothesis.from_unified_hypothesis(
         #    recommendation,
         #    #biological_context=biological_context # this goes into `protein_metadata`
