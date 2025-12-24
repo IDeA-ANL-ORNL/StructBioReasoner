@@ -116,7 +116,7 @@ class ManagerAgent(Agent):
         # TODO: what agent is this going to? ForwardFoldingAgent? 
         result = await folding_handle.fold_sequences(
             sequences=params['sequences'],
-            names=params['names']
+            names=params['names'],
             constraints=params['constraints']
             #target_sequence=params.get('target_sequence'),
             #device=params.get('device', 'cuda:0')
