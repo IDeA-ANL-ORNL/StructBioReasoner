@@ -249,6 +249,8 @@ class MDAgentAdapter:
                 sim_kwargss=sim_kwargs,
             )
 
+            return results
+
             self.logger.info(f'{results=}')
            
             for sim_id, result in enumerate(results):
@@ -567,6 +569,8 @@ class MDAgentAdapter:
                                  'platform': 'OpenCL',
                                  'solvent': solvent},
         )
+        
+        return sim_results
 
         summary_stats = self.summarize(sim_results)
         
