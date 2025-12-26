@@ -885,10 +885,10 @@ class AgenticBinderPipelineWithCheckpointing:
         previous_task = iteration_result['task']
         previous_config = iteration_result['config']
 
-        try:
-            previous_results = iteration_result['results'].__dict__
-        except:
-            previous_results = iteration_result['results']
+        ##try:
+        #    previous_results = iteration_result['results'].__dict__
+        #except:
+        previous_results = iteration_result['results']
 
         # Update hypothesis and track binders
         best_binders_this_iter = self._update_hypothesis(
