@@ -542,7 +542,7 @@ class AgenticBinderPipeline:
             analysis_type = [analysis_type]
         #data_type = list(data_type)
 
-        seqs = [pdb2seq(p/'build/protein.pdb')[1] for p in paths]
+        #seqs = [pdb2seq(p/'build/protein.pdb')[1] for p in paths]
         analysis_config = {
             data_type: {
                 at: {
@@ -550,7 +550,7 @@ class AgenticBinderPipeline:
                 'kwargs': {'distance_cutoff': distance_cutoff,
                            'n_top': 10,
                           },
-                'seqs': seqs
+                #'seqs': seqs
                 }
             } for at in analysis_type}
         return analysis_config
