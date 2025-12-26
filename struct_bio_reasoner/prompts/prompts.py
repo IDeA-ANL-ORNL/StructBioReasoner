@@ -502,10 +502,20 @@ class FreeEnergyPromptManager():
         #pass
     def conclusion_prompt(self):
 
+        input_json_str = json.dumps(self.input_json, indent=2, default=str)
+        history_str = json.dumps(self.history, indent=2, default=str)
         prompt = f'''
                 You are an expert in evaluating free energy calculations, especially as performed by MM-PBSA. 
-                Evaluate the following results and decide whether the current scaffold should be used in the next round of computational_design or if a new scaffold should be accessed here. The next task  For context please use the history of decisions, recommendations, rationales, recommended configs, and key items like best binders 
+                Evaluate the following results and decide whether the current scaffold should be used in the next round of computational_design or if a new scaffold should be accessed here. 
+                Results:
+                    {input_json_str}
+
+                Inform the scaffold to use 'affibody', 'nanobody', 'affitin', or 'use_top_binders'. Only suggest 'use_top_binders' if the previous binders produced good free energies and are improving in the workflow. Put the next_task as 'computational_design' but suggest a new scaffold in the rationale.
+                For context please use the history of decisions, recommendations, rationales, recommended configs, and key items like best binders:
+                {history_str}
                 '''
+
+        self.prompt_c = prompt  
         if self.prompt_type == 'interactome_simulation':
             prompt = f"""
             You are an expert in evaluating md simulations. Evaluate the simulations and decide which ones should be used to calculate hotspots and which should be discarded.
