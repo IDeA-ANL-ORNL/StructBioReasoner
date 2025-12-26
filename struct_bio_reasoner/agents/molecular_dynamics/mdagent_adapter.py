@@ -77,7 +77,7 @@ class MDAgentAdapter:
         
         # Simulation parameters
         self.equil_steps = self.mdagent_config.get("equil_steps", 10_000)
-        self.prod_steps = self.mdagent_config.get("prod_steps", 1_000_000)
+        self.prod_steps = self.mdagent_config.get("prod_steps", 20_000)
         
         p_steps = self.prod_steps * 4 / 1000000
         self.logger.info(f'Will run MD for {p_steps} ns')
@@ -249,29 +249,12 @@ class MDAgentAdapter:
                 sim_kwargss=sim_kwargs,
             )
 
-            return results
-
-            self.logger.info(f'{results=}')
-           
-            for sim_id, result in enumerate(results):
-                # Store results
-                self.completed_simulations[sim_id] = {
-                    'results': result,
-                    'build_kwargs': build_kwargs,
-                    'sim_kwargs': sim_kwargs,
-                    'timestamp': datetime.now().isoformat()
-                }
-            
-            self.logger.info('Analyzing simulation results')
-            # Analyze results and create structured output
-            analysis = await self._analyze_mdagent_results(results)
-            
             # Clean up agent/parsl
             await self.cleanup()
             
             self.logger.info(f"MDAgent simulation completed")
 
-            return analysis
+            return results
 
         except Exception as e:
             import traceback
@@ -279,186 +262,6 @@ class MDAgentAdapter:
             self.logger.error(f"MDAgent simulation failed: {e}")
             return {}
     
-    async def _analyze_mdagent_results(self, results: Dict[int, Any]) -> Dict[str, Any]:
-        """
-        Analyze MDAgent simulation results.
-
-        Args:
-            sim_id: Simulation identifier
-            results: Raw results from MDAgent
-
-        Returns:
-            Structured analysis results
-        """
-        analyses = {sim_id: {} for sim_id in range(len(results))}
-        for sim_id, result in enumerate(results):
-            build_path = result.get('build')
-            sim_status = result.get('sim')
-
-            # Basic analysis structure
-            analysis = {
-                'simulation_id': sim_id,
-                'build_path': str(build_path) if build_path else None,
-                'simulation_status': sim_status,
-                'solvent_model': self.solvent_model,
-                'success': 'unknown',
-                'confidence': 0.8 if sim_status == 'success' else 0.0,
-                'timestamp': datetime.now().isoformat()
-            }
-
-            # Perform trajectory analysis if simulation succeeded
-            if sim_status == 'success' and build_path:
-                try:
-                    self.logger.info(f'Analyzing {build_path}!')
-                    trajectory_analysis = await self._analyze_trajectory(build_path)
-                    analysis['trajectory_analysis'] = trajectory_analysis
-
-
-                    # Update confidence based on trajectory quality
-                    if trajectory_analysis:
-                        analysis['confidence'] = self._calculate_confidence(trajectory_analysis)
-
-                    analysis['success'] = True
-
-                except Exception as e:
-                    self.logger.warning(f"Trajectory analysis failed: {e}")
-                    analysis['trajectory_analysis_error'] = str(e)
-
-                analyses[sim_id] = analysis
-
-        return analyses
-
-    async def _analyze_trajectory(self, build_path: Path) -> Optional[Dict[str, Any]]:
-        """
-        Analyze MD trajectory to extract structural and dynamic properties.
-
-        Args:
-            build_path: Path to simulation directory
-
-        Returns:
-            Trajectory analysis results or None if failed
-        """
-        try:
-            # Try to import MDTraj for trajectory analysis
-            try:
-                import mdtraj as md
-                import numpy as np
-            except ImportError:
-                self.logger.warning("MDTraj not available - skipping detailed trajectory analysis")
-                return self._create_placeholder_analysis()
-
-            # Look for trajectory files
-            build_path = Path(build_path)
-            trajectory = build_path / self.mdagent_config['output_dcd']
-
-            if not trajectory.exists():
-                self.logger.warning("No trajectory files found")
-                return self._create_placeholder_analysis()
-
-            # Load topology
-            pdb_file = build_path / self.mdagent_config['topology']
-            if not pdb_file.exists():
-                self.logger.warning("No PDB topology file found")
-                return self._create_placeholder_analysis()
-
-            # Load trajectory
-            traj = md.load(str(trajectory), top=str(pdb_file))
-
-            self.logger.info('Loaded trajectory')
-
-            # Compute structural metrics
-            analysis = {}
-
-            # RMSD (Root Mean Square Deviation)
-            rmsd = md.rmsd(traj, traj[0])
-            analysis['rmsd'] = {
-                'mean': float(np.mean(rmsd)),
-                'std': float(np.std(rmsd)),
-                'min': float(np.min(rmsd)),
-                'max': float(np.max(rmsd)),
-                'unit': 'nm'
-            }
-
-            # RMSF (Root Mean Square Fluctuation)
-            rmsf = md.rmsf(traj, traj[0])
-            analysis['rmsf'] = {
-                'mean': float(np.mean(rmsf)),
-                'std': float(np.std(rmsf)),
-                'per_residue': rmsf.tolist(),
-                'unit': 'nm'
-            }
-
-            # Radius of gyration
-            rg = md.compute_rg(traj)
-            analysis['radius_of_gyration'] = {
-                'mean': float(np.mean(rg)),
-                'std': float(np.std(rg)),
-                'min': float(np.min(rg)),
-                'max': float(np.max(rg)),
-                'unit': 'nm'
-            }
-
-            # Secondary structure (DSSP)
-            try:
-                dssp = md.compute_dssp(traj)
-                # Count secondary structure elements
-                helix_content = np.mean(np.isin(dssp, ['H', 'G', 'I']))
-                sheet_content = np.mean(np.isin(dssp, ['E', 'B']))
-                coil_content = np.mean(np.isin(dssp, ['C', 'T', 'S']))
-
-                analysis['secondary_structure'] = {
-                    'helix_content': float(helix_content * 100),
-                    'sheet_content': float(sheet_content * 100),
-                    'coil_content': float(coil_content * 100),
-                    'unit': 'percent'
-                }
-            except Exception as e:
-                self.logger.warning(f"DSSP calculation failed: {e}")
-
-            # Identify flexible residues (high RMSF)
-            rmsf_threshold = np.mean(rmsf) + np.std(rmsf)
-            flexible_residues = np.where(rmsf > rmsf_threshold)[0].tolist()
-
-            # Identify stable residues (low RMSF)
-            stable_threshold = np.mean(rmsf) - 0.5 * np.std(rmsf)
-            stable_residues = np.where(rmsf < stable_threshold)[0].tolist()
-
-            analysis['flexibility_analysis'] = {
-                'flexible_residues': flexible_residues[:20],  # Top 20
-                'stable_residues': stable_residues[:20],  # Top 20
-                'rmsf_threshold': float(rmsf_threshold),
-                'stable_threshold': float(stable_threshold)
-            }
-
-            # Trajectory quality metrics
-            analysis['trajectory_info'] = {
-                'n_frames': int(traj.n_frames),
-                'n_atoms': int(traj.n_atoms),
-                'n_residues': int(traj.n_residues),
-                'time_ns': float(traj.time[-1] / 1000) if len(traj.time) > 0 else 0.0
-            }
-
-            return analysis
-
-        except Exception as e:
-            self.logger.error(f"Trajectory analysis failed: {e}")
-            return None
-
-    def _create_placeholder_analysis(self) -> Dict[str, Any]:
-        """
-        Create placeholder analysis when detailed analysis is not available.
-
-        Returns:
-            Placeholder analysis dictionary
-        """
-        return {
-            'status': 'placeholder',
-            'message': 'Detailed trajectory analysis not available (MDTraj not installed)',
-            'rmsd': {'mean': 0.0, 'std': 0.0, 'unit': 'nm'},
-            'rmsf': {'mean': 0.0, 'std': 0.0, 'unit': 'nm'},
-            'radius_of_gyration': {'mean': 0.0, 'std': 0.0, 'unit': 'nm'}
-        }
-
     def _calculate_confidence(self, trajectory_analysis: Dict[str, Any]) -> float:
         """
         Calculate confidence score based on trajectory analysis quality.
@@ -570,70 +373,12 @@ class MDAgentAdapter:
                                  'solvent': solvent},
         )
         
-        return sim_results
-
-        summary_stats = self.summarize(sim_results)
-        
-        analysis = SimAnalysis(
-            protein_id='',
-            simulation_time_in_ns=self.prod_steps * 4 / 1000000,
-            rmsd=summary_stats['rmsd'],
-            rmsf=summary_stats['rmsf'],
-            rog=summary_stats['rog']
-        )
-
-        analysis.confidence_score = self._calculate_confidence(analysis)
-        analysis.tools_used = self._get_tools_used()
-
-        return analysis
+        return {'paths': sim_results}
 
     async def is_ready(self) -> bool:
         if not hasattr(self, 'initialized'):
             await self.initialize()
         return self.initialized
-
-    def summarize(self,
-                  results: dict[str, Any]) -> dict[str, Any]:
-        N = len(results)
-        rmsds = np.zeros((N, 3))
-        rmsfs = np.zeros((N, 3))
-        rogs = np.zeros((N, 3))
-
-        for i, v in results.items():
-            analysis = v['trajectory_analysis']
-            n_frames = analysis['trajectory_info']['n_frames']
-            rmsds[i, 0] = analysis['rmsd']['mean']
-            rmsds[i, 1] = analysis['rmsd']['std']
-            rmsds[i, 2] = n_frames
-
-            rmsfs[i, 0] = analysis['rmsf']['mean']
-            rmsfs[i, 1] = analysis['rmsf']['std']
-            rmsfs[i, 2] = n_frames
-            
-            rogs[i, 0] = analysis['radius_of_gyration']['mean']
-            rogs[i, 1] = analysis['radius_of_gyration']['std']
-            rogs[i, 2] = n_frames
-
-        return {
-            'rmsd': self.population_stats(rmsds),
-            'rmsf': self.population_stats(rmsfs),
-            'rog': self.population_stats(rogs)
-        }
-
-    def population_stats(self,
-                         data: np.ndarray) -> np.ndarray:
-        means = data[:, 0]
-        stds = data[:, 1]
-        ns = data[:, 2].astype(float)
-
-        N_total = ns.sum()
-        mean_combined = (ns * means).sum() / N_total
-        
-        # Formula: sigma^2 = ( Σ n_i (s_i^2 + (m_i - μ)^2) ) / N
-        var_combined = (ns * (stds**2 + (means - mean_combined)**2)).sum() / N_total
-        std_combined = np.sqrt(var_combined)
-        
-        return np.array([mean_combined, std_combined])
 
     def _calculate_confidence(self,
                               analysis: SimAnalysis) -> float:
