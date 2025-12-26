@@ -464,9 +464,11 @@ class AnalysisPromptManager():
         Here is the history (which may include details from hiperrag about the interacting proteins):
         {history_str}
 
-        Please provide your decision and reasoning and include the paths of the structures to keep in the format:
-        {config_str}
-        Also include the root_output_path and steps for the simulation. Right now we are running some short simulations (100000 steps) to test the waters."""
+        Please provide your decision and reasoning and indicate which step should be taken next ('molecular_dynamics', 'free_energy', 'computational_design').
+        Rationale for each decision:
+        'molecular_dynamics': before progressing to free energy more simulation steps are needed to make a valid decision.
+        'free_energy': analysis indicates that produced binders are stable but we need further analysis to characterize binding free energy.
+        'computational_design': analysis indicates that the produced binders are unstable and we need to restart bindcraft with a different seed. """
         self.prompt_c = prompt
         return prompt
 
