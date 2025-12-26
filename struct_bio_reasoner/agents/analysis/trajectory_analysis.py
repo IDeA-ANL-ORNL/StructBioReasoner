@@ -108,6 +108,7 @@ class TrajectoryAnalysisAgent:
         
         try:
             self.logger.info('Analyzing simulation results')
+            self.logger.info(f'{analysis_schedule=}')
             # Analyze results and create structured output
             analysis = await self.coordinator_handle.analyze(analysis_schedule)
             
@@ -200,13 +201,11 @@ class TrajectoryAnalysisAgent:
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> SimAnalysis:
-        cutoff = task_params.get('contact_freq_cutoff', 0.5)
-
         sim_results = await self.perform_analysis(
             task_params
         )
         
-        analysis = []
+        analysis = {}
         confidence_score = self._calculate_confidence(sim_results)
         tools_used = self._get_tools_used()
         protein_id = task_params.get('protein_id', '')
@@ -223,24 +222,37 @@ class TrajectoryAnalysisAgent:
         if dynamic_results is not None:
             if 'basic_simulation_analysis' in sim_results['dynamic'].keys():
                 summary = sim_results['dynamic']['basic_simulation_analysis']['summary']
-                analysis.append(
-                    SimAnalysis(
-                        protein_id=protein_id,
-                        simulation_time_in_ns=self.prod_steps * 4 / 1000000,
-                        rmsd=summary['rmsd'],
-                        rmsf=summary['rmsf'],
-                        rog=summary['rog']
-                    )
-                )
+                analysis.update({
+                    'protein_id': protein_id,
+                    'rmsd': summary['rmsd'],
+                    'rmsf': summary['rmsf'],
+                    'rog': summary['rog']
+                })
+                #analysis.append(
+                #    SimAnalysis(
+                #        protein_id=protein_id,
+                #        simulation_time_in_ns=self.prod_steps * 4 / 1000000,
+                #        rmsd=summary['rmsd'],
+                #        rmsf=summary['rmsf'],
+                #        rog=summary['rog']
+                #    )
+                #)
             if 'advanced_simulation_analysis' in sim_results['dynamic'].keys():
                 contact_freqs = sim_results['dynamic']['advanced_simulation_analysis']['summary']
+                freqs = sorted(list(contact_freqs.values()))
+                try:
+                    cutoff = freqs[-10]
+                except IndexError:
+                    cutoff = freqs[0]
+
                 contacts = [k for k, v in contact_freqs.items() if v > cutoff]
-                analysis.append(
-                    StructuralAnalysis(
-                        protein_id=protein_id,
-                        binding_sites=contacts,
-                    )
-                )
+                analysis.update({'binding_sites': contacts})
+                #analysis.append(
+                #    StructuralAnalysis(
+                #        protein_id=protein_id,
+                #        binding_sites=contacts,
+                #    )
+                #)
 
         return analysis
 
