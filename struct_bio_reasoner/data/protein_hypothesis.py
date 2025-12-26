@@ -521,7 +521,7 @@ class ProteinHypothesis(UnifiedHypothesis):
 
         # Update metadata
         self.metadata['has_md_analysis'] = True
-        self.metadata['md_confidence'] = analysis.confidence_score
+        #self.metadata['md_confidence'] = analysis.confidence_score
 
     def add_structural_analysis(self, analysis: StructuralAnalysis):
         """Add structural analysis results."""

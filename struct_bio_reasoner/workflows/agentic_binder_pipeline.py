@@ -665,8 +665,10 @@ class AgenticBinderPipeline:
 
         previous_task = iteration_result['task']
         previous_config = iteration_result['config']
-        previous_results = iteration_result['results'].__dict__
-
+        try:
+            previous_results = iteration_result['results'].__dict__
+        except:
+            prvious_results = iteration_result['results']
         # Update hypothesis and track binders
         best_binders_this_iter = self._update_hypothesis(
             hypothesis,
@@ -706,7 +708,13 @@ class AgenticBinderPipeline:
             # Update for next iteration
             previous_task = iteration_result['task']
             previous_config = iteration_result['config']
-            previous_results = iteration_result['results'].__dict__
+            #if iteration_result['results'] is not dict:
+            #    previous_results = iteration_result['results'].__dict__
+            #else:
+            try:
+                previous_results = iteration_result['results'].__dict__
+            except:
+                previous_results = iteration_result['results']
 
             # Update hypothesis and track binders
             best_binders_this_iter = self._update_hypothesis(
