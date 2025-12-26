@@ -209,59 +209,53 @@ class MDAgentAdapter:
             self.logger.error("MDAgent adapter not ready")
             return {}
         
-        try:
-            # Create simulation directory
-            sim_id = f"mdagent_{protein_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            for pdb in pdb_path:
-                self.logger.info(f'Running simulations at: {pdb}')
+        # Create simulation directory
+        sim_id = f"mdagent_{protein_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        for pdb in pdb_path:
+            self.logger.info(f'Running simulations at: {pdb}')
 
-            # Prepare build kwargs
-            build_kwargs = custom_build_kwargs or {
-                'solvent': self.solvent_model,
-                'protein': True,
-                'out': 'system.pdb',
-            }
-            
-            if 'amberhome' not in build_kwargs:
-                build_kwargs['amberhome'] = self.amberhome
+        # Prepare build kwargs
+        build_kwargs = custom_build_kwargs or {
+            'solvent': self.solvent_model,
+            'protein': True,
+            'out': 'system.pdb',
+        }
+        
+        if 'amberhome' not in build_kwargs:
+            build_kwargs['amberhome'] = self.amberhome
 
-            # Prepare simulation kwargs
-            sim_kwargs = custom_sim_kwargs or {
-                'solvent': self.solvent_model,
-                'equil_steps': self.equil_steps,
-                'prod_steps': self.prod_steps,
-            }
+        # Prepare simulation kwargs
+        sim_kwargs = custom_sim_kwargs or {
+            'solvent': self.solvent_model,
+            'equil_steps': self.equil_steps,
+            'prod_steps': self.prod_steps,
+        }
 
-            sim_paths = [Path(root_path) / f'mdagent_{i}' for i in range(len(pdb_path))]
-            for sim_path in sim_paths:
-                sim_path.mkdir(parents=True, exist_ok=True)
-            
-            build_kwargs = [build_kwargs.copy() for _ in range(len(sim_paths))]
-            sim_kwargs = [sim_kwargs.copy() for _ in range(len(sim_paths))]
-            
-            # Run MDAgent workflow
-            self.logger.info(f"Starting MDAgent simulation: {sim_id}")
-            
-            results = await self.coordinator_handle.deploy_md(
-                paths=sim_paths,
-                initial_pdbs=pdb_path,
-                build_kwargss=build_kwargs,
-                sim_kwargss=sim_kwargs,
-            )
+        sim_paths = [Path(root_path) / f'mdagent_{i}' for i in range(len(pdb_path))]
+        for sim_path in sim_paths:
+            sim_path.mkdir(parents=True, exist_ok=True)
+        
+        build_kwargs = [build_kwargs.copy() for _ in range(len(sim_paths))]
+        sim_kwargs = [sim_kwargs.copy() for _ in range(len(sim_paths))]
+        
+        # Run MDAgent workflow
+        self.logger.info(f"Starting MDAgent simulation: {sim_id}")
+        
+        results = await self.coordinator_handle.deploy_md(
+            paths=sim_paths,
+            initial_pdbs=pdb_path,
+            build_kwargss=build_kwargs,
+            sim_kwargss=sim_kwargs,
+        )
 
-            # Clean up agent/parsl
-            await self.cleanup()
-            
-            self.logger.info(f"MDAgent simulation completed")
+        # Clean up agent/parsl
+        await self.cleanup()
+        
+        self.logger.info(f"MDAgent simulation completed")
 
-            self.logger.info(f'MD results: {results}')
-            return results
+        self.logger.info(f'MD results: {results}')
+        return results
 
-        except Exception as e:
-            import traceback
-            self.logger.info(traceback.format_exc())
-            self.logger.error(f"MDAgent simulation failed: {e}")
-            return {}
     
     def _calculate_confidence(self, trajectory_analysis: Dict[str, Any]) -> float:
         """
@@ -356,8 +350,6 @@ class MDAgentAdapter:
         out = Path(task_params['root_output_path'])
         prod_steps = task_params.get('steps', self.prod_steps)
         
-        self.logger.info(f'{prod_steps=}')
-        self.logger.info(f'{task_params["steps"]=}')
         solvent = task_params.get('solvent', 'explicit')
 
         # TODO: get kwargs for build/sim from task_params
