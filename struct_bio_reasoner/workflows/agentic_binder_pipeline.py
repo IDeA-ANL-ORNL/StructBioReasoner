@@ -112,6 +112,7 @@ class AgenticBinderPipeline:
         self.system.prompt_gen_llm = alcfLLM()
         await self.system.start()
         
+        logger.info(f'design agents allowed : {self.system.design_agents}')
         # Set research goal
         self.research_goal = research_goal
         self.session_id = await self.system.set_research_goal(research_goal)
@@ -485,7 +486,7 @@ class AgenticBinderPipeline:
 
         config['simulation_paths'] = passing
         config['root_output_path'] = f'{self.global_cwd}/molecular_dynamics/{self.comp_design_it}'
-        config['steps'] = 1000
+        config['steps'] = 10000
         return config
 
     def _prepare_analysis_config(
@@ -505,20 +506,52 @@ class AgenticBinderPipeline:
         Returns:
             Updated configuration for MD task
         """
-        checkpoint_file = hypothesis.binder_analysis.checkpoint_file
-        checkpoint_data = pickle.load(open(checkpoint_file, 'rb'))
-        all_cycles = checkpoint_data['all_cycles']
+        """
+    '_analysis': {
+        'static': {
+            'basic': {
+                'paths': 'list[str]',
+                'kwargs': {'distance_cutoff': 'float'}
+            },
+            'advanced': {
+                'paths': 'list[str]',
+                'kwargs': {'placeholder': 'None'}
+            },
+        },
+        'dynamic': {
+            'basic': {
+                'paths': 'list[str]',
+                'kwargs': {'placeholder': 'None'}
+            },
+            'advanced': {
+                'paths': 'list[str]',
+                'kwargs': {'distance_cutoff': 'float', 'n_top': 'int'}
+            },
+        }
+    }
+        """
+        paths = hypothesis.md_analysis['paths']
+        data_type = config['data_type']
+        analysis_type = config['analysis_type']
+        analysis_type_copy = analysis_type
 
-        passing = [
-            all_cycles[i]['passing_structures']
-            for i in range(len(all_cycles))
-        ]
-        passing = [Path(item).resolve() for sublist in passing for item in sublist]
+        distance_cutoff = config['distance_cutoff']
+        if analysis_type == 'both':
+            analysis_type = ['basic', 'advanced']
+        else:
+            analysis_type = [analysis_type]
+        #data_type = list(data_type)
 
-        config['simulation_paths'] = passing
-        config['root_output_path'] = f'{self.global_cwd}/molecular_dynamics/{self.comp_design_it}'
-        config['steps'] = 1000
-        return config
+        analysis_config = {
+            data_type: {
+                at: {
+                'paths': paths,
+                'kwargs': {'distance_cutoff': distance_cutoff,
+                           'n_top': 10
+                          },
+                }
+            } for at in analysis_type}
+        return analysis_config
 
     async def _execute_task(
         self,
@@ -548,20 +581,23 @@ class AgenticBinderPipeline:
             self.comp_design_it +=1
             # Set up constraints if specified
             if 'constraint' in config and 'residues_bind' in config['constraint']:
-                config['constraints'] = {
-                    i: {
-                        'chainA': 'B',
-                        'resA': '',
-                        'chainB': 'A',
-                        'resB': f'{self.target_sequence[entry-1]}{entry}',
-                        'const_type': 'pocket',
-                        'distance': 5.5
+                try:
+                    config['constraints'] = {
+                        i: {
+                            'chainA': 'B',
+                            'resA': '',
+                            'chainB': 'A',
+                            'resB': f'{self.target_sequence[entry-1]}{entry}',
+                            'const_type': 'pocket',
+                            'distance': 5.5
+                        }
+                        for i, entry in enumerate([
+                            int(r) for r in config['constraint']['residues_bind']
+                        ])
                     }
-                    for i, entry in enumerate([
-                        int(r) for r in config['constraint']['residues_bind']
-                    ])
-                }
 
+                except:
+                    config['constraints'] = {}
             self.system.design_agents[task_name].config['cwd'] = config['cwd']
             await self.system.design_agents[task_name].initialize()
 
@@ -599,9 +635,12 @@ class AgenticBinderPipeline:
             hypothesis.add_binder_analysis(results)
             best_binders = results.top_binders
             logger.info(f'Best binders from this iteration: {best_binders}')
+
         elif task_name == 'molecular_dynamics':
             hypothesis.add_md_analysis(results)
 
+        elif task_name == 'analysis':
+            pass
         return best_binders
 
     async def run(

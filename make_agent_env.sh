@@ -12,7 +12,7 @@ cd /lus/flare/projects/FoundEpidem/avasan/IDEAL/Agentics/StructBioReasoner
 uv pip install -e .
 
 cd /lus/flare/projects/FoundEpidem/avasan/IDEAL/Agentics/MDAgent
-uv pip install .
+uv pip install -e .
 
 cd /lus/flare/projects/FoundEpidem/msinclair/github/bindcraft
 uv pip install -e .

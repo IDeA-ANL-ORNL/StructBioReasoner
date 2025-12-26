@@ -36,8 +36,13 @@ config_master = {
     'structure_prediction': {'sequences': 'list[list[str]]', 'names': 'list[str]'},
 
     'molecular_dynamics': {'simulation_paths': 'list[str]', 'root_output_path': 'str', 'steps': 'int'},
-
+    
     'analysis': {
+        'data_type': 'str',
+        'analysis_type': 'str',
+        'distance_cutoff': 'float'
+    },
+    '_analysis': {
         'static': {
             'basic': {
                 'paths': 'list[str]',
@@ -321,7 +326,29 @@ class MDPromptManager():
         self.prompt_c = None #self.conclusion_prompt()
         self.prompt_r = None
     def running_prompt(self):
-        pass
+        config_str = json.dumps(config_master['molecular_dynamics'], indent=2)
+        prompt = f"""
+        You are an expert in setting up molecular dynamics simulations. 
+        Evaluate the following history and decide how long to run the simulations for here. 
+        
+        Instructions:
+        - At the beginning of the workflow we should run shorter simulations (10_000 to 50_000) to test if binder design is setup correctly.
+        - Once enough binders (several thousand) have been identified, suggest longer simulations (1_000_000 to 2_500_000) to provide enough statistics
+        for hotspot analysis and free energy calculations.
+
+        This is the history to evaluate:
+        - History of decisions made by the resoner:
+            - {self.history['decisions'] if self.history['decisions'] != [] else 'No history'}
+        - History of results (least recent first):
+            - {self.history['results'] if self.history['results'] != [] else 'No history'}
+        - History of configurations (least recent first):
+            - {self.history['configurations'] if self.history['configurations'] != [] else 'No history'}.
+        - Very important key items to consider:
+            -  {self.history['key_items']}
+       
+        Provide your response in the format {config_str}
+        """
+        self.prompt_r = prompt
 
     def conclusion_prompt(self):
         if self.prompt_type == 'interactome_simulation':
@@ -404,19 +431,19 @@ class AnalysisPromptManager():
         Rationale: {self.recommendation.metadata['rationale']}.
         Evaluate the recommendation and decide which analysis to perform.
         Analyses are structured by input type (static vs dynamic) and rigor (basic vs advanced.
-        Input types: 
+        Input types ('data_type'): 
           static: to be performed on PDBs 
           dynamic: to be performed on simulation trajectories
         
-        Rigor:
+        Rigor ('analysis_type'):
           static, basic: interface contacts
           static, advanced: not currently supported
           dynamic, basic: rmsd, rmsf, radius of gyration
           dynamic, advanced: hotspot analysis (which residues do the binders interact with the most) 
-
+          dynamic, both: rmsd, rmsf, radius of gyration, and hotspot analysis
         The results will be a dictionary with two keys: 'data_type', 'analysis_type'. 
         The elements of the 'data_type' key should be 'static', 'dynamic' or both, depending on if the input is a trajectory or static model. 
-        The elements of 'analysis_type' should be 'basic', 'advanced' or both. Any keys in the present in this dictionary will correspond to analyses that will be run.
+        The elements of 'analysis_type' should be 'basic', 'advanced' or 'both'. Any keys in the present in this dictionary will correspond to analyses that will be run.
         The specific output format is: {config_str}.
         Currently all distance_cutoffs refer to distances between alpha carbons, and have a default value of 8.0 angstroms."""
         self.prompt_r = prompt

@@ -254,6 +254,7 @@ class MDAgentAdapter:
             
             self.logger.info(f"MDAgent simulation completed")
 
+            self.logger.info(f'MD results: {results}')
             return results
 
         except Exception as e:

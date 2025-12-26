@@ -25,6 +25,7 @@ from ..agents.computational_design.bindcraft_agent import BindCraftAgent
 from ..agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
 from ..agents.molecular_dynamics.free_energy_agent import FEAgent
 from ..agents.structure_prediction.chai_agent import ChaiAgent
+from ..agents.analysis.trajectory_analysis import TrajectoryAnalysisAgent
 from ..prompts.prompts import get_prompt_manager
 try:
     from ..agents.hiper_rag.rag_agent import RAGWrapper 
@@ -125,7 +126,7 @@ class BinderDesignSystem(JnanaSystem):
         
         # Protein-specific configuration
         self.enable_tools = enable_tools or []
-        self.enable_agents = enable_agents or ['computational_design', 'molecular_dynamics', 'structure_prediction', 'rag', 'free_energy']
+        self.enable_agents = enable_agents or ['computational_design', 'molecular_dynamics', 'analysis', 'structure_prediction', 'rag', 'free_energy']
         self.knowledge_graph_enabled = knowledge_graph
         self.literature_processing_enabled = literature_processing
         

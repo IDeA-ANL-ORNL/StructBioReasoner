@@ -227,6 +227,7 @@ class SimAnalysis:
     protein_id: str = ''
 
     # Simulation analysis
+    paths: list[str] = field(default_factory=list)
     simulation_time_in_ns: int = 1
     rmsd: np.ndarray = field(default_factory=lambda x: np.zeros(2))
     rmsf: np.ndarray = field(default_factory=lambda x: np.zeros(2))
@@ -522,6 +523,11 @@ class ProteinHypothesis(UnifiedHypothesis):
         # Update metadata
         self.metadata['has_md_analysis'] = True
         #self.metadata['md_confidence'] = analysis.confidence_score
+
+    def add_analyzer_analysis(self, analysis):
+        self.analyzer_analysis = analysis
+        self.update_at = time.time()
+        self.metadata['has_analyzer_analysis'] = True
 
     def add_structural_analysis(self, analysis: StructuralAnalysis):
         """Add structural analysis results."""
