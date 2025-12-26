@@ -21,6 +21,7 @@ from jnana.protognosis.core.agent_core import ContextMemory
 from jnana.protognosis.core.llm_interface import alcfLLM
 # Import protein-specific components
 from ..data.protein_hypothesis import ProteinHypothesis
+from ..agents.analysis.trajectory_analysis import TrajectoryAnalysisAgent
 from ..agents.computational_design.bindcraft_agent import BindCraftAgent
 from ..agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
 from ..agents.molecular_dynamics.free_energy_agent import FEAgent
