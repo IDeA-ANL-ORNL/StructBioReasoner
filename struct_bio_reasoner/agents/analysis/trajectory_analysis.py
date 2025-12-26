@@ -200,6 +200,8 @@ class TrajectoryAnalysisAgent:
     async def analyze_hypothesis(self,
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> SimAnalysis:
+        cutoff = task_params.get('contact_freq_cutoff', 0.5)
+
         sim_results = await self.perform_analysis(
             task_params
         )
@@ -209,13 +211,13 @@ class TrajectoryAnalysisAgent:
         tools_used = self._get_tools_used()
         protein_id = task_params.get('protein_id', '')
         
-        static_results = sim_results.get('static', None)
-        if static_results is not None:
-            analysis.append(
-                StructuralAnalysis(
-                    protein_id=protein_id,
-                )
-            )
+        #static_results = sim_results.get('static', None)
+        #if static_results is not None:
+        #    analysis.append(
+        #        StructuralAnalysis(
+        #            protein_id=protein_id,
+        #        )
+        #    )
 
         dynamic_results = sim_results.get('dynamic', None)
         if dynamic_results is not None:
@@ -231,10 +233,12 @@ class TrajectoryAnalysisAgent:
                     )
                 )
             if 'advanced_simulation_analysis' in sim_results['dynamic'].keys():
+                contact_freqs = sim_results['dynamic']['advanced_simulation_analysis']['summary']
+                contacts = [k for k, v in contact_freqs.items() if v > cutoff]
                 analysis.append(
                     StructuralAnalysis(
                         protein_id=protein_id,
-                        binding_sites=[],
+                        binding_sites=contacts,
                     )
                 )
 
