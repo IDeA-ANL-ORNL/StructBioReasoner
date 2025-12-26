@@ -491,8 +491,11 @@ class FreeEnergyPromptManager():
         #    self.recommendation = self.input_json.get('recommendation', 'string')
 
     def running_prompt(self):
-        pass
-
+        prompt = f'''
+                 Run free energy with default configs
+                 '''   
+        self.prompt_r = prompt
+        #pass
     def conclusion_prompt(self):
         if self.prompt_type == 'interactome_simulation':
             prompt = f"""
@@ -509,7 +512,7 @@ class FreeEnergyPromptManager():
             This is the history of decisions (least recent first):
             {self.history_list[:self.num_history]}
             Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['free_energy']} where the list of paths is a list of root paths (e.g. root0/mdagent_0/prod.dcd, root1/mdagent_0/prod.dcd would be [root0, root1])."""
-
+           
 
 # I want to make a factory class that can generate the right prompt manager based on the agent type
 def get_prompt_manager(agent_type: str, research_goal: str, input_json: dict[str, Any] | list[dict], target_prot: str, prompt_type: str, history: dict, num_history: int = 3):
