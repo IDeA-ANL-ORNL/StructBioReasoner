@@ -207,11 +207,13 @@ class TrajectoryAnalysisAgent:
         confidence_score = self._calculate_confidence(sim_results)
         tools_used = self._get_tools_used()
         protein_id = task_params.get('protein_id', '')
-
-        if sim_results['static'] is not None:
+        
+        static_results = sim_results.get('static', None)
+        if static_results is not None:
             analysis = StructureAnalysis()
 
-        if sim_results['dynamic'] is not None:
+        dynamic_results = sim_results.get('dynamic', None)
+        if dynamic_results is not None:
             if 'basic_simulation_analysis' in sim_results['dynamic'].keys():
                 summary = sim_results['dynamic']['basic_simulation_analysis']['summary']
                 analysis = SimAnalysis(
