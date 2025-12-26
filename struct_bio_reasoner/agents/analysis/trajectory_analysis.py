@@ -219,6 +219,7 @@ class TrajectoryAnalysisAgent:
         #    )
 
         dynamic_results = sim_results.get('dynamic', None)
+        self.logger.info(f'{dynamic_results=}')
         if dynamic_results is not None:
             if 'basic_simulation_analysis' in sim_results['dynamic'].keys():
                 summary = sim_results['dynamic']['basic_simulation_analysis']['summary']
@@ -226,7 +227,7 @@ class TrajectoryAnalysisAgent:
                     'protein_id': protein_id,
                     'rmsd': summary['rmsd'],
                     'rmsf': summary['rmsf'],
-                    'rog': summary['rog']
+                    'rog': summary['radius_of_gyration']
                 })
                 #analysis.append(
                 #    SimAnalysis(
