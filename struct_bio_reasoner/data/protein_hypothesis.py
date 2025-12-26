@@ -513,7 +513,7 @@ class ProteinHypothesis(UnifiedHypothesis):
 
         # Update metadata
         self.metadata['has_binder_analysis'] = True
-        self.metadata['binder_confidence'] = analysis.confidence_score
+        #self.metadata['binder_confidence'] = analysis.confidence_score
 
     def add_md_analysis(self, analysis: SimAnalysis):
         """"""
@@ -536,7 +536,7 @@ class ProteinHypothesis(UnifiedHypothesis):
         
         # Update metadata
         self.metadata["has_structural_analysis"] = True
-        self.metadata["structural_confidence"] = analysis.confidence_score
+        #self.metadata["structural_confidence"] = analysis.confidence_score
     
     def add_evolutionary_analysis(self, analysis: EvolutionaryAnalysis):
         """Add evolutionary analysis results."""
@@ -545,7 +545,7 @@ class ProteinHypothesis(UnifiedHypothesis):
         
         # Update metadata
         self.metadata["has_evolutionary_analysis"] = True
-        self.metadata["evolutionary_confidence"] = analysis.confidence_score
+        #self.metadata["evolutionary_confidence"] = analysis.confidence_score
     
     def add_energetic_analysis(self, analysis: EnergeticAnalysis):
         """Add energetic analysis results."""
@@ -554,7 +554,7 @@ class ProteinHypothesis(UnifiedHypothesis):
         
         # Update metadata
         self.metadata["has_energetic_analysis"] = True
-        self.metadata["energetic_confidence"] = analysis.confidence_score
+        #self.metadata["energetic_confidence"] = analysis.confidence_score
     
     def add_experimental_validation(self, validation: ExperimentalValidation):
         """Add experimental validation data."""
@@ -590,7 +590,7 @@ class ProteinHypothesis(UnifiedHypothesis):
                 "molecular_dynamics": self.md_analysis is not None
             },
             "experimental_validations": len(self.experimental_validations),
-            "overall_confidence": self._calculate_overall_confidence()
+            #"overall_confidence": self._calculate_overall_confidence()
         }
     
     def _calculate_overall_confidence(self) -> float:
