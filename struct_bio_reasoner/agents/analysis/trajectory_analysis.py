@@ -75,7 +75,7 @@ class TrajectoryAnalysisAgent:
 
         self.coordinator_handle = await self.manager.launch(
             AnalysisCoordinator,
-            args=(self.parsl_settings)
+            args=(self.parsl_settings,),
         )
 
         self.initialized = True
