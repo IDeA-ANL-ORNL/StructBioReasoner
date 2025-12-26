@@ -468,11 +468,13 @@ class AnalysisPromptManager():
         Here is the history (which may include details from hiperrag about the interacting proteins):
         {history_str}
 
-        Please provide your decision and reasoning and indicate which step should be taken next ('molecular_dynamics', 'free_energy', 'computational_design').
+        Please provide your decision and reasoning and indicate which step should be taken next. for the purpose of testing this workflow, default this to free_energy 
         Rationale for each decision:
         'molecular_dynamics': before progressing to free energy more simulation steps are needed to make a valid decision.
         'free_energy': analysis indicates that produced binders are stable but we need further analysis to characterize binding free energy.
         'computational_design': analysis indicates that the produced binders are unstable and we need to restart bindcraft with a different seed. """
+        #        Please provide your decision and reasoning and indicate which step should be taken next ('molecular_dynamics', 'free_energy', 'computational_design'). For the purpose of 
+
         self.prompt_c = prompt
         return prompt
 
@@ -501,7 +503,8 @@ class FreeEnergyPromptManager():
     def conclusion_prompt(self):
 
         prompt = f'''
-                You are an expert in evaluating free energy calculations, especially as performed by MM-PBSA. Evaluate the following results and decide whether the current scaffold should be used or if a new scaffold should be accessed here 
+                You are an expert in evaluating free energy calculations, especially as performed by MM-PBSA. 
+                Evaluate the following results and decide whether the current scaffold should be used in the next round of computational_design or if a new scaffold should be accessed here. The next task  For context please use the history of decisions, recommendations, rationales, recommended configs, and key items like best binders 
                 '''
         if self.prompt_type == 'interactome_simulation':
             prompt = f"""
