@@ -485,6 +485,8 @@ class FreeEnergyPromptManager():
     history_list : list[dict]
     num_history: int = 3
     def __post_init__(self):
+        self.prompt_r = 'Running prompt placeholder'
+        self.prompt_c = 'Conclusion prompt placeholder'
         pass
         #if self.prompt_type == 'interactome_simulation' or self.prompt_type == 'binder_design':
         #    self.previous_run_type = self.input_json.get('previous_run_type', 'bindcraft')
@@ -497,6 +499,10 @@ class FreeEnergyPromptManager():
         self.prompt_r = prompt
         #pass
     def conclusion_prompt(self):
+
+        prompt = f'''
+                You are an expert in evaluating free energy calculations, especially as performed by MM-PBSA. Evaluate the following results and decide whether the current scaffold should be used or if a new scaffold should be accessed here 
+                '''
         if self.prompt_type == 'interactome_simulation':
             prompt = f"""
             You are an expert in evaluating md simulations. Evaluate the simulations and decide which ones should be used to calculate hotspots and which should be discarded.
