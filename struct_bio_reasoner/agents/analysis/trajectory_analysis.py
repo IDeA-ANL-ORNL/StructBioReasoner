@@ -16,7 +16,7 @@ from academy.manager import Manager
 from concurrent.futures import ThreadPoolExecutor
     
 from ...core.base_agent import BaseAgent
-from ...data.protein_hypothesis import SimAnalysis, ProteinHypothesis
+from ...data.protein_hypothesis import SimAnalysis, ProteinHypothesis, StructuralAnalysis
 
 
 class TrajectoryAnalysisAgent:
@@ -204,30 +204,38 @@ class TrajectoryAnalysisAgent:
             task_params
         )
         
-        analysis = None
+        analysis = []
         confidence_score = self._calculate_confidence(sim_results)
         tools_used = self._get_tools_used()
         protein_id = task_params.get('protein_id', '')
         
         static_results = sim_results.get('static', None)
         if static_results is not None:
-            analysis = StructureAnalysis()
+            analysis.append(
+                StructuralAnalysis(
+                    protein_id=protein_id,
+                )
+            )
 
         dynamic_results = sim_results.get('dynamic', None)
         if dynamic_results is not None:
             if 'basic_simulation_analysis' in sim_results['dynamic'].keys():
                 summary = sim_results['dynamic']['basic_simulation_analysis']['summary']
-                analysis = SimAnalysis(
-                    protein_id=protein_id,
-                    simulation_time_in_ns=self.prod_steps * 4 / 1000000,
-                    rmsd=summary['rmsd'],
-                    rmsf=summary['rmsf'],
-                    rog=summary['rog']
+                analysis.append(
+                    SimAnalysis(
+                        protein_id=protein_id,
+                        simulation_time_in_ns=self.prod_steps * 4 / 1000000,
+                        rmsd=summary['rmsd'],
+                        rmsf=summary['rmsf'],
+                        rog=summary['rog']
+                    )
                 )
             if 'advanced_simulation_analysis' in sim_results['dynamic'].keys():
-                analysis = StructuralAnalysis(
-                    protein_id=protein_id,
-                    binding_sites=[],
+                analysis.append(
+                    StructuralAnalysis(
+                        protein_id=protein_id,
+                        binding_sites=[],
+                    )
                 )
 
         return analysis
