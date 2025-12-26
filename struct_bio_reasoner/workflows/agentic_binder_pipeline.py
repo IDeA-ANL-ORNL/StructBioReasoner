@@ -542,7 +542,7 @@ class AgenticBinderPipeline:
             analysis_type = [analysis_type]
         #data_type = list(data_type)
 
-        seqs = [pdb2seq(p)[1] for p in paths/'build/protein.pdb']
+        seqs = [pdb2seq(p/'build/protein.pdb')[1] for p in paths]
         analysis_config = {
             data_type: {
                 at: {
