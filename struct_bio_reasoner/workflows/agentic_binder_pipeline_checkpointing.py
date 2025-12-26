@@ -718,7 +718,7 @@ class AgenticBinderPipelineWithCheckpointing:
         else:
             analysis_type = [analysis_type]
 
-        seqs = [pdb2seq(p/'build/protein.pdb')[1] for p in paths]
+        #seqs = [pdb2seq(p/'build/protein.pdb')[1] for p in paths]
         analysis_config = {
             data_type: {
                 at: {
@@ -727,7 +727,7 @@ class AgenticBinderPipelineWithCheckpointing:
                         'distance_cutoff': distance_cutoff,
                         'n_top': 10,
                     },
-                    'seqs': seqs
+                    #'seqs': seqs
                 }
             } for at in analysis_type
         }
