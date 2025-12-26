@@ -280,3 +280,15 @@ def add_chainids(u: mda.Universe,
             chain_index += 1
 
     return u
+
+def pdb2seq(pdbf):
+    u = mda.Universe(pdbf)
+    
+    # Chain A only
+    chain_a = u.select_atoms('protein and chainID A')
+    seq_a = ''.join([aa_dict.get(res.resname, 'X') for res in chain_a.residues])
+    
+    # Or by chainID
+    chain_b = u.select_atoms('protein and chainID B')
+    seq_b = ''.join([aa_dict.get(res.resname, 'X') for res in chain_b.residues])
+    return [seq_a, seq_b] 

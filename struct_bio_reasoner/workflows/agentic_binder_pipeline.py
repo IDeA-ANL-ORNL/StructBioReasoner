@@ -34,7 +34,7 @@ from ..data.protein_hypothesis import ProteinHypothesis
 from ..prompts.prompts import get_prompt_manager, config_master
 from ..utils.uniprot_api import fetch_uniprot_sequence
 from ..utils.hotspot import get_hotspot_resids_from_simulations
-
+from ..utils.protein_utils import pdb2seq
 
 # Configure logging
 logging.basicConfig(
@@ -542,13 +542,15 @@ class AgenticBinderPipeline:
             analysis_type = [analysis_type]
         #data_type = list(data_type)
 
+        seqs = [pdb2seq(p)[1] for p in paths/'build/protein.pdb']
         analysis_config = {
             data_type: {
                 at: {
                 'paths': paths,
                 'kwargs': {'distance_cutoff': distance_cutoff,
-                           'n_top': 10
+                           'n_top': 10,
                           },
+                'seqs': seqs
                 }
             } for at in analysis_type}
         return analysis_config

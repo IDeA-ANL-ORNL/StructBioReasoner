@@ -458,7 +458,7 @@ class AnalysisPromptManager():
         prompt = f"""
         You are an expert in evaluating md simulation analyses. Evaluate the analyses here and decide what step should be taken next.
 
-        The following analyses have been generated including path (which describes the interacting protein name + chai score):
+        The following analyses have generated the following statistics:
         {input_json_str}
 
         Here is the history (which may include details from hiperrag about the interacting proteins):
