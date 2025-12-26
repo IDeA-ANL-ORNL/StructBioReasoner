@@ -525,5 +525,6 @@ def get_prompt_manager(agent_type: str, research_goal: str, input_json: dict[str
         return MDPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
     elif agent_type == 'analysis':
         return AnalysisPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
-        
+    elif agent_type == 'free_energy':
+        return FreeEnergyPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
         
