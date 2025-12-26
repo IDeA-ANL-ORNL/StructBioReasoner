@@ -645,6 +645,9 @@ class AgenticBinderPipelineWithCheckpointing:
         if next_task == 'analysis':
             current_config = self._prepare_analysis_config(current_config, hypothesis, iteration)
 
+        if next_task == 'free_energy':
+            current_config = self._prepare_fe_config(current_config, hypothesis, iteration)
+
         # Execute the task
         results = await self._execute_task(
             task_name=next_task,
@@ -732,6 +735,29 @@ class AgenticBinderPipelineWithCheckpointing:
             } for at in analysis_type
         }
         return analysis_config
+
+    def _prepare_fe_config(
+        self,
+        config: Dict[str, Any],
+        hypothesis: ProteinHypothesis,
+        iteration: int
+    ) -> Dict[str, Any]:
+        """
+        Prepare configuration for analysis task.
+
+        Args:
+            config: Base configuration
+            hypothesis: The protein hypothesis object
+            iteration: Current iteration number
+
+        Returns:
+            Updated configuration for analysis task
+        """
+        paths = hypothesis.md_analysis['paths']
+
+        fe_config = {'simulation_paths' : paths}
+
+        return fe_config
 
     async def _execute_task(
         self,
