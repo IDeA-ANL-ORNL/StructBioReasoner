@@ -203,7 +203,8 @@ class TrajectoryAnalysisAgent:
         sim_results = await self.perform_analysis(
             task_params
         )
-
+        
+        analysis = None
         confidence_score = self._calculate_confidence(sim_results)
         tools_used = self._get_tools_used()
         protein_id = task_params.get('protein_id', '')
