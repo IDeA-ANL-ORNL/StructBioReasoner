@@ -140,6 +140,10 @@ class BindCraftPromptManager():
         self.prompt_c = None
 
         if self.prompt_type == 'conclusion':
+            try:
+                self.input_json = self.input_json.__dict__
+            except:
+                pass
             self.num_rounds = self.input_json.get('num_rounds', 1)
             self.total_sequences = self.input_json.get('total_sequences', 10)
             self.passing_sequences = self.input_json.get('passing_sequences', 10)
