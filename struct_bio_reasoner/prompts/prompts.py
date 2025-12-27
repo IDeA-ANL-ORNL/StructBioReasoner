@@ -484,11 +484,7 @@ class FreeEnergyPromptManager():
     input_json: dict[str, Any]
     target_prot: str
     prompt_type: str
-<<<<<<< HEAD
-    history : list[dict]
-=======
     history : dict
->>>>>>> f136790b935a60b773296b801e2b26eb45a599ec
     num_history: int = 3
     def __post_init__(self):
         self.prompt_r = 'Running prompt placeholder'
