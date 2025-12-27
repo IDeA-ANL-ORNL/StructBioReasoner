@@ -692,6 +692,10 @@ class AgenticBinderPipelineWithCheckpointing:
         config['simulation_paths'] = passing
         config['root_output_path'] = f'{self.global_cwd}/molecular_dynamics/{self.comp_design_it}'
         config['steps'] = 10000
+
+        if config['steps']<10000:
+            config['steps'] = 10000
+
         return config
 
     def _prepare_analysis_config(
