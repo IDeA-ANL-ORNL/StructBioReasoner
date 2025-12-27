@@ -109,7 +109,7 @@ class RAGPromptManager():
             prompt_optimization_request = f""" Given this research goal:
             {self.research_goal}
             Generate an optimal prompt for literature mining using HiPerRAG to identify:
-                starting binders for bindcraft optimization. If clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/nanobody/affitin provided in the research goal or best binders in the input_json {input_json}.
+                starting binders for bindcraft optimization. If clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/affitin provided in the research goal or best binders in the input_json {input_json}.
                 Focus on returning a single peptide amino acid sequence and rationale for this in a json with these keys:
                  - binder_sequence: string
                   - rationale: string """ 
@@ -510,7 +510,7 @@ class FreeEnergyPromptManager():
                 Results:
                     {input_json_str}
 
-                Inform the scaffold to use 'affibody', 'nanobody', 'affitin', or 'use_top_binders'. Only suggest 'use_top_binders' if the previous binders produced good free energies and are improving in the workflow. Put the next_task as 'computational_design' but suggest a new scaffold in the rationale.
+                Inform the scaffold to use 'affibody', 'affitin', or 'use_top_binders'. Only suggest 'use_top_binders' if the previous binders produced good free energies and are improving in the workflow. Put the next_task as 'computational_design' but suggest a new scaffold in the rationale.
                 For context please use the history of decisions, recommendations, rationales, recommended configs, and key items like best binders:
                 {history_str}
                 '''
