@@ -119,20 +119,8 @@ class FEAgent:
             # Import FEAgent components
             # Note: FEAgent should be installed and available in Python path
             # The agents are defined in agents.py at the root of FEAgent repo
-            try:
-                # Try importing from mdagent package (if installed as package)
-                from MDAgent.core.mmpbsa_agent import FECoordinator
-                from molecular_simulations.simulate.mmpbsa import MMPBSA
-            except ImportError:
-                try:
-                    # Try importing from agents module (if MDAgent is in PYTHONPATH)
-                    from agents import FECoordinator
-                except ImportError as e:
-                    self.logger.error(f"Cannot import MDAgent components: {e}")
-                    self.logger.info("Make sure MDAgent is installed and in PYTHONPATH")
-                    self.logger.info("Install from: https://github.com/msinclair-py/MDAgent")
-                    self.initialized = False
-                    return False
+            # Try importing from mdagent package (if installed as package)
+            from MDAgent.core.mmpbsa_agent import FECoordinator
 
             # Create Academy manager using async context manager pattern
             # This ensures the exchange client is properly initialized
@@ -152,9 +140,10 @@ class FEAgent:
             # worker_init, nodes, max_workers_per_node, cores_per_worker
             parsl_settings = LocalCPUSettings(parsl_config).config_factory(Path.cwd())
 
+            self.logger.info('Attempting to launch FEAgent')
             self.coordinator_handle = await self.manager.launch(
                 FECoordinator,
-                args=(parsl_settings,),
+                args=(parsl_settings,)
             )
 
             self.initialized = True
