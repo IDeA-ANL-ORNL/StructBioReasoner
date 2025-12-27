@@ -138,7 +138,7 @@ class FEAgent:
             self.logger.info('Attempting to launch FEAgent')
             self.coordinator_handle = await self.manager.launch(
                 FECoordinator,
-                args=(parsl_settings)
+                args=(parsl_settings,)
             )
 
             self.initialized = True
@@ -198,14 +198,13 @@ class FEAgent:
 
             analysis = {}
             for result in results:
-                if result['fe'] is None:
-                    mean, std = None, None
-                else:
+                if result['success']:
+                    path = result['path']
                     mean, std = result['fe']
 
-                result['path']: {'mean': mean,
-                                 'std': std,
-                                 'unit': 'kcal/mol'} 
+                    analysis[path]: {'mean': mean,
+                                     'std': std,
+                                     'unit': 'kcal/mol'} 
             
             return analysis
 
