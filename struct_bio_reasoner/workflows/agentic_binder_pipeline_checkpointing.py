@@ -33,6 +33,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from types import SimpleNamespace
+import wandb
+from struct_bio_reasoner.utils.metric_eval import MetricEvaluator
 
 from jnana.protognosis.core.llm_interface import alcfLLM
 from ..core.binder_design_system import BinderDesignSystem
@@ -41,6 +43,8 @@ from ..prompts.prompts import get_prompt_manager, config_master
 from ..utils.uniprot_api import fetch_uniprot_sequence
 from ..utils.hotspot import get_hotspot_resids_from_simulations
 from ..utils.protein_utils import pdb2seq
+from ..utils.metric_eval import MetricEvaluator
+
 
 # Configure logging
 logging.basicConfig(
@@ -135,7 +139,9 @@ class AgenticBinderPipelineWithCheckpointing:
         max_iterations: int = 1_000_000_000,
         enable_agents: Optional[List[str]] = None,
         checkpoint_dir: str = "checkpoints",
-        checkpoint_interval: int = 1
+        checkpoint_interval: int = 1,
+        wandb_project ='binder_design',
+        wandb_name = 'nmnat2_test'
     ):
         """
         Initialize the agentic binder design pipeline with checkpointing.
@@ -173,7 +179,12 @@ class AgenticBinderPipelineWithCheckpointing:
         self.best_binders = []
         self.iteration_count = 0
         self.comp_design_it = 0
-
+        
+        # In __init__():
+        self.metric_evaluator = MetricEvaluator(
+                project_name=wandb_project,
+                run_name=f"exp_{wandb_name}{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
     async def initialize(self, research_goal: str) -> None:
         """
         Initialize the binder design system and set research goal.
@@ -639,6 +650,8 @@ class AgenticBinderPipelineWithCheckpointing:
         current_config = recommended_config_list[-1]['metadata']['new_config'] if recommended_config_list else {}
 
         # Handle task-specific configuration
+        if next_task == 'computational_design':
+            current_config = self._prepare_compdesign_config(current_config, hypothesis, iteration)
         if next_task == 'molecular_dynamics':
             current_config = self._prepare_md_config(current_config, hypothesis, iteration)
 
@@ -656,11 +669,42 @@ class AgenticBinderPipelineWithCheckpointing:
             iteration=iteration
         )
 
+        # After each iteration:
+        self.metric_evaluator.update_metrics(
+            decision=next_task,
+            binder_results=results if next_task == 'computational_design' else None,
+            md_results=results if next_task == 'molecular_dynamics' else None,
+            fe_results=results if next_task == 'free_energy' else None
+            )
+        self.metric_evaluator.log_to_wandb(step=self.iteration_count)
+
         return {
             'task': next_task,
             'config': current_config,
             'results': results
         }
+    def _prepare_compdesign_config(
+        self,
+        config: Dict[str, Any],
+        hypothesis: ProteinHypothesis,
+        iteration: int
+    ) -> Dict[str, Any]:
+        """
+        Prepare configuration for computational design task.
+
+        Args:
+            config: Base configuration
+            hypothesis: The protein hypothesis object
+            iteration: Current iteration number
+
+        Returns:
+            Updated configuration for analysis task
+        """
+
+        if config['batch_size']>200:
+            config['batch_size'] = 200
+
+        return config
 
     def _prepare_md_config(
         self,
@@ -739,6 +783,7 @@ class AgenticBinderPipelineWithCheckpointing:
             } for at in analysis_type
         }
         return analysis_config
+
 
     def _prepare_fe_config(
         self,
@@ -968,7 +1013,7 @@ class AgenticBinderPipelineWithCheckpointing:
             # Check if we should stop
             if next_task == 'stop' or next_task == '':
                 logger.info("\n[STOPPING] Reasoner recommends stopping.")
-                break
+                next_task = 'computational_design'
 
             # Update state
             previous_task = next_task
