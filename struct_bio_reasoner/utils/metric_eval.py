@@ -30,7 +30,7 @@ Usage:
 """
 
 import logging
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Tuple
 from pathlib import Path
 import numpy as np
 
@@ -123,16 +123,18 @@ class MetricEvaluator:
         decision: str,
         binder_results: Optional[Any] = None,
         md_results: Optional[Any] = None,
-        fe_results: Optional[Any] = None
+        fe_results: Optional[Any] = None,
+        analysis_results: Optional[Any] = None
     ):
         """
         Update metrics with results from current iteration.
-        
+
         Args:
             decision: Agent decision name (e.g., 'computational_design')
             binder_results: Results from BindCraft agent (BinderAnalysis object)
             md_results: Results from MD agent (SimAnalysis object or dict)
             fe_results: Results from free energy agent (EnergeticAnalysis object or dict)
+            analysis_results: Results from trajectory analysis agent (dict with RMSD/RMSF)
         """
         # Map decision to index
         decision_idx = self.AGENT_MAPPING.get(decision, -1)
@@ -156,16 +158,24 @@ class MetricEvaluator:
         else:
             self.metrics['best_binder_free_energy'].append(None)
 
-        # Extract RMSD and RMSF from MD results
+        # Extract RMSD and RMSF from MD results or analysis results
+        rmsd, rmsf = None, None
+
         if md_results is not None:
             rmsd, rmsf = self._extract_md_metrics(md_results)
-            self.metrics['binder_rmsds'].append(rmsd)
-            self.metrics['binder_rmsfs'].append(rmsf)
-        else:
-            self.metrics['binder_rmsds'].append(None)
-            self.metrics['binder_rmsfs'].append(None)
 
-    def _extract_binder_info(self, binder_results: Any) -> tuple[Optional[float], Optional[str]]:
+        # If analysis_results provided, try to extract from there (may override MD results)
+        if analysis_results is not None:
+            analysis_rmsd, analysis_rmsf = self._extract_md_metrics(analysis_results)
+            if analysis_rmsd is not None:
+                rmsd = analysis_rmsd
+            if analysis_rmsf is not None:
+                rmsf = analysis_rmsf
+
+        self.metrics['binder_rmsds'].append(rmsd)
+        self.metrics['binder_rmsfs'].append(rmsf)
+
+    def _extract_binder_info(self, binder_results: Any) -> Tuple[Optional[float], Optional[str]]:
         """
         Extract best binder energy and sequence from BinderAnalysis results.
 
@@ -189,8 +199,14 @@ class MetricEvaluator:
             if not top_binders or len(top_binders) == 0:
                 return None, None
 
-            # Get the first (best) binder
-            best_binder = top_binders[0]
+            # Get the first (best) binder - handle any key structure
+            if isinstance(top_binders, dict):
+                # Get the binder with the smallest key (assumed to be best)
+                first_key = min(top_binders.keys())
+                best_binder = top_binders[first_key]
+            else:
+                # If it's a list or other sequence
+                best_binder = top_binders[0]
 
             # Extract energy
             energy = best_binder.get('energy', None)
@@ -205,7 +221,7 @@ class MetricEvaluator:
             # If sequence not found, try to read from PDB file
             if sequence is None and 'pdb_path' in best_binder:
                 try:
-                    from ..utils.protein_utils import pdb2seq
+                    from struct_bio_reasoner.utils.protein_utils import pdb2seq
                     pdb_path = Path(best_binder['pdb_path'])
                     if pdb_path.exists():
                         _, sequence = pdb2seq(pdb_path)
@@ -263,7 +279,7 @@ class MetricEvaluator:
             logger.error(f"Error extracting free energy: {e}")
             return None
 
-    def _extract_md_metrics(self, md_results: Any) -> tuple[Optional[float], Optional[float]]:
+    def _extract_md_metrics(self, md_results: Any) -> Tuple[Optional[float], Optional[float]]:
         """
         Extract RMSD and RMSF from MD simulation results.
 
@@ -274,16 +290,7 @@ class MetricEvaluator:
             Tuple of (mean_rmsd, mean_rmsf)
         """
         try:
-            # Handle SimAnalysis object or dict
-            if hasattr(md_results, 'paths'):
-                # This is a dict with 'paths' key from MD agent
-                paths = md_results.paths if hasattr(md_results, 'paths') else md_results.get('paths', [])
-                # For now, we don't have direct RMSD/RMSF in this format
-                # These would need to be extracted from trajectory analysis
-                logger.warning("MD results contain paths but no direct RMSD/RMSF data")
-                return None, None
-
-            # Try to extract from trajectory analysis format
+            # Try to extract from trajectory analysis format first
             rmsd = None
             rmsf = None
 
@@ -316,7 +323,31 @@ class MetricEvaluator:
                         if isinstance(rmsf_data, dict) and 'mean' in rmsf_data:
                             rmsf = rmsf_data['mean']
 
-            logger.info(f"Extracted MD metrics: RMSD={rmsd}, RMSF={rmsf}")
+                # Format 3: Check if it has 'paths' attribute (SimAnalysis from MD agent)
+                # In this case, RMSD/RMSF might not be directly available
+                if 'paths' in md_results and rmsd is None and rmsf is None:
+                    logger.debug("MD results contain paths but no direct RMSD/RMSF data")
+
+            # Handle SimAnalysis object
+            elif hasattr(md_results, 'paths'):
+                # This is a SimAnalysis object from MD agent
+                # RMSD/RMSF would need to be extracted from trajectory analysis
+                logger.debug("MD results is SimAnalysis object, checking for trajectory data")
+
+                # Try to get trajectory analysis if it exists
+                if hasattr(md_results, 'trajectory_analysis'):
+                    traj = md_results.trajectory_analysis
+                    if isinstance(traj, dict):
+                        if 'rmsd' in traj and isinstance(traj['rmsd'], dict) and 'mean' in traj['rmsd']:
+                            rmsd = traj['rmsd']['mean']
+                        if 'rmsf' in traj and isinstance(traj['rmsf'], dict) and 'mean' in traj['rmsf']:
+                            rmsf = traj['rmsf']['mean']
+
+            if rmsd is not None or rmsf is not None:
+                logger.info(f"Extracted MD metrics: RMSD={rmsd}, RMSF={rmsf}")
+            else:
+                logger.debug("No RMSD/RMSF data found in MD results")
+
             return rmsd, rmsf
 
         except Exception as e:

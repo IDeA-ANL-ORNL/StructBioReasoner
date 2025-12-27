@@ -34,7 +34,6 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from types import SimpleNamespace
 import wandb
-from struct_bio_reasoner.utils.metric_eval import MetricEvaluator
 
 from jnana.protognosis.core.llm_interface import alcfLLM
 from ..core.binder_design_system import BinderDesignSystem
@@ -671,10 +670,10 @@ class AgenticBinderPipelineWithCheckpointing:
 
         # After each iteration:
         self.metric_evaluator.update_metrics(
-            decision=next_task,
-            binder_results=results if next_task == 'computational_design' else None,
-            md_results=results if next_task == 'molecular_dynamics' else None,
-            fe_results=results if next_task == 'free_energy' else None
+            decision=previous_task,
+            binder_results=previous_results if previous_task == 'computational_design' else None,
+            md_results=previous_results if previous_task == 'molecular_dynamics' else None,
+            fe_results=previous_results if previous_task == 'free_energy' else None
             )
         self.metric_evaluator.log_to_wandb(step=self.iteration_count)
 
@@ -1056,6 +1055,7 @@ class AgenticBinderPipelineWithCheckpointing:
         # Generate final report
         final_report = self._generate_final_report(research_goal)
 
+        self.metric_evaluator.finish()
         # Save final checkpoint
         final_checkpoint = self._create_checkpoint(
             iteration=self.iteration_count,
