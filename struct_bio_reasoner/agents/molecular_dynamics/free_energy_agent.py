@@ -199,13 +199,14 @@ class FEAgent:
             analysis = {}
             for result in results:
                 if result['success']:
-                    path = result['path']
+                    path = str(result['path'])
                     mean, std = result['fe']
 
-                    analysis[path]: {'mean': mean,
-                                     'std': std,
-                                     'unit': 'kcal/mol'} 
+                    analysis[path] = {'mean': mean,
+                                      'std': std,
+                                      'unit': 'kcal/mol'} 
             
+            await self.cleanup()
             return analysis
 
         except Exception as e:
@@ -355,6 +356,7 @@ class FEAgent:
             protein_name = "unknown",
             parsl = parsl
         )
+
 
         analysis = EnergeticAnalysis(
             protein_id='',
