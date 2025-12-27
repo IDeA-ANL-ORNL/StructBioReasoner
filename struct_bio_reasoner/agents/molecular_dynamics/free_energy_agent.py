@@ -110,11 +110,6 @@ class FEAgent:
         Returns:
             True if initialization successful, False otherwise
         """
-        if not MDAGENT_AVAILABLE:
-            self.logger.error("FEAgent not available - cannot initialize adapter")
-            self.initialized = False
-            return False
-
         try:
             # Import FEAgent components
             # Note: FEAgent should be installed and available in Python path
@@ -143,7 +138,7 @@ class FEAgent:
             self.logger.info('Attempting to launch FEAgent')
             self.coordinator_handle = await self.manager.launch(
                 FECoordinator,
-                args=(parsl_settings,)
+                args=(parsl_settings)
             )
 
             self.initialized = True
