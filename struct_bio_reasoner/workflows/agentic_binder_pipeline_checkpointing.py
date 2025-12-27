@@ -755,7 +755,7 @@ class AgenticBinderPipelineWithCheckpointing:
         """
         paths = hypothesis.md_analysis['paths']
 
-        fe_config = {'simulation_paths' : paths}
+        fe_config = {'simulation_paths' : Path(f'{self.global_cwd}/molecular_dynamics/{self.comp_design_it}')}
 
         return fe_config
 
