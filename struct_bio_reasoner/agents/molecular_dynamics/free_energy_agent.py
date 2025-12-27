@@ -133,7 +133,7 @@ class FEAgent:
                     parsl_config[k] = v
 
             # worker_init, nodes, max_workers_per_node, cores_per_worker
-            parsl_settings = LocalCPUSettings(parsl_config).config_factory(Path.cwd())
+            parsl_settings = LocalCPUSettings(**parsl_config).config_factory(Path.cwd())
 
             self.logger.info('Attempting to launch FEAgent')
             self.coordinator_handle = await self.manager.launch(
