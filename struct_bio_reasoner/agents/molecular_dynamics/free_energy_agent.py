@@ -334,9 +334,6 @@ class FEAgent:
                     self.fe_handle = None
                     delattr(self, 'initialized')
 
-            # Call parent cleanup
-            await super().cleanup()
-
             self.logger.info("FEAgent adapter cleanup completed")
 
         except Exception as e:
