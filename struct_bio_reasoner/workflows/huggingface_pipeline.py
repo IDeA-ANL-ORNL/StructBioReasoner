@@ -23,19 +23,19 @@ Author: StructBioReasoner Team
 Date: 2025-12-26
 """
 
-import sys
-import asyncio
-import logging
-import json
 import argparse
-import dill as pickle
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+import asyncio
 from datetime import datetime
+import dill as pickle
+import json
+import logging
+from pathlib import Path
+import sys
 from types import SimpleNamespace
+from typing import Dict, Any, List, Optional, Tuple
 import wandb
 
-from jnana.protognosis.core.llm_interface import alcfLLM
+from jnana.protognosis.core.llm_interface import huggingfaceLLM
 from ..core.binder_design_system import BinderDesignSystem
 from ..data.protein_hypothesis import ProteinHypothesis
 from ..prompts.prompts import get_prompt_manager, config_master
@@ -202,8 +202,8 @@ class AgenticBinderPipelineWithCheckpointing:
             jnana_config_path=self.jnana_config_path,
             enable_agents=self.enable_agents
         )
-
-        self.system.prompt_gen_llm = alcfLLM()
+        
+        self.system.prompt_gen_llm = huggingfaceLLM()
         await self.system.start()
 
         logger.info(f'design agents allowed : {self.system.design_agents}')
