@@ -42,7 +42,7 @@ from ..prompts.prompts import get_prompt_manager, config_master
 from ..utils.uniprot_api import fetch_uniprot_sequence
 from ..utils.hotspot import get_hotspot_resids_from_simulations
 from ..utils.protein_utils import pdb2seq
-from ..utils.metric_eval import MetricEvaluator
+#from ..utils.metric_eval import MetricEvaluator
 
 
 # Configure logging
@@ -180,10 +180,10 @@ class AgenticBinderPipelineWithCheckpointing:
         self.comp_design_it = 0
         
         # In __init__():
-        self.metric_evaluator = MetricEvaluator(
-                project_name=wandb_project,
-                run_name=f"exp_{wandb_name}{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            )
+        #self.metric_evaluator = MetricEvaluator(
+        #        project_name=wandb_project,
+        #        run_name=f"exp_{wandb_name}{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        #    )
     async def initialize(self, research_goal: str) -> None:
         """
         Initialize the binder design system and set research goal.
@@ -669,13 +669,13 @@ class AgenticBinderPipelineWithCheckpointing:
         )
 
         # After each iteration:
-        self.metric_evaluator.update_metrics(
-            decision=previous_task,
-            binder_results=previous_results if previous_task == 'computational_design' else None,
-            md_results=previous_results if previous_task == 'molecular_dynamics' else None,
-            fe_results=previous_results if previous_task == 'free_energy' else None
-            )
-        self.metric_evaluator.log_to_wandb(step=self.iteration_count)
+        #self.metric_evaluator.update_metrics(
+        #    decision=previous_task,
+        #    binder_results=previous_results if previous_task == 'computational_design' else None,
+        #    md_results=previous_results if previous_task == 'molecular_dynamics' else None,
+        #    fe_results=previous_results if previous_task == 'free_energy' else None
+        #    )
+        #self.metric_evaluator.log_to_wandb(step=self.iteration_count)
 
         return {
             'task': next_task,
@@ -734,7 +734,7 @@ class AgenticBinderPipelineWithCheckpointing:
 
         config['simulation_paths'] = passing
         config['root_output_path'] = f'{self.global_cwd}/molecular_dynamics/{self.comp_design_it}'
-        config['steps'] = 10000
+        #config['steps'] = 10000
 
         if config['steps']<10000:
             config['steps'] = 10000
@@ -934,7 +934,7 @@ class AgenticBinderPipelineWithCheckpointing:
             else:
                 # Use default hotspot residues
                 logger.info("\n[HOTSPOT] Using default hotspot residues...")
-                hotspot_residues = [45, 67, 89, 102, 134, 156, 178, 199, 211, 234]
+                hotspot_residues = None#[]#45, 67, 89, 102, 134, 156, 178, 199, 211, 234]
 
         # Create hypothesis for tracking
         hypothesis = ProteinHypothesis(
@@ -999,63 +999,69 @@ class AgenticBinderPipelineWithCheckpointing:
 
         # Iterations 1+: LLM-guided agentic loop
         while self.iteration_count < self.max_iterations:
-            iteration_result = await self.run_iteration(
-                hypothesis=hypothesis,
-                previous_task=previous_task,
-                previous_config=previous_config,
-                previous_results=previous_results,
-                iteration=self.iteration_count
-            )
-
-            next_task = iteration_result['task']
-
-            # Check if we should stop
-            if next_task == 'stop' or next_task == '':
-                logger.info("\n[STOPPING] Reasoner recommends stopping.")
-                next_task = 'computational_design'
-
-            # Update state
-            previous_task = next_task
-            previous_config = iteration_result['config']
-            previous_results = iteration_result['results']
-
-            # Update hypothesis and track binders
-            best_binders_this_iter = self._update_hypothesis(
-                hypothesis,
-                previous_task,
-                previous_results
-            )
-
-            if best_binders_this_iter:
-                self.all_binders.extend(best_binders_this_iter)
-                self.best_binders.append(best_binders_this_iter)
-
-            # Append to history
-            self.system.append_history(
-                key_items=best_binders_this_iter,
-                decision=previous_task,
-                configuration=previous_config,
-                results=previous_results
-            )
-
-            self.iteration_count += 1
-
-            # Save checkpoint
-            if self.checkpoint_interval > 0 and self.iteration_count % self.checkpoint_interval == 0:
-                checkpoint = self._create_checkpoint(
-                    iteration=self.iteration_count,
+            try:
+                iteration_result = await self.run_iteration(
                     hypothesis=hypothesis,
-                    hotspot_residues=hotspot_residues,
                     previous_task=previous_task,
                     previous_config=previous_config,
-                    previous_results=previous_results
+                    previous_results=previous_results,
+                    iteration=self.iteration_count
                 )
-                self._save_checkpoint(checkpoint)
+
+                next_task = iteration_result['task']
+
+                # Check if we should stop
+                if next_task == 'stop' or next_task == '':
+                    logger.info("\n[STOPPING] Reasoner recommends stopping.")
+                    next_task = 'computational_design'
+
+                # Update state
+                previous_task = next_task
+                previous_config = iteration_result['config']
+                previous_results = iteration_result['results']
+
+                # Update hypothesis and track binders
+                best_binders_this_iter = self._update_hypothesis(
+                    hypothesis,
+                    previous_task,
+                    previous_results
+                )
+
+                if best_binders_this_iter:
+                    self.all_binders.extend(best_binders_this_iter)
+                    self.best_binders.append(best_binders_this_iter)
+
+                # Append to history
+                self.system.append_history(
+                    key_items=best_binders_this_iter,
+                    decision=previous_task,
+                    configuration=previous_config,
+                    results=previous_results
+                )
+
+                self.iteration_count += 1
+
+                # Save checkpoint
+                if self.checkpoint_interval > 0 and self.iteration_count % self.checkpoint_interval == 0:
+                    checkpoint = self._create_checkpoint(
+                        iteration=self.iteration_count,
+                        hypothesis=hypothesis,
+                        hotspot_residues=hotspot_residues,
+                        previous_task=previous_task,
+                        previous_config=previous_config,
+                        previous_results=previous_results
+                    )
+                    self._save_checkpoint(checkpoint)
+
+            except Exception as e:
+                next_task = 'computational_design'
+                logger.error('Exception during while loop: {e}')
+                continue
 
         # Generate final report
         final_report = self._generate_final_report(research_goal)
 
-        self.metric_evaluator.finish()
+        #self.metric_evaluator.finish()
         # Save final checkpoint
         final_checkpoint = self._create_checkpoint(
             iteration=self.iteration_count,

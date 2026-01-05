@@ -92,18 +92,17 @@ class RAGPromptManager():
             {self.research_goal}
             Generate an optimal prompt for a literature mining system (HiPerRAG) to identify:
             1. Key proteins that physically interact with {self.target_prot}
-            2. Proteins involved in cancer pathways
+            2. Proteins involved in cellular pathways
             3. Proteins where disrupting the {self.target_prot} interaction could have therapeutic benefit.
-                Evaluate P53 binding here as well and return if relevant
 
             The prompt should request structured output in JSON format with:
             - interacting_protein_name: string
             - interacting_protein_uniprot_id: string
-            - cancer_pathway: string
+            - cellular_pathway: string
             - interaction_type: string (e.g., "direct binding", "complex formation")
             - therapeutic_rationale: string
 
-            Return ONLY the optimized prompt text, no additional explanation with the prompt in a json format as {config_master['rag']} strip any /n characters or anything that obfuscates teh output."""
+            Return ONLY the optimized prompt text, no additional explanation with the prompt in a json format as {config_master['rag']} strip any /n characters or anything that obfuscates the output."""
 
         elif self.prompt_type == 'binder_design':
             prompt_optimization_request = f""" Given this research goal:
@@ -120,7 +119,7 @@ class RAGPromptManager():
        prompt =f""" Using hiper-rag output {self.input_json} clean up and return as json with the following information cleanly: 
        - interacting_protein_name: string
        - interacting_protein_uniprot_id: string
-       - cancer_pathway: string
+       - cellular_pathway: string
        - interaction_type: string (e.g., "direct binding", "complex formation")
        - therapeutic_rationale: string""" 
        self.prompt_c = prompt

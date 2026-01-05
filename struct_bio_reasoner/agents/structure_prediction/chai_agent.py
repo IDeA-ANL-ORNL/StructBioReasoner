@@ -59,6 +59,7 @@ class ChaiAgent:
             
             parsl_settings = LocalSettings(**parsl_config).config_factory(Path.cwd())
             
+            self.logger.info(f'{data=}')
             cwd = data.get('cwd', None)
             if cwd is None:
                 fasta_dir = self.fasta_dir
