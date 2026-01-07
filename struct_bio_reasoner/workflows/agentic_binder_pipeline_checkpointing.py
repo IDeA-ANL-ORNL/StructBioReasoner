@@ -547,7 +547,7 @@ class AgenticBinderPipelineWithCheckpointing:
         logger.info(f"Using starting binder: {starting_binder[:50]}...")
 
         # Generate initial recommendation
-        previous_task = 'computational_design'
+        previous_task = 'starting'
         previous_config = current_config
         previous_results = {'results': 'none'}
 
@@ -1219,8 +1219,7 @@ Goals:
 Default Scaffolds:
 - Affibody: VDNKFNKEQQNAFYEILHLPNLNEEQRNAFIQSLKDDPSQSANLLAEAKKLNDAQAPK
 - Affitin: MGSWAEFKQRLAAIKTRLQALGGSEAELAAFEKEIAAFESELQAYKGKGNPEVEALRKEAAAIRDELQAYRHN
-- Nanobody: QVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAA...WGQGTLVTVSS"""
-
+- Nanobody: QVKLEESGGGSVQTGGSLRLTCAASGRTSRSYGMGWFRQAPGKEREFVSGISWRGDSTGYADSVKGRFTISRDNAKNTVDLQMNSLKPEDTAIYYCAAAAGSAWYGTLYEYDYWGQGTQVTVSSALE"""
 
 async def main():
     """Main entry point for the agentic binder pipeline with checkpointing."""

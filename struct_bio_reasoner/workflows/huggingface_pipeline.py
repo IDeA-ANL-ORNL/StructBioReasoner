@@ -33,9 +33,9 @@ from pathlib import Path
 import sys
 from types import SimpleNamespace
 from typing import Dict, Any, List, Optional, Tuple
-import wandb
+#import wandb
 
-from jnana.protognosis.core.llm_interface import huggingfaceLLM
+from jnana.protognosis.core.llm_interface import create_llm, huggingfaceLLM
 from ..core.binder_design_system import BinderDesignSystem
 from ..data.protein_hypothesis import ProteinHypothesis
 from ..prompts.prompts import get_prompt_manager, config_master
@@ -135,6 +135,7 @@ class AgenticBinderPipelineWithCheckpointing:
         self,
         config_path: str = "config/binder_config.yaml",
         jnana_config_path: str = "config/jnana_config.yaml",
+        llm_provider: str = 'hugging_face',
         max_iterations: int = 1_000_000_000,
         enable_agents: Optional[List[str]] = None,
         checkpoint_dir: str = "checkpoints",
@@ -166,7 +167,7 @@ class AgenticBinderPipelineWithCheckpointing:
         ]
         self.checkpoint_dir = Path(checkpoint_dir)
         self.checkpoint_interval = checkpoint_interval
-
+        self.llm_provider = llm_provider
         self.system: Optional[BinderDesignSystem] = None
         self.session_id: Optional[str] = None
         self.target_sequence: Optional[str] = None
@@ -180,7 +181,8 @@ class AgenticBinderPipelineWithCheckpointing:
         self.comp_design_it = 0
         
         # In __init__():
-        self.metric_evaluator = MetricEvaluator(
+        if False:
+            self.metric_evaluator = MetricEvaluator(
                 project_name=wandb_project,
                 run_name=f"exp_{wandb_name}{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             )
@@ -203,7 +205,7 @@ class AgenticBinderPipelineWithCheckpointing:
             enable_agents=self.enable_agents
         )
         
-        self.system.prompt_gen_llm = huggingfaceLLM()
+        self.system.prompt_gen_llm = create_llm(self.llm_provider)#huggingfaceLLM()
         await self.system.start()
 
         logger.info(f'design agents allowed : {self.system.design_agents}')
@@ -547,7 +549,7 @@ class AgenticBinderPipelineWithCheckpointing:
         logger.info(f"Using starting binder: {starting_binder[:50]}...")
 
         # Generate initial recommendation
-        previous_task = 'computational_design'
+        previous_task = 'starting'
         previous_config = current_config
         previous_results = {'results': 'none'}
 
@@ -669,13 +671,14 @@ class AgenticBinderPipelineWithCheckpointing:
         )
 
         # After each iteration:
-        self.metric_evaluator.update_metrics(
-            decision=previous_task,
-            binder_results=previous_results if previous_task == 'computational_design' else None,
-            md_results=previous_results if previous_task == 'molecular_dynamics' else None,
-            fe_results=previous_results if previous_task == 'free_energy' else None
-            )
-        self.metric_evaluator.log_to_wandb(step=self.iteration_count)
+        if False:
+            self.metric_evaluator.update_metrics(
+                decision=previous_task,
+                binder_results=previous_results if previous_task == 'computational_design' else None,
+                md_results=previous_results if previous_task == 'molecular_dynamics' else None,
+                fe_results=previous_results if previous_task == 'free_energy' else None
+                )
+            self.metric_evaluator.log_to_wandb(step=self.iteration_count)
 
         return {
             'task': next_task,
@@ -734,7 +737,6 @@ class AgenticBinderPipelineWithCheckpointing:
 
         config['simulation_paths'] = passing
         config['root_output_path'] = f'{self.global_cwd}/molecular_dynamics/{self.comp_design_it}'
-        config['steps'] = 10000
 
         if config['steps']<10000:
             config['steps'] = 10000
@@ -1055,7 +1057,8 @@ class AgenticBinderPipelineWithCheckpointing:
         # Generate final report
         final_report = self._generate_final_report(research_goal)
 
-        self.metric_evaluator.finish()
+        if False:
+            self.metric_evaluator.finish()
         # Save final checkpoint
         final_checkpoint = self._create_checkpoint(
             iteration=self.iteration_count,
@@ -1213,7 +1216,7 @@ Goals:
 Default Scaffolds:
 - Affibody: VDNKFNKEQQNAFYEILHLPNLNEEQRNAFIQSLKDDPSQSANLLAEAKKLNDAQAPK
 - Affitin: MGSWAEFKQRLAAIKTRLQALGGSEAELAAFEKEIAAFESELQAYKGKGNPEVEALRKEAAAIRDELQAYRHN
-- Nanobody: QVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAA...WGQGTLVTVSS"""
+- Nanobody: QVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAAWGQGTLVTVSS"""
 
 
 async def main():
@@ -1268,6 +1271,14 @@ Examples:
         default='config/jnana_config.yaml',
         help='Path to Jnana configuration file (default: config/jnana_config.yaml)'
     )
+
+    parser.add_argument(
+        '--llm-provider',
+        type=str,
+        default='hugging_face',
+        help='Provider for reasoning agent'
+    )
+
 
     parser.add_argument(
         '--max-iterations',
@@ -1348,7 +1359,8 @@ Examples:
             jnana_config_path=args.jnana_config,
             max_iterations=args.max_iterations,
             checkpoint_dir=args.checkpoint_dir,
-            checkpoint_interval=args.checkpoint_interval
+            checkpoint_interval=args.checkpoint_interval,
+            llm_provider=args.llm_provider
         )
 
         # Resume from checkpoint or start fresh

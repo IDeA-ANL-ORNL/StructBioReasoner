@@ -108,7 +108,7 @@ class RAGPromptManager():
             prompt_optimization_request = f""" Given this research goal:
             {self.research_goal}
             Generate an optimal prompt for literature mining using HiPerRAG to identify:
-                starting binders for bindcraft optimization. If clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/affitin provided in the research goal or best binders in the input_json {input_json}.
+                starting binders for bindcraft optimization. If clinical evidence available use clinically relevant starting peptide otherwise use one of the default scaffolds for affibody/affitin/nanobody provided in the research goal or best binders in the input_json {input_json}.
                 Focus on returning a single peptide amino acid sequence and rationale for this in a json with these keys:
                  - binder_sequence: string
                   - rationale: string """ 
@@ -509,7 +509,7 @@ class FreeEnergyPromptManager():
                 Results:
                     {input_json_str}
 
-                Inform the scaffold to use 'affibody', 'affitin', or 'use_top_binders'. Only suggest 'use_top_binders' if the previous binders produced good free energies and are improving in the workflow. Put the next_task as 'computational_design' but suggest a new scaffold in the rationale.
+                Inform the scaffold to use 'affibody', 'affitin', 'nanobody' or 'use_top_binders'. Only suggest 'use_top_binders' if the previous binders produced good free energies and are improving in the workflow. Put the next_task as 'computational_design' but suggest a new scaffold in the rationale.
                 For context please use the history of decisions, recommendations, rationales, recommended configs, and key items like best binders:
                 {history_str}
                 '''
@@ -531,21 +531,63 @@ class FreeEnergyPromptManager():
             {self.history_list[:self.num_history]}
             Please provide your decision and reasoning and include the paths of the simulations to analyze in the format {config_master['free_energy']} where the list of paths is a list of root paths (e.g. root0/mdagent_0/prod.dcd, root1/mdagent_0/prod.dcd would be [root0, root1])."""
            
+@dataclass
+class StartingPromptManager():
+    research_goal: str
+    input_json: dict[str, Any]
+    target_prot: str
+    prompt_type: str
+    history : dict
+    num_history: int = 3
+    def __post_init__(self):
+        self.prompt_c = None #self.conclusion_prompt()
+        self.prompt_r = None
+    def running_prompt(self):
+        prompt = f"""
+        """
+        self.prompt_r = prompt
+
+    def conclusion_prompt(self):
+        prompt = f"""
+        This is to initialize the workflow. Please recommend bindcraft as the initial run and recommend few rounds (1/2) and to start at a default in the research goal
+        """
+        self.prompt_r = prompt
+
 
 # I want to make a factory class that can generate the right prompt manager based on the agent type
 def get_prompt_manager(agent_type: str, research_goal: str, input_json: dict[str, Any] | list[dict], target_prot: str, prompt_type: str, history: dict, num_history: int = 3):
-    if agent_type == 'rag':
-        return RAGPromptManager(research_goal, input_json, target_prot, prompt_type)
-    elif agent_type == 'computational_design':
-        if history == []:
-            history = {'key_items': [], 'decisions': [], 'results': [], 'configurations': []}
-        return BindCraftPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
-    elif agent_type == 'structure_prediction':
-        return CHAIPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
-    elif agent_type == 'molecular_dynamics':
-        return MDPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
-    elif agent_type == 'analysis':
-        return AnalysisPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
-    elif agent_type == 'free_energy':
-        return FreeEnergyPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
-        
+    match agent_type:
+        case 'rag':
+            return RAGPromptManager(research_goal, input_json, target_prot, prompt_type)
+        case 'computational_design':
+            if history == []:
+                history = {'key_items': [], 'decisions': [], 'results': [], 'configurations': []}
+            return BindCraftPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
+        case 'structure_prediction':
+            return CHAIPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
+        case 'molecular_dynamics':
+            return MDPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
+        case 'analysis':
+            return AnalysisPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
+        case 'free_energy':
+            return FreeEnergyPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
+        case 'starting':
+            return StartingPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
+
+    #if agent_type == 'rag':
+    #    return RAGPromptManager(research_goal, input_json, target_prot, prompt_type)
+    #elif agent_type == 'computational_design':
+    #    if history == []:
+    #        history = {'key_items': [], 'decisions': [], 'results': [], 'configurations': []}
+    #    return BindCraftPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
+    #elif agent_type == 'structure_prediction':
+    #    return CHAIPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
+    #elif agent_type == 'molecular_dynamics':
+    #    return MDPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
+    #elif agent_type == 'analysis':
+    #    return AnalysisPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
+    #elif agent_type == 'free_energy':
+    #    return FreeEnergyPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
+    #elif agent_type == 'starting':
+    #    return StartingPromptManager(research_goal, input_json, target_prot, prompt_type, history, num_history)
+       

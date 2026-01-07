@@ -11,7 +11,7 @@ import yaml
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
-
+import json
 # Import Jnana components
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent.parent / "Jnana"))
@@ -159,15 +159,32 @@ class BinderDesignSystem(JnanaSystem):
             self.history['recommendations'].append(recommendations)
         if decision is not None:
             self.history['decisions'].append(decision)
-        elif key_items is None:
+        elif decision is None:
             self.history['decisions'].append('No decision')
         if configuration is not None:
+            try:
+                configuration = json.dumps(configuration)
+            except Exception as e:
+                self.logger.debug(e)
+                configuration = configuration.__dict__
+                configuration = json.dumps(configuration)
+
+            max_length = 500
+            configuration = configuration[:max_length]
             self.history['configurations'].append(configuration)
-        elif key_items is None:
+        elif configuration is None:
             self.history['configurations'].append('No configuration')
         if results is not None:
+            try:
+                results = json.dumps(results)
+            except Exception as e:
+                self.logger.debug(e)
+                results = results.__dict__
+                results = json.dumps(results)
+            max_length = 500
+            results = results[:max_length]
             self.history['results'].append(results)
-        elif key_items is None:
+        elif results is None:
             self.history['results'].append('No results')
 
         if len(self.history['decisions']) > self.num_history:
@@ -675,7 +692,7 @@ class BinderDesignSystem(JnanaSystem):
         recommendation = await self.generate_single_recommendation(results_pass)
         self.logger.info(f"Here is the protein recommendation: \n {[rec.to_dict() for rec in recommendation]}")
         self.append_history(recommendations=recommendation)
-        recommendation[0].metadata['history_list'] = self.history
+        recommendation[0].metadata['history'] = self.history
         recommendation[0].metadata['num_history'] = self.num_history
         #protein_recommendation = ProteinHypothesis.from_unified_hypothesis(
         #    recommendation,
