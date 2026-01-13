@@ -15,35 +15,71 @@ from typing import Dict, Any, Optional, Union
 def load_protein_config(config_path: Union[str, Path]) -> Dict[str, Any]:
     """
     Load protein engineering configuration from YAML file.
-    
+
     Args:
         config_path: Path to configuration file
-        
+
     Returns:
         Configuration dictionary
-        
+
     Raises:
         FileNotFoundError: If config file doesn't exist
         yaml.YAMLError: If config file is invalid YAML
     """
     config_path = Path(config_path)
-    
+
     if not config_path.exists():
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
-    
+
     try:
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
-        
+
         # Validate configuration
         validated_config = validate_config(config)
-        
+
         # Expand environment variables
         expanded_config = expand_environment_variables(validated_config)
-        
+
         logging.info(f"Configuration loaded from {config_path}")
         return expanded_config
-        
+
+    except yaml.YAMLError as e:
+        raise yaml.YAMLError(f"Invalid YAML in configuration file: {e}")
+
+
+def load_binder_config(config_path: Union[str, Path]) -> Dict[str, Any]:
+    """
+    Load binder design configuration from YAML file.
+
+    Args:
+        config_path: Path to configuration file
+
+    Returns:
+        Configuration dictionary
+
+    Raises:
+        FileNotFoundError: If config file doesn't exist
+        yaml.YAMLError: If config file is invalid YAML
+    """
+    config_path = Path(config_path)
+
+    if not config_path.exists():
+        raise FileNotFoundError(f"Configuration file not found: {config_path}")
+
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+
+        # Validate configuration
+        validated_config = validate_config(config)
+
+        # Expand environment variables
+        expanded_config = expand_environment_variables(validated_config)
+
+        logging.info(f"Binder configuration loaded from {config_path}")
+        return expanded_config
+
     except yaml.YAMLError as e:
         raise yaml.YAMLError(f"Invalid YAML in configuration file: {e}")
 

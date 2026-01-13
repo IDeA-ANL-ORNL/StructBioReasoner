@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = 'struct_bio_reasoner'
+version = '0.1.0'
+authors = [
+    {name='Matt Sinclair', email='msinclair@anl.gov'},
+    {name='Archit Vasan', email='125404521+architvasan@users.noreply.github.com'}
+]
+description='''
+A flexible abstracted version of BindCraft (https://github.com/martinpacesa/BindCraft)
+wherein the folding model and inverse folding models can be swapped out in a generalizable
+framework.
+'''
+readme = 'README.md'
+requires-python = '>= 3.10'
+license = {text = 'MIT'}
+dependencies = [
+    "numpy>=1.21.0",
+    "biopython>=1.79",
+    "pyyaml>=6.0",
+    "requests>=2.26.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=22.0",
+    "flake8>=4.0",
+]
+md = [
+    "openmm>=8.0",
+    "mdtraj>=1.9.7",
+]
+all = [
+    "struct_bio_reasoner[dev,md]",
+]
+
+[project.urls]
+Homepage = 'https://github.com/IDeA-ANL-ORNL/StructBioReasoner'
+Issues = 'https://github.com/IDeA-ANL-ORNL/StructBioReasoner/issues'
+Repository = 'https://github.com/IDeA-ANL-ORNL/StructBioReasoner'
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["struct_bio_reasoner*"]
+exclude = ["tests*", "docs*", "examples*", "scripts*", "data*", "config*", "sessions*", "structbio_venv*"]
+
+[tool.setuptools.package-data]
+struct_bio_reasoner = ["py.typed"]

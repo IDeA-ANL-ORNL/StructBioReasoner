@@ -3,7 +3,7 @@
 
 # Jnana Integration Settings
 jnana:
-  config_path: "../Jnana/config/models.yaml"  # Path to Jnana configuration
+  config_path: "../Jnana/config/models.example.yaml"  # Path to Jnana configuration
   enable_protognosis: true
   enable_biomni: false  # Disabled for now
   enable_wisteria_ui: true
@@ -261,6 +261,7 @@ agents:
   # Molecular Dynamics Agent
   molecular_dynamics:
     enabled: true
+    md_backend: "openmm"  # Options: "openmm" or "mdagent"
     capabilities:
       - "thermostability_prediction"
       - "mutation_validation"
@@ -279,6 +280,16 @@ agents:
       rmsf_threshold: 0.2  # nm
       stability_score_threshold: 70.0
       confidence_threshold: 0.6
+
+    # MDAgent backend configuration (optional)
+    mdagent:
+      solvent_model: "explicit"  # Options: "implicit" or "explicit"
+      force_field: "amber14"
+      water_model: "tip3p"
+      equil_steps: 10_000
+      prod_steps: 1_000_000  # 2ns at 2fs timestep
+      protein: true
+      output_file: "system.pdb"
 
   # RFDiffusion Generative Design Agent
   rfdiffusion_agent:

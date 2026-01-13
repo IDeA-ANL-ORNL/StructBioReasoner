@@ -1,7 +1,7 @@
 # StructBioReasoner .gitignore
 
 # Environment and API Keys
-.env
+.env*
 .env.local
 .env.production
 .env.staging
@@ -166,11 +166,6 @@ Thumbs.db
 *.old
 
 # Debug Files
-debug_*.py
-test_*.py
-*_debug.py
-*_test.py
-
 # Large Model Files
 *.model
 *.pkl
@@ -242,3 +237,35 @@ ubiquitin_*_results_*.json
 *.gro
 *.top
 *.itp
+structbio_venv
+pics
+
+# Misc testing things
+data/fastas/
+data/folds/
+data/jnana.db
+data/fastas/trial_0/fixed_design.jsonl
+data/fastas/trial_0/parsed_design.jsonl
+bindcraft_output/
+fastas/
+logs/test.err
+logs/two_steptoolcall.err
+parsl_out/
+chai/
+cmd_parsl.htex.*
+cmd_parsl.htex.*
+cmd_parsl.htex.*
+data_matt/
+parsl.htex.*
+parsl.htex.*
+parsl.htex.*
+runinfo/
+temp.fa
+test_chai.py
+matt_structbioenv.txt
+struct_bio_reasoner/agents/hiper_rag/__rag_agent.py
+struct_bio_reasoner/agents/hiper_rag/_rag_agent.py
+examples/example_hotspot_analysis.py
+examples/nmnat2_agentic_binder_workflow_new.py
+examples/nmnat2_agentic_binder_workflow_new2.py
+examples/workflow_implementation/

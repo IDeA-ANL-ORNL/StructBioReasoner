@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StructBioReasoner - Binder Design Workflow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+        
+        .workflow {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: relative;
+        }
+        
+        .step {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .step:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .step:hover .tech-details {
+            display: block;
+        }
+        
+        .step-number {
+            position: absolute;
+            top: -15px;
+            left: 20px;
+            background: #f56565;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        
+        .step-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-left: 50px;
+        }
+        
+        .step-content {
+            padding-left: 50px;
+            line-height: 1.6;
+        }
+        
+        .step-tags {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+            padding-left: 50px;
+        }
+        
+        .tag {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .decision {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .loop {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .computational {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+        
+        .llm {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+        
+        .final {
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+        }
+        
+        .arrow {
+            text-align: center;
+            color: #4a5568;
+            font-size: 2em;
+            margin: -10px 0;
+        }
+        
+        .branch-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .branch {
+            border: 3px dashed #cbd5e0;
+            padding: 20px;
+            border-radius: 15px;
+            background: #f7fafc;
+        }
+        
+        .branch-label {
+            text-align: center;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        
+        .loop-indicator {
+            border-left: 5px solid #f56565;
+            padding-left: 20px;
+            margin: 20px 0;
+            background: #fff5f5;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .loop-title {
+            color: #c53030;
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        .output-box {
+            background: #edf2f7;
+            color: #2d3748;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            border-left: 4px solid #4299e1;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #e2e8f0;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .legend-box {
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+        }
+
+        .tech-details {
+            display: none;
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-size: 0.9em;
+            line-height: 1.8;
+        }
+
+        .tech-section {
+            margin-bottom: 12px;
+        }
+
+        .tech-label {
+            font-weight: bold;
+            color: #fbbf24;
+            margin-right: 8px;
+        }
+
+        .tech-value {
+            color: #e5e7eb;
+        }
+
+        .hover-hint {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 0.85em;
+            font-style: italic;
+            margin-top: 30px;
+            padding: 15px;
+            background: #f3f4f6;
+            border-radius: 10px;
+        }
+
+        .repo-section {
+            margin-top: 40px;
+            padding: 30px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            border: 2px solid #cbd5e0;
+        }
+
+        .repo-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .repo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .repo-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .repo-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .repo-name {
+            font-weight: bold;
+            color: #4a5568;
+            margin-bottom: 8px;
+            font-size: 1.05em;
+        }
+
+        .repo-link {
+            color: #4299e1;
+            text-decoration: none;
+            font-size: 0.9em;
+            word-break: break-all;
+            display: block;
+            margin-top: 5px;
+        }
+
+        .repo-link:hover {
+            color: #2b6cb0;
+            text-decoration: underline;
+        }
+
+        .repo-desc {
+            color: #718096;
+            font-size: 0.85em;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        .framework-highlight {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+            border: 2px solid #f39c12;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧬 StructBioReasoner</h1>
+        <p class="subtitle">AI-Driven Binder Design Workflow</p>
+        
+        <div class="workflow">
+            <!-- Step 1 -->
+            <div class="step llm">
+                <div class="step-number">1</div>
+                <div class="step-title">Research Goal Generation</div>
+                <div class="step-content">
+                    <strong>Input:</strong> Target protein name + sequence<br>
+                    <strong>Process:</strong> LLM generates research goal focused on probing interacting partners<br>
+                    <strong>Output:</strong> Research goal hypothesis
+                </div>
+                <div class="step-tags">
+                    <span class="tag">LLM Reasoning</span>
+                    <span class="tag">Goal Setting</span>
+                </div>
+                <div class="tech-details">
+                    <div class="tech-section">
+                        <span class="tech-label">Software:</span>
+                        <span class="tech-value">Jnana LLM Reasoner (currently OpenAI GPT-4o, migrating to vLLM/ALCF endpoints)</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Hardware:</span>
+                        <span class="tech-value">CUDA GPU, Intel XPU</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Step 2 -->
+            <div class="step llm">
+                <div class="step-number">2</div>
+                <div class="step-title">Literature Mining for Interacting Partners</div>
+                <div class="step-content">
+                    <strong>Process:</strong> Parse scientific literature to identify known interacting partners<br>
+                    <strong>Output:</strong> Hypothesis with target protein + interacting partner sequences
+                </div>
+                <div class="step-tags">
+                    <span class="tag">Literature Search</span>
+                    <span class="tag">Sequence Extraction</span>
+                </div>
+                <div class="tech-details">
+                    <div class="tech-section">
+                        <span class="tech-label">Software:</span>
+                        <span class="tech-value">HiPerRAG (High-Performance Retrieval-Augmented Generation)</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Workflow Tools:</span>
+                        <span class="tech-value">Parsl / Globus Compute</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Hardware:</span>
+                        <span class="tech-value">AMD GPU, Intel XPU, CUDA GPU</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Step 3 -->
+            <div class="step computational">
+                <div class="step-number">3</div>
+                <div class="step-title">Structure Prediction (Chai)</div>
+                <div class="step-content">
+                    <strong>Process:</strong> Fold target sequence AND interacting partner sequences using Chai<br>
+                    <strong>Output:</strong> 3D structures of target and interacting partners
+                </div>
+                <div class="step-tags">
+                    <span class="tag">Chai Folding</span>
+                    <span class="tag">Structure Prediction</span>
+                </div>
+                <div class="tech-details">
+                    <div class="tech-section">
+                        <span class="tech-label">Software:</span>
+                        <span class="tech-value">Chai-1 (Structure Prediction)</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Workflow Tools:</span>
+                        <span class="tech-value">Parsl / Globus Compute</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Hardware:</span>
+                        <span class="tech-value">Intel XPU, CUDA GPU</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Step 4 -->
+            <div class="step computational">
+                <div class="step-number">4</div>
+                <div class="step-title">MD Simulations & Hotspot Identification</div>
+                <div class="step-content">
+                    <strong>Process:</strong> Run MD simulations of target-partner complexes using MDAgent<br>
+                    <strong>Analysis:</strong> Cluster interaction sites to identify common binding hotspots on target<br>
+                    <strong>Output:</strong> Hotspot residues on target protein
+                </div>
+                <div class="step-tags">
+                    <span class="tag">MDAgent</span>
+                    <span class="tag">Clustering</span>
+                    <span class="tag">Hotspot Analysis</span>
+                </div>
+                <div class="tech-details">
+                    <div class="tech-section">
+                        <span class="tech-label">Software:</span>
+                        <span class="tech-value">OpenMM, MDAnalysis</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Workflow Tools:</span>
+                        <span class="tech-value">Parsl / Globus Compute</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Hardware:</span>
+                        <span class="tech-value">CPU, Intel XPU, CUDA GPU, AMD GPU (should work but not tested by our team)</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Step 5 -->
+            <div class="step llm">
+                <div class="step-number">5</div>
+                <div class="step-title">Peptide Hypothesis Generation</div>
+                <div class="step-content">
+                    <strong>Input:</strong> Target protein + identified hotspots<br>
+                    <strong>Process:</strong> LLM generates hypotheses for starting peptide sequences likely to bind hotspots<br>
+                    <strong>Output:</strong> Proposed peptide sequences + target sequence
+                </div>
+                <div class="step-tags">
+                    <span class="tag">LLM Reasoning</span>
+                    <span class="tag">Peptide Design</span>
+                    <span class="tag">Hotspot Targeting</span>
+                </div>
+                <div class="tech-details">
+                    <div class="tech-section">
+                        <span class="tech-label">Software:</span>
+                        <span class="tech-value">Jnana LLM Reasoner (currently OpenAI GPT-4o, migrating to vLLM/ALCF endpoints)</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Hardware:</span>
+                        <span class="tech-value">CUDA GPU, Intel XPU</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Step 6 - Branching -->
+            <div class="branch-container">
+                <div class="branch">
+                    <div class="branch-label">Strategy 6a: BindCraft Optimization</div>
+                    <div class="step computational" style="margin: 0;">
+                        <div class="step-number">6a</div>
+                        <div class="step-title">BindCraft Design</div>
+                        <div class="step-content">
+                            <strong>Input:</strong> Proposed peptides + target sequence<br>
+                            <strong>Process:</strong> ProteinMPNN inverse folding + Chai forward folding + QC filtering<br>
+                            <strong>Output:</strong> Optimized peptides passing quality cutoffs
+                        </div>
+                        <div class="step-tags">
+                            <span class="tag">ProteinMPNN</span>
+                            <span class="tag">Chai</span>
+                            <span class="tag">QC Filters</span>
+                        </div>
+                        <div class="tech-details">
+                            <div class="tech-section">
+                                <span class="tech-label">Software:</span>
+                                <span class="tech-value">Chai-1, ProteinMPNN, MDAnalysis</span>
+                            </div>
+                            <div class="tech-section">
+                                <span class="tech-label">Workflow Tools:</span>
+                                <span class="tech-value">Parsl / Globus Compute</span>
+                            </div>
+                            <div class="tech-section">
+                                <span class="tech-label">Hardware:</span>
+                                <span class="tech-value">Intel XPU, CUDA GPU</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="branch">
+                    <div class="branch-label">Strategy 6b: Protein MLM</div>
+                    <div class="step computational" style="margin: 0;">
+                        <div class="step-number">6b</div>
+                        <div class="step-title">Masked Language Model</div>
+                        <div class="step-content">
+                            <strong>Input:</strong> Proposed peptides<br>
+                            <strong>Process:</strong> Evaluate sequence uncertainty and propose mutations<br>
+                            <strong>Output:</strong> Mutated peptide variants
+                        </div>
+                        <div class="step-tags">
+                            <span class="tag">Protein MLM</span>
+                            <span class="tag">Mutation Proposal</span>
+                        </div>
+                        <div class="tech-details">
+                            <div class="tech-section">
+                                <span class="tech-label">Software:</span>
+                                <span class="tech-value">ESM (Evolutionary Scale Modeling) / GenSLM</span>
+                            </div>
+                            <div class="tech-section">
+                                <span class="tech-label">Workflow Tools:</span>
+                                <span class="tech-value">Parsl / Globus Compute</span>
+                            </div>
+                            <div class="tech-section">
+                                <span class="tech-label">Hardware:</span>
+                                <span class="tech-value">Intel XPU, CUDA GPU</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Step 7 - Decision Point -->
+            <div class="step decision">
+                <div class="step-number">7</div>
+                <div class="step-title">Decision: Continue Optimization?</div>
+                <div class="step-content">
+                    <strong>Decision Maker:</strong> LLM Reasoner<br>
+                    <strong>Question:</strong> Are there enough high-quality passing peptides?<br>
+                    <strong>If NO:</strong> Loop back to Step 6 (BindCraft/MLM) with current best peptides<br>
+                    <strong>If YES:</strong> Proceed to MD simulations
+                </div>
+                <div class="step-tags">
+                    <span class="tag">Decision Point</span>
+                    <span class="tag">Quality Check</span>
+                </div>
+                <div class="tech-details">
+                    <div class="tech-section">
+                        <span class="tech-label">Software:</span>
+                        <span class="tech-value">Jnana LLM Reasoner (currently OpenAI GPT-4o, migrating to vLLM/ALCF endpoints)</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Hardware:</span>
+                        <span class="tech-value">CUDA GPU, Intel XPU</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="loop-indicator">
+                <div class="loop-title">🔄 OPTIMIZATION LOOP (Steps 6-7)</div>
+                Iteratively refine peptides using BindCraft or Protein MLM until sufficient high-quality candidates are obtained
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Step 8 -->
+            <div class="step computational">
+                <div class="step-number">8</div>
+                <div class="step-title">MD Simulations of Peptide-Target Complexes</div>
+                <div class="step-content">
+                    <strong>Input:</strong> Passing peptides + target protein<br>
+                    <strong>Process:</strong> Run MD simulations for each peptide-target pair<br>
+                    <strong>Output:</strong> Structures + trajectories for all complexes
+                </div>
+                <div class="step-tags">
+                    <span class="tag">MDAgent</span>
+                    <span class="tag">Complex Simulation</span>
+                    <span class="tag">Trajectory Analysis</span>
+                </div>
+                <div class="tech-details">
+                    <div class="tech-section">
+                        <span class="tech-label">Software:</span>
+                        <span class="tech-value">OpenMM</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Workflow Tools:</span>
+                        <span class="tech-value">Parsl / Globus Compute</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Hardware:</span>
+                        <span class="tech-value">Intel XPU, CUDA GPU, AMD GPU</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Step 9 -->
+            <div class="step computational">
+                <div class="step-number">9</div>
+                <div class="step-title">Binding Free Energy Calculations</div>
+                <div class="step-content">
+                    <strong>Method:</strong> MM-PBSA (Molecular Mechanics Poisson-Boltzmann Surface Area)<br>
+                    <strong>Process:</strong> Calculate binding free energies for all peptide-target pairs<br>
+                    <strong>Output:</strong> Ranked peptides with binding free energies
+                </div>
+                <div class="step-tags">
+                    <span class="tag">MM-PBSA</span>
+                    <span class="tag">Free Energy</span>
+                    <span class="tag">Ranking</span>
+                </div>
+                <div class="tech-details">
+                    <div class="tech-section">
+                        <span class="tech-label">Software:</span>
+                        <span class="tech-value">Amber MMPBSA</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Hardware:</span>
+                        <span class="tech-value">CPU</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Step 10 - Decision Point -->
+            <div class="step decision">
+                <div class="step-number">10</div>
+                <div class="step-title">Decision: Sufficient Top Peptides?</div>
+                <div class="step-content">
+                    <strong>Decision Maker:</strong> LLM Reasoner<br>
+                    <strong>Input:</strong> Top-ranked peptides + binding free energies<br>
+                    <strong>Question:</strong> Are there enough high-affinity peptides?<br>
+                    <strong>If NO:</strong> Loop back to Step 5 using top peptides as new starting points<br>
+                    <strong>If YES:</strong> Proceed to final output
+                </div>
+                <div class="step-tags">
+                    <span class="tag">Decision Point</span>
+                    <span class="tag">Affinity Check</span>
+                </div>
+                <div class="tech-details">
+                    <div class="tech-section">
+                        <span class="tech-label">Software:</span>
+                        <span class="tech-value">Jnana LLM Reasoner (currently OpenAI GPT-4o, migrating to vLLM/ALCF endpoints)</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Hardware:</span>
+                        <span class="tech-value">CUDA GPU, Intel XPU</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="loop-indicator">
+                <div class="loop-title">🔄 REFINEMENT LOOP (Steps 5-10)</div>
+                Use top-performing peptides as seeds for new design cycles until sufficient high-affinity binders are obtained
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Step 11 - Final -->
+            <div class="step final">
+                <div class="step-number">11</div>
+                <div class="step-title">✅ Final Output: Top Peptide Binders</div>
+                <div class="step-content">
+                    <strong>Deliverables:</strong>
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>List of top-ranked peptide sequences</li>
+                        <li>Binding free energies (ΔG)</li>
+                        <li>Predicted structures of peptide-target complexes</li>
+                        <li>MD trajectory data</li>
+                        <li>Quality metrics and confidence scores</li>
+                    </ul>
+                </div>
+                <div class="output-box">
+                    OUTPUT: Validated peptide binders ready for experimental validation
+                </div>
+                <div class="tech-details">
+                    <div class="tech-section">
+                        <span class="tech-label">Software:</span>
+                        <span class="tech-value">Jnana LLM Reasoner (Report Generation)</span>
+                    </div>
+                    <div class="tech-section">
+                        <span class="tech-label">Hardware:</span>
+                        <span class="tech-value">CUDA GPU, Intel XPU</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hover Hint -->
+        <div class="hover-hint">
+            💡 <strong>Tip:</strong> Hover over any step to see detailed software, hardware, and workflow tool information
+        </div>
+
+        <!-- Repository Information -->
+        <div class="repo-section">
+            <div class="repo-title">📚 Repository Information</div>
+            <div class="repo-grid">
+                <!-- Framework -->
+                <div class="repo-item framework-highlight">
+                    <div class="repo-name">🏛️ Academy (Agentic Framework)</div>
+                    <a href="https://github.com/academy-agents/academy" target="_blank" class="repo-link">
+                        github.com/academy-agents/academy
+                    </a>
+                    <div class="repo-desc">All agentic workflows are performed using Academy</div>
+                </div>
+
+                <!-- LLM Reasoning -->
+                <div class="repo-item">
+                    <div class="repo-name">🧠 StructBioReasoner</div>
+                    <a href="https://github.com/IDeA-ANL-ORNL/StructBioReasoner/tree/akv_dev" target="_blank" class="repo-link">
+                        github.com/IDeA-ANL-ORNL/StructBioReasoner (akv_dev)
+                    </a>
+                    <div class="repo-desc">Main orchestration and LLM reasoning</div>
+                </div>
+
+                <div class="repo-item">
+                    <div class="repo-name">🧠 Jnana</div>
+                    <a href="https://github.com/architvasan/Jnana" target="_blank" class="repo-link">
+                        github.com/architvasan/Jnana
+                    </a>
+                    <div class="repo-desc">LLM reasoning framework</div>
+                </div>
+
+                <!-- MD Simulations -->
+                <div class="repo-item">
+                    <div class="repo-name">🔬 MDAgent</div>
+                    <a href="https://github.com/msinclair-py/MDAgent" target="_blank" class="repo-link">
+                        github.com/msinclair-py/MDAgent
+                    </a>
+                    <div class="repo-desc">Molecular dynamics agent implementation</div>
+                </div>
+
+                <div class="repo-item">
+                    <div class="repo-name">⚛️ OpenMM</div>
+                    <a href="https://github.com/openmm/openmm" target="_blank" class="repo-link">
+                        github.com/openmm/openmm
+                    </a>
+                    <div class="repo-desc">MD simulation engine</div>
+                </div>
+
+                <!-- Structure Prediction -->
+                <div class="repo-item">
+                    <div class="repo-name">🧬 Chai-Lab</div>
+                    <a href="https://github.com/chaidiscovery/chai-lab/tree/main/chai_lab" target="_blank" class="repo-link">
+                        github.com/chaidiscovery/chai-lab
+                    </a>
+                    <div class="repo-desc">Structure prediction (folding)</div>
+                </div>
+
+                <!-- Binder Design -->
+                <div class="repo-item">
+                    <div class="repo-name">🔗 BindCraft (Agent Implementation)</div>
+                    <a href="https://github.com/msinclair-py/bindcraft/tree/agent_acad" target="_blank" class="repo-link">
+                        github.com/msinclair-py/bindcraft (agent_acad)
+                    </a>
+                    <div class="repo-desc">Peptide binder design agent</div>
+                </div>
+
+                <!-- Protein Language Models -->
+                <div class="repo-item">
+                    <div class="repo-name">🧪 PepMLM (ESM Fine-tuned)</div>
+                    <a href="https://github.com/programmablebio/pepmlm" target="_blank" class="repo-link">
+                        github.com/programmablebio/pepmlm
+                    </a>
+                    <div class="repo-desc">ESM fine-tuned on peptide/target interactions</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-box llm"></div>
+                <span>LLM Reasoning</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box computational"></div>
+                <span>Computational Tools</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box decision"></div>
+                <span>Decision Points</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box final"></div>
+                <span>Final Output</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

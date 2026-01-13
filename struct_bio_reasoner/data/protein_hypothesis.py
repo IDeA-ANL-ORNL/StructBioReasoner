@@ -4,12 +4,13 @@ Protein-specific hypothesis data models.
 This module extends Jnana's UnifiedHypothesis with protein engineering
 specific fields and methods.
 """
-
+import inspect
 import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
+import numpy as np
 
 # Import Jnana components
 import sys
@@ -18,6 +19,56 @@ sys.path.append(str(Path(__file__).parent.parent.parent.parent / "Jnana"))
 
 from jnana.data.unified_hypothesis import UnifiedHypothesis, Reference
 from .mutation_model import Mutation, MutationSet, MutationEffect
+
+
+@dataclass
+class BinderHypothesisData:
+    """Data structure for binder design hypotheses
+    """
+    hypothesis_text: str
+    target_name: str
+    target_sequence: str
+    proposed_peptides: List[Dict[str, Any]] # Each has seq, source, rationale, peptide_id
+    literature_references: List[str]
+    binding_affinity_goal: Optional[str] = None
+    clinical_context: Optional[str] = None
+    # Binder type information
+    binder_type: str = "peptide"  # "peptide", "antibody", "nanobody", etc.
+    # Metadata
+    generated_by: str = "coscientist"  # Which agent generated this
+    generation_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            'hypothesis_text': self.hypothesis_text,
+            'target_name': self.target_name,
+            'target_sequence': self.target_sequence,
+            'proposed_peptides': self.proposed_peptides,
+            'literature_references': self.literature_references,
+            'binding_affinity_goal': self.binding_affinity_goal,
+            'clinical_context': self.clinical_context,
+            'binder_type': self.binder_type,
+            'generated_by': self.generated_by,
+            'generation_timestamp': self.generation_timestamp
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'BinderHypothesisData':
+        """Create from dictionary (e.g., from CoScientist JSON response)."""
+        return cls(
+            hypothesis_text=data.get('hypothesis_text', ''),
+            target_name=data.get('target_name', ''),
+            target_sequence=data.get('target_sequence', ''),
+            proposed_peptides=data.get('proposed_peptides', []),
+            literature_references=data.get('literature_references', []),
+            binding_affinity_goal=data.get('binding_affinity_goal'),
+            clinical_context=data.get('clinical_context'),
+            binder_type=data.get('binder_type', 'peptide'),
+            generated_by=data.get('generated_by', 'coscientist'),
+            generation_timestamp=data.get('generation_timestamp', datetime.now().isoformat())
+        )
+
 
 
 @dataclass
@@ -46,6 +97,163 @@ class StructuralAnalysis:
     confidence_score: float = 0.0
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
+
+@dataclass
+class BinderAnalysis:
+    """"""
+    analysis_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    protein_id: str = ''
+
+    # Binder analysis
+    num_rounds: int = 1
+    total_sequences: int = 10
+    passing_sequences: int = 0
+    passing_structures: int = 0
+    success_rate: float = 0.0
+    checkpoint_file: str = ''
+
+    # Top binder features
+    top_binders: dict = field(default_factory=dict)
+
+    # Analysis metadata
+    optimized_hypotheses: list[dict] = field(default_factory=list)
+    passing_hypotheses: list[dict] = field(default_factory=list)
+    sequences_per_round: list[int] = field(default_factory=list)
+    passing_per_round: list[int] = field(default_factory=list)
+    parameters_used: dict = field(default_factory=dict)
+    tools_used: list[str] = field(default_factory=list)
+    confidence_score: float = 0.0
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert BinderAnalysis to dictionary for serialization.
+        
+        Returns:
+            Dictionary representation of the analysis
+        """
+        return {
+            'analysis_id': self.analysis_id,
+            'protein_id': self.protein_id,
+            'num_rounds': self.num_rounds,
+            'total_sequences': self.total_sequences,
+            'passing_sequences': self.passing_sequences,
+            'passing_structures': self.passing_structures,
+            'success_rate': self.success_rate,
+            'checkpoint_file': self.checkpoint_file,
+            'optimized_hypotheses': self.optimized_hypotheses,
+            'passing_hypotheses': self.passing_hypotheses,
+            'sequences_per_round': self.sequences_per_round,
+            'passing_per_round': self.passing_per_round,
+            'parameters_used': self.parameters_used,
+            'tools_used': self.tools_used,
+            'confidence_score': self.confidence_score,
+            'timestamp': self.timestamp
+        }
+    def get_best_candidates(self, n: int = 10, metric: str = 'plddt') -> List[Dict[str, Any]]:
+        """
+        Get the top N best candidates from passing hypotheses.
+        
+        Args:
+            n: Number of top candidates to return
+            metric: Metric to rank by. Options:
+                - 'plddt': AlphaFold confidence score (higher is better)
+                - 'clash_score': Structural clash score (lower is better)
+                - 'binding_score': Predicted binding score (higher is better)
+                - 'net_charge': Net charge (closer to 0 is better)
+                
+        Returns:
+            List of top N candidate dicts sorted by the specified metric
+        """
+        if not self.passing_hypotheses:
+            return []
+        
+        # Create a copy to avoid modifying original
+        candidates = self.passing_hypotheses.copy()
+        
+        # Sort based on metric
+        if metric == 'plddt':
+            # Higher pLDDT is better
+            candidates.sort(
+                key=lambda x: x.get('metrics', {}).get('plddt', 0),
+                reverse=True
+            )
+        elif metric == 'clash_score':
+            # Lower clash score is better
+            candidates.sort(
+                key=lambda x: x.get('metrics', {}).get('clash_score', float('inf')),
+                reverse=False
+            )
+        elif metric == 'binding_score':
+            # Higher binding score is better (more negative binding energy)
+            candidates.sort(
+                key=lambda x: x.get('metrics', {}).get('binding_score', 0),
+                reverse=True
+            )
+        elif metric == 'net_charge':
+            # Closer to 0 is better
+            candidates.sort(
+                key=lambda x: abs(x.get('metrics', {}).get('net_charge', 0)),
+                reverse=False
+            )
+        else:
+            # Default: use pLDDT
+            candidates.sort(
+                key=lambda x: x.get('metrics', {}).get('plddt', 0),
+                reverse=True
+            )
+        
+        # Return top N
+        return candidates[:n] 
+
+    def get_passing_sequences(self) -> List[str]:
+        """
+        Extract just the sequences from passing hypotheses.
+        
+        Returns:
+            List of amino acid sequences that passed all filters
+        """
+        sequences = []
+        for hypothesis in self.passing_hypotheses:
+            seq = hypothesis.get('sequence')
+            if seq:
+                sequences.append(seq)
+        return sequences
+
+@dataclass
+class SimAnalysis:
+    """"""
+    analysis_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    protein_id: str = ''
+
+    # Simulation analysis
+    paths: list[str] = field(default_factory=list)
+    simulation_time_in_ns: int = 1
+    rmsd: np.ndarray = field(default_factory=lambda x: np.zeros(2))
+    rmsf: np.ndarray = field(default_factory=lambda x: np.zeros(2))
+    rog: np.ndarray = field(default_factory=lambda x: np.zeros(2))
+
+    # Analysis metadata
+    tools_used: list[str] = field(default_factory=list)
+    confidence_score: float = 0.0
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+
+
+@dataclass
+class FoldAnalysis:
+    """"""
+    analysis_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    folding_algorithm: str = 'Chai-1'
+
+    # metadata
+    unique_models: int = 1
+    total_models: int = 5
+    best_models: list[Path] = field(default_factory=list)
+    scores: dict[str, np.ndarray] = field(default_factory=dict)
+
+    tools_used: list[str] = field(default_factory=list)
+    confidence_score: float = 0.0
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
 @dataclass
 class EvolutionaryAnalysis:
@@ -138,7 +346,9 @@ class ProteinHypothesis(UnifiedHypothesis):
     
     def __init__(self, **kwargs):
         """Initialize protein hypothesis."""
-        super().__init__(**kwargs)
+        uh_keys = set(inspect.signature(UnifiedHypothesis.__init__).parameters)
+        uh_kwargs = {k: kwargs[k] for k in kwargs if k in uh_keys}
+        super().__init__(**uh_kwargs)
         
         # Protein-specific fields
         self.protein_id: str = kwargs.get("protein_id", "")
@@ -159,10 +369,13 @@ class ProteinHypothesis(UnifiedHypothesis):
         self.structural_analysis: Optional[StructuralAnalysis] = None
         self.evolutionary_analysis: Optional[EvolutionaryAnalysis] = None
         self.energetic_analysis: Optional[EnergeticAnalysis] = None
+        self.binder_analysis: Optional[BinderAnalysis] = None
+        self.md_analysis: Optional[SimAnalysis] = None
+        self.binder_data: Optional[BinderHypothesisData] = kwargs.get("binder_data")
         
         # Experimental validation
         self.experimental_validations: List[ExperimentalValidation] = []
-        
+
         # Protein-specific metadata
         self.protein_metadata = kwargs.get("protein_metadata", {})
         
@@ -171,24 +384,25 @@ class ProteinHypothesis(UnifiedHypothesis):
             self.hypothesis_type = "protein_engineering"
     
     @classmethod
-    def from_unified_hypothesis(cls, 
+    def from_unified_hypothesis(cls,
                               unified_hypothesis: UnifiedHypothesis,
                               protein_id: str = "",
                               protein_name: str = "",
-                              mutation_context: Optional[Dict] = None) -> 'ProteinHypothesis':
+                              biological_context: Optional[Dict] = None) -> 'ProteinHypothesis':
         """
         Create a ProteinHypothesis from a UnifiedHypothesis.
-        
+
         Args:
             unified_hypothesis: Base hypothesis to extend
             protein_id: Target protein identifier
             protein_name: Protein name
-            mutation_context: Mutation-specific context
-            
+            biological_context: Biological context information
+
         Returns:
             ProteinHypothesis instance
         """
         # Extract all fields from unified hypothesis
+        print(unified_hypothesis)
         hypothesis_data = {
             "hypothesis_id": unified_hypothesis.hypothesis_id,
             "title": unified_hypothesis.title,
@@ -219,23 +433,110 @@ class ProteinHypothesis(UnifiedHypothesis):
             "biomedical_domains": unified_hypothesis.biomedical_domains + ["protein_engineering"],
             "metadata": unified_hypothesis.metadata,
             "tags": unified_hypothesis.tags + ["protein", "structural_biology"],
-            
+
             # Protein-specific fields
             "protein_id": protein_id,
             "protein_name": protein_name,
-            "protein_metadata": mutation_context or {}
+            "protein_metadata": biological_context or {},
+            # ADD THIS: Check if this is a binder hypothesis
+            "binder_data": unified_hypothesis.metadata['binder_data'] #[unified_hypothesis['hypotheses'][i]['metadata']['binder_data'] for i in range(len(unified_hypothesis['hypotheses']))]#.metadata["binder_data"] #cls._extract_binder_data(unified_hypothesis, biological_context)
         }
-        
         return cls(**hypothesis_data)
-    
+
+    @classmethod
+    def _extract_binder_data(cls,
+                            unified_hypothesis: UnifiedHypothesis,
+                            biological_context: Optional[Dict] = None) -> Optional[BinderHypothesisData]:
+        """
+        Extract binder-specific data from a unified hypothesis.
+
+        This checks multiple sources:
+        1. biological_context dict (if explicitly provided)
+        2. unified_hypothesis.metadata (if CoScientist stored it there)
+        3. unified_hypothesis.content (if it's structured JSON)
+
+        Args:
+            unified_hypothesis: The base hypothesis
+            biological_context: Optional context dict
+
+        Returns:
+            BinderHypothesisData if binder data found, None otherwise
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        binder_data = None
+
+        # DEBUG: Log what we're checking
+        logger.info(f"_extract_binder_data: Checking for binder_data...")
+        logger.info(f"  - biological_context keys: {list(biological_context.keys()) if biological_context else 'None'}")
+        logger.info(f"  - unified_hypothesis.metadata keys: {list(unified_hypothesis.metadata.keys()) if unified_hypothesis.metadata else 'None'}")
+
+        # Method 1: Check biological_context for explicit binder data
+        if biological_context and 'binder_data' in biological_context:
+            logger.info("  ✓ Found binder_data in biological_context")
+            binder_data = BinderHypothesisData.from_dict(biological_context['binder_data'])
+
+        # Method 2: Check if biological_context itself IS the binder data
+        elif biological_context and 'target_sequence' in biological_context:
+            logger.info("  ✓ Found target_sequence in biological_context (treating as binder_data)")
+            # biological_context contains binder fields directly
+            binder_data = BinderHypothesisData.from_dict(biological_context)
+
+        # Method 3: Check unified_hypothesis.metadata
+        elif unified_hypothesis.metadata and 'binder_data' in unified_hypothesis.metadata:
+            logger.info("  ✓ Found binder_data in unified_hypothesis.metadata")
+            binder_data = BinderHypothesisData.from_dict(unified_hypothesis.metadata['binder_data'])
+
+        # Method 4: Try to parse from content if it's JSON
+        elif unified_hypothesis.content:
+            try:
+                import json
+                # Check if content is JSON with binder data
+                content_data = json.loads(unified_hypothesis.content)
+                if 'target_sequence' in content_data and 'proposed_peptides' in content_data:
+                    logger.info("  ✓ Found binder_data in unified_hypothesis.content (JSON)")
+                    binder_data = BinderHypothesisData.from_dict(content_data)
+            except (json.JSONDecodeError, TypeError):
+                # Content is not JSON or doesn't contain binder data
+                pass
+
+        if not binder_data:
+            logger.warning("  ❌ No binder_data found in any location!")
+
+        return binder_data
+
+    def add_binder_analysis(self, analysis: BinderAnalysis):
+        """"""
+        self.binder_analysis = analysis
+        self.update_at = time.time()
+
+        # Update metadata
+        self.metadata['has_binder_analysis'] = True
+        #self.metadata['binder_confidence'] = analysis.confidence_score
+
+    def add_md_analysis(self, analysis: SimAnalysis):
+        """"""
+        self.md_analysis = analysis
+        self.update_at = time.time()
+
+        # Update metadata
+        self.metadata['has_md_analysis'] = True
+        #self.metadata['md_confidence'] = analysis.confidence_score
+
+    def add_analyzer_analysis(self, analysis):
+        self.analyzer_analysis = analysis
+        self.update_at = time.time()
+        self.metadata['has_analyzer_analysis'] = True
+
     def add_structural_analysis(self, analysis: StructuralAnalysis):
         """Add structural analysis results."""
         self.structural_analysis = analysis
-        self.updated_at = time.time()
+        self.update_at = time.time()
         
         # Update metadata
         self.metadata["has_structural_analysis"] = True
-        self.metadata["structural_confidence"] = analysis.confidence_score
+        #self.metadata["structural_confidence"] = analysis.confidence_score
     
     def add_evolutionary_analysis(self, analysis: EvolutionaryAnalysis):
         """Add evolutionary analysis results."""
@@ -244,7 +545,7 @@ class ProteinHypothesis(UnifiedHypothesis):
         
         # Update metadata
         self.metadata["has_evolutionary_analysis"] = True
-        self.metadata["evolutionary_confidence"] = analysis.confidence_score
+        #self.metadata["evolutionary_confidence"] = analysis.confidence_score
     
     def add_energetic_analysis(self, analysis: EnergeticAnalysis):
         """Add energetic analysis results."""
@@ -253,7 +554,7 @@ class ProteinHypothesis(UnifiedHypothesis):
         
         # Update metadata
         self.metadata["has_energetic_analysis"] = True
-        self.metadata["energetic_confidence"] = analysis.confidence_score
+        #self.metadata["energetic_confidence"] = analysis.confidence_score
     
     def add_experimental_validation(self, validation: ExperimentalValidation):
         """Add experimental validation data."""
@@ -284,10 +585,12 @@ class ProteinHypothesis(UnifiedHypothesis):
             "analysis_status": {
                 "structural": self.structural_analysis is not None,
                 "evolutionary": self.evolutionary_analysis is not None,
-                "energetic": self.energetic_analysis is not None
+                "energetic": self.energetic_analysis is not None,
+                "computational_design": self.binder_analysis is not None,
+                "molecular_dynamics": self.md_analysis is not None
             },
             "experimental_validations": len(self.experimental_validations),
-            "overall_confidence": self._calculate_overall_confidence()
+            #"overall_confidence": self._calculate_overall_confidence()
         }
     
     def _calculate_overall_confidence(self) -> float:
@@ -300,10 +603,129 @@ class ProteinHypothesis(UnifiedHypothesis):
             confidences.append(self.evolutionary_analysis.confidence_score)
         if self.energetic_analysis:
             confidences.append(self.energetic_analysis.confidence_score)
+        if self.binder_analysis:
+            confidences.append(self.binder_analysis.confidence_score)
+        if self.md_analysis:
+            confidences.append(self.md_analysis.confidence_score)
         
         if confidences:
             return sum(confidences) / len(confidences)
         return 0.0
+
+    def has_binder_data(self) -> bool:
+        """Check if this hypothesis contains binder-specific data."""
+        return self.binder_data is not None
+
+    def get_target_sequence(self) -> Optional[str]:
+        """Get the target sequence from binder data."""
+        if self.binder_data:
+            return self.binder_data.target_sequence
+        return None
+    
+    def get_proposed_peptides(self) -> List[Dict[str, Any]]:
+        """Get the proposed peptides from binder data."""
+        if self.binder_data:
+            return self.binder_data.proposed_peptides
+        return []
+    
+    def get_binder_data(self, binder_data: Union[BinderHypothesisData, Dict[str, Any]]):
+        """
+        Add or update binder-specific data.
+        
+        Args:
+            binder_data: Either a BinderHypothesisData object or dict
+        """
+        if isinstance(binder_data, dict):
+            self.binder_data = BinderHypothesisData.from_dict(binder_data)
+        else:
+            self.binder_data = binder_data
+        self.updated_at = time.time()
+        return self.binder_data
+
+    def add_binder_data(self, binder_data: Union[BinderHypothesisData, Dict[str, Any]]):
+        """
+        Add or update binder-specific data.
+        
+        Args:
+            binder_data: Either a BinderHypothesisData object or dict
+        """
+        if isinstance(binder_data, dict):
+            self.binder_data = BinderHypothesisData.from_dict(binder_data)
+        else:
+            self.binder_data = binder_data
+        self.updated_at = time.time()
+    
+    # Parent-child tracking methods
+    def add_child_hypothesis(self, child_hypothesis_id: str):
+        """
+        Add a child hypothesis ID to track lineage.
+        
+        Args:
+            child_hypothesis_id: ID of the child hypothesis
+        """
+        if child_hypothesis_id not in self.children_ids:
+            self.children_ids.append(child_hypothesis_id)
+            self.updated_at = time.time()
+    
+    def set_parent_hypothesis(self, parent_hypothesis_id: str):
+        """
+        Set the parent hypothesis ID.
+        
+        Args:
+            parent_hypothesis_id: ID of the parent hypothesis
+        """
+        self.parent_id = parent_hypothesis_id
+        self.updated_at = time.time()
+    
+    def get_lineage_depth(self) -> int:
+        """
+        Get the depth of this hypothesis in the lineage tree.
+        
+        Returns:
+            Depth (0 for root, 1 for first generation, etc.)
+        """
+        if self.parent_id is None:
+            return 0
+        # If we have a parent, we're at least depth 1
+        # Note: To get exact depth, you'd need to traverse up the tree
+        # This is a simplified version
+        return 1
+    
+    def is_root_hypothesis(self) -> bool:
+        """
+        Check if this is a root hypothesis (no parent).
+        
+        Returns:
+            True if this is a root hypothesis
+        """
+        return self.parent_id is None
+    
+    def has_children(self) -> bool:
+        """
+        Check if this hypothesis has child hypotheses.
+        
+        Returns:
+            True if this hypothesis has children
+        """
+        return len(self.children_ids) > 0
+    
+    def get_lineage_info(self) -> Dict[str, Any]:
+        """
+        Get complete lineage information for this hypothesis.
+        
+        Returns:
+            Dictionary with lineage information
+        """
+        return {
+            'hypothesis_id': self.hypothesis_id,
+            'parent_id': self.parent_id,
+            'children_ids': self.children_ids,
+            'is_root': self.is_root_hypothesis(),
+            'has_children': self.has_children(),
+            'num_children': len(self.children_ids),
+            'generation': self.get_lineage_depth(),
+            'hypothesis_type': self.hypothesis_type
+        }
 
 
 class MutationHypothesis(ProteinHypothesis):

@@ -6,8 +6,11 @@ and manipulation.
 """
 
 import logging
-from typing import Dict, List, Optional, Any, Union
+import MDAnalysis as mda
+import numpy as np
 from pathlib import Path
+import string
+from typing import Dict, List, Optional, Any, Union
 
 try:
     import Bio
@@ -251,3 +254,41 @@ def parse_fasta_sequences(fasta_content: str) -> List[Dict[str, str]]:
         })
     
     return sequences
+
+def add_chainids(u: mda.Universe,
+                 terminus_selection: str='name OXT') -> mda.Universe:
+    if not hasattr(u.atoms, 'chainIDs'):
+        u.add_TopologyAttr('chainIDs')
+
+    u.atoms.chainIDs = np.full(u.atoms.chainIDs.shape, 'A', dtype=object)
+    
+    term_atoms = u.select_atoms(terminus_selection)
+    term_resindices = set(term_atoms.resindices)
+
+    def get_chain_label(index):
+        if index < 26:
+            return string.ascii_uppercase[index]
+        first = string.ascii_uppercase[(index // 26) - 1]
+        second = string.ascii_uppercase[index % 26]
+        return first + second
+
+    chain_index = 0
+    for residue in u.residues:
+        residue.atoms.chainIDs = get_chain_label(chain_index)
+
+        if residue.resindex in term_resindices:
+            chain_index += 1
+
+    return u
+
+def pdb2seq(pdbf):
+    u = mda.Universe(pdbf)
+    
+    # Chain A only
+    chain_a = u.select_atoms('protein and chainID A')
+    seq_a = ''.join([aa_dict.get(res.resname, 'X') for res in chain_a.residues])
+    
+    # Or by chainID
+    chain_b = u.select_atoms('protein and chainID B')
+    seq_b = ''.join([aa_dict.get(res.resname, 'X') for res in chain_b.residues])
+    return [seq_a, seq_b] 

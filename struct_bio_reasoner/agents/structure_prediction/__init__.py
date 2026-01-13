@@ -6,8 +6,3 @@ This module contains agents that use structure prediction tools:
 - Other structure prediction agents
 """
 
-from .alphafold_agent import AlphaFoldAgent
-
-__all__ = [
-    'AlphaFoldAgent'
-]
