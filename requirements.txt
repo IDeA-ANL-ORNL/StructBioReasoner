@@ -1,7 +1,11 @@
-# StructBioReasoner Core Dependencies
-# Python 3.8+ required
+# StructBioReasoner Comprehensive Dependencies
+# Python 3.8+ required for async features and modern typing
 
-# AI and OpenAI Integration
+# =============================================================================
+# CORE AI AND LANGUAGE MODEL INTEGRATION
+# =============================================================================
+
+# OpenAI Integration
 openai>=1.0.0
 
 # Core Scientific Computing
@@ -10,8 +14,11 @@ openai>=1.0.0
 #pandas>=1.3.0
 #matplotlib>=3.5.0
 
-# Structural Biology
+# Core structural biology
 biopython>=1.79
+biotite>=0.37.0  # Advanced protein structure analysis
+
+# PyMOL (molecular visualization)
 # pymol-open-source>=2.5.0  # Install via: pip install pymol-open-source
 # Note: PyMOL works best when installed via Homebrew: brew install pymol
 
@@ -26,17 +33,127 @@ mdtraj>=1.9.0  # Install via: conda install -c conda-forge mdtraj
 #torch>=1.12.0  # For ESM and other ML models
 #torchvision>=0.13.0
 fair-esm>=2.0.0  # ESM protein language models
-biotite>=0.37.0  # For protein structure analysis
 
-# RFDiffusion dependencies (optional - requires separate installation)
+# Traditional ML
+scikit-learn>=1.1.0
+xgboost>=1.6.0  # For gradient boosting
+lightgbm>=3.3.0  # Alternative gradient boosting
+
+# =============================================================================
+# MULTI-COMMUNITY AGENTIC SYSTEMS (PROTOGNOSIS-STYLE)
+# =============================================================================
+
+# Network analysis and graph algorithms
+networkx>=2.8.0  # For community networks and graph analysis
+
+# Optimization algorithms
+scipy>=1.7.0  # Already included above, but needed for optimization
+optuna>=3.0.0  # For hyperparameter optimization
+
+# Clustering and community detection
+scikit-learn>=1.1.0  # Already included above
+community>=0.13.0  # For community detection algorithms
+
+# =============================================================================
+# PAPER2AGENT SYSTEM DEPENDENCIES
+# =============================================================================
+
+# Natural Language Processing
+nltk>=3.7.0  # For text processing
+spacy>=3.4.0  # For advanced NLP
+textblob>=0.17.0  # For sentiment analysis and text processing
+
+# PDF and document processing
+PyPDF2>=3.0.0  # For PDF text extraction
+pdfplumber>=0.7.0  # Alternative PDF processing
+python-docx>=0.8.11  # For Word document processing
+
+# Web scraping and API access
+requests>=2.25.0
+beautifulsoup4>=4.11.0  # For HTML parsing
+arxiv>=1.4.0  # For arXiv paper access
+
+# =============================================================================
+# MCP (MODEL CONTEXT PROTOCOL) INTEGRATION
+# =============================================================================
+
+# MCP protocol implementation
+# Note: MCP is implemented directly in the codebase
+# These are supporting dependencies for the MCP framework
+
+# JSON schema validation
+jsonschema>=4.0.0
+
+# Dynamic code loading and execution
+importlib-metadata>=4.0.0  # For dynamic imports
+
+# =============================================================================
+# ASYNC AND WEB FRAMEWORKS
+# =============================================================================
+
+# Async HTTP and web
+aiohttp>=3.8.0
+aiofiles>=0.8.0  # For async file operations
+asyncio-mqtt>=0.11.0  # For MQTT if needed
+
+# Web APIs and requests
+requests>=2.25.0  # Already included above
+httpx>=0.24.0  # Modern async HTTP client
+
+# =============================================================================
+# CONFIGURATION AND ENVIRONMENT
+# =============================================================================
+
+# Configuration management
+pyyaml>=6.0
+python-dotenv>=0.19.0
+configparser>=5.3.0
+toml>=0.10.2  # For TOML configuration files
+
+# =============================================================================
+# DATABASE AND PERSISTENCE
+# =============================================================================
+
+# SQL databases
+sqlalchemy>=1.4.0
+sqlite3  # Built-in, but listed for completeness
+
+# NoSQL and graph databases
+neo4j>=5.0.0  # For knowledge graphs
+redis>=4.3.0  # For caching and session storage
+
+# =============================================================================
+# CLI, LOGGING, AND PROGRESS
+# =============================================================================
+
+# Command line interfaces
+click>=8.0.0
+typer>=0.7.0  # Modern CLI framework
+argparse  # Built-in, but listed for completeness
+
+# Rich terminal output
+rich>=12.0.0
+colorama>=0.4.5  # For cross-platform colored output
+
+# Progress tracking
+tqdm>=4.62.0
+
+# Enhanced logging
+loguru>=0.6.0  # Modern logging framework
+
+# =============================================================================
+# OPTIONAL ADVANCED TOOLS (commented out - install as needed)
+# =============================================================================
+
+# RFDiffusion dependencies (requires separate installation)
 # hydra-core>=1.2.0
 # omegaconf>=2.2.0
 # Note: RFDiffusion requires separate installation from GitHub
 
-# Rosetta dependencies (optional - requires license and separate installation)
+# Rosetta dependencies (requires license and separate installation)
 # Note: Rosetta requires separate installation and academic/commercial license
 
-# AlphaFold dependencies (optional - requires separate installation)
+# AlphaFold dependencies (requires separate installation)
 # tensorflow>=2.9.0
 # dm-haiku>=0.0.9
 # dm-tree>=0.1.7
@@ -49,28 +166,53 @@ biotite>=0.37.0  # For protein structure analysis
 #scikit-learn>=1.1.0
 #seaborn>=0.12.0
 
-# Async and Web
-aiohttp>=3.8.0
-requests>=2.25.0
+# =============================================================================
+# DEVELOPMENT AND TESTING DEPENDENCIES
+# =============================================================================
 
-# Configuration and Environment
-pyyaml>=6.0
-python-dotenv>=0.19.0
+# Testing frameworks
+pytest>=7.0.0
+pytest-asyncio>=0.19.0  # For async testing
+pytest-cov>=4.0.0  # For coverage reporting
 
-# Database
-sqlalchemy>=1.4.0
+# Code formatting and linting
+black>=23.0.0
+isort>=5.10.0
+flake8>=5.0.0
+mypy>=0.991  # For type checking
 
-# CLI and Progress
-click>=8.0.0
-rich>=12.0.0
-tqdm>=4.62.0
+# Jupyter and interactive development
+jupyter>=1.0.0
+ipykernel>=6.15.0
+notebook>=6.4.0
 
-# Optional Development Dependencies
-# pytest>=7.0.0
-# black>=23.0.0
-# jupyter>=1.0.0
+# =============================================================================
+# INSTALLATION NOTES AND REQUIREMENTS
+# =============================================================================
 
-# Installation Notes:
-# 1. PyMOL: Install via Homebrew for best results: brew install pymol
-# 2. OpenAI API: Set OPENAI_API_KEY in .env file
-# 3. Python 3.8+ required for async features
+# System Requirements:
+# - Python 3.8+ (required for async features and modern typing)
+# - 8GB+ RAM recommended for large protein analysis
+# - GPU recommended for deep learning models (CUDA-compatible)
+
+# Installation Order:
+# 1. Install conda/mamba for scientific packages
+# 2. Install PyMOL via Homebrew: brew install pymol
+# 3. Install OpenMM via conda: conda install -c conda-forge openmm
+# 4. Install remaining packages via pip: pip install -r requirements.txt
+# 5. Set OPENAI_API_KEY in .env file
+# 6. Install Jnana separately from the Jnana repository
+
+# Platform-Specific Notes:
+# - macOS: Use Homebrew for PyMOL and system dependencies
+# - Linux: Use conda-forge for scientific packages
+# - Windows: Use conda/mamba for all scientific packages
+
+# GPU Support:
+# - CUDA 11.8+ recommended for PyTorch and OpenMM
+# - Install PyTorch with CUDA: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# Memory Requirements:
+# - Minimum: 4GB RAM
+# - Recommended: 16GB+ RAM for large protein systems
+# - Large-scale simulations: 32GB+ RAM recommended

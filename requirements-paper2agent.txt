@@ -1,0 +1,255 @@
+# Paper2Agent System Dependencies
+# These are the specific dependencies for the Paper2Agent MCP tool generation system
+
+# =============================================================================
+# NATURAL LANGUAGE PROCESSING
+# =============================================================================
+
+# Core NLP libraries
+nltk>=3.7.0  # Natural Language Toolkit
+spacy>=3.4.0  # Industrial-strength NLP
+textblob>=0.17.0  # Simple text processing
+
+# Advanced NLP models
+transformers>=4.21.0  # Hugging Face transformers
+sentence-transformers>=2.2.0  # Sentence embeddings
+torch>=1.12.0  # PyTorch for NLP models
+
+# Text preprocessing
+regex>=2022.7.0  # Advanced regular expressions
+unidecode>=1.3.0  # Unicode text normalization
+ftfy>=6.1.0  # Text encoding fixes
+
+# =============================================================================
+# DOCUMENT PROCESSING AND PARSING
+# =============================================================================
+
+# PDF processing
+PyPDF2>=3.0.0  # PDF text extraction
+pdfplumber>=0.7.0  # Advanced PDF processing
+pymupdf>=1.20.0  # Fast PDF processing
+pdfminer.six>=20220524  # PDF mining
+
+# Document formats
+python-docx>=0.8.11  # Word documents
+openpyxl>=3.0.10  # Excel files
+python-pptx>=0.6.21  # PowerPoint files
+
+# HTML and XML processing
+beautifulsoup4>=4.11.0  # HTML/XML parsing
+lxml>=4.9.0  # Fast XML processing
+html2text>=2020.1.16  # HTML to text conversion
+
+# =============================================================================
+# SCIENTIFIC PAPER ACCESS AND RETRIEVAL
+# =============================================================================
+
+# Academic databases
+arxiv>=1.4.0  # arXiv paper access
+biopython>=1.79  # For PubMed and biological databases
+scholarly>=1.6.0  # Google Scholar scraping
+crossref-commons>=0.0.7  # CrossRef API
+
+# Web scraping
+requests>=2.25.0  # HTTP requests
+httpx>=0.24.0  # Async HTTP client
+selenium>=4.5.0  # Web browser automation (optional)
+scrapy>=2.6.0  # Web scraping framework (optional)
+
+# Rate limiting and caching
+requests-cache>=0.9.0  # HTTP caching
+ratelimit>=2.2.0  # Rate limiting
+backoff>=2.2.0  # Exponential backoff
+
+# =============================================================================
+# MODEL CONTEXT PROTOCOL (MCP) IMPLEMENTATION
+# =============================================================================
+
+# JSON schema validation
+jsonschema>=4.0.0  # JSON schema validation
+pydantic>=1.10.0  # Data validation and serialization
+
+# Dynamic code loading
+importlib-metadata>=4.0.0  # Dynamic imports
+types-setuptools>=57.0.0  # Type hints for setuptools
+
+# Code generation and templating
+jinja2>=3.1.0  # Template engine
+black>=23.0.0  # Code formatting
+isort>=5.10.0  # Import sorting
+
+# =============================================================================
+# CODE GENERATION AND ANALYSIS
+# =============================================================================
+
+# Abstract syntax tree manipulation
+ast  # Built-in AST module
+astunparse>=1.6.0  # AST to code conversion
+astor>=0.8.0  # AST manipulation
+
+# Code analysis
+pylint>=2.15.0  # Code analysis
+flake8>=5.0.0  # Style guide enforcement
+mypy>=0.991  # Type checking
+
+# Code execution and sandboxing
+subprocess  # Built-in subprocess module
+docker>=6.0.0  # Docker integration (optional)
+RestrictedPython>=6.0.0  # Restricted code execution
+
+# =============================================================================
+# MACHINE LEARNING FOR METHODOLOGY EXTRACTION
+# =============================================================================
+
+# Text classification and extraction
+scikit-learn>=1.1.0  # Machine learning
+xgboost>=1.6.0  # Gradient boosting
+lightgbm>=3.3.0  # Light gradient boosting
+
+# Named entity recognition
+spacy>=3.4.0  # Already included above
+transformers>=4.21.0  # Already included above
+
+# Clustering and similarity
+faiss-cpu>=1.7.0  # Similarity search
+umap-learn>=0.5.0  # Dimensionality reduction
+hdbscan>=0.8.0  # Clustering
+
+# =============================================================================
+# KNOWLEDGE EXTRACTION AND REPRESENTATION
+# =============================================================================
+
+# Knowledge graphs
+networkx>=2.8.0  # Graph algorithms
+rdflib>=6.2.0  # RDF processing
+owlrl>=6.0.2  # OWL reasoning
+
+# Ontology processing
+pronto>=2.5.0  # Ontology parsing
+goatools>=1.2.0  # Gene Ontology tools
+
+# =============================================================================
+# ASYNC AND CONCURRENT PROCESSING
+# =============================================================================
+
+# Async operations
+aiohttp>=3.8.0  # Async HTTP
+aiofiles>=0.8.0  # Async file operations
+asyncio  # Built-in async module
+
+# Concurrent processing
+concurrent.futures  # Built-in
+joblib>=1.2.0  # Parallel processing
+multiprocessing  # Built-in
+
+# =============================================================================
+# VALIDATION AND TESTING
+# =============================================================================
+
+# Code validation
+py-compile  # Built-in compilation check
+pyflakes>=2.5.0  # Static analysis
+bandit>=1.7.0  # Security analysis
+
+# Testing frameworks
+pytest>=7.0.0  # Testing framework
+pytest-asyncio>=0.19.0  # Async testing
+pytest-mock>=3.8.0  # Mocking
+
+# Property-based testing
+hypothesis>=6.54.0  # Property-based testing
+
+# =============================================================================
+# CACHING AND PERSISTENCE
+# =============================================================================
+
+# Caching
+diskcache>=5.4.0  # Persistent caching
+joblib>=1.2.0  # Memory caching
+functools  # Built-in LRU cache
+
+# Database integration
+sqlalchemy>=1.4.0  # SQL databases
+sqlite3  # Built-in SQLite
+
+# =============================================================================
+# MONITORING AND LOGGING
+# =============================================================================
+
+# Enhanced logging
+loguru>=0.6.0  # Modern logging
+structlog>=22.1.0  # Structured logging
+rich>=12.0.0  # Rich terminal output
+
+# Progress tracking
+tqdm>=4.62.0  # Progress bars
+alive-progress>=3.0.0  # Animated progress bars
+
+# Performance monitoring
+psutil>=5.9.0  # System monitoring
+memory-profiler>=0.60.0  # Memory profiling
+
+# =============================================================================
+# CONFIGURATION AND SERIALIZATION
+# =============================================================================
+
+# Configuration management
+pyyaml>=6.0  # YAML processing
+toml>=0.10.2  # TOML processing
+configparser>=5.3.0  # INI files
+
+# Data serialization
+pickle  # Built-in
+dill>=0.3.5  # Extended pickling
+cloudpickle>=2.2.0  # Cloud pickling
+
+# =============================================================================
+# VISUALIZATION AND REPORTING
+# =============================================================================
+
+# Plotting and visualization
+matplotlib>=3.5.0  # Basic plotting
+seaborn>=0.12.0  # Statistical visualization
+plotly>=5.0.0  # Interactive plots
+
+# Report generation
+reportlab>=3.6.0  # PDF generation
+weasyprint>=57.0  # HTML to PDF
+markdown>=3.4.0  # Markdown processing
+
+# =============================================================================
+# OPTIONAL ADVANCED FEATURES
+# =============================================================================
+
+# Large language models (optional)
+# openai>=1.0.0  # OpenAI API (already in main requirements)
+# anthropic>=0.3.0  # Anthropic Claude API
+# google-cloud-aiplatform>=1.25.0  # Google AI Platform
+
+# Advanced NLP (optional)
+# spacy-transformers>=1.2.0  # Transformer models for spaCy
+# allennlp>=2.10.0  # Advanced NLP toolkit
+
+# =============================================================================
+# INSTALLATION NOTES
+# =============================================================================
+
+# Installation:
+# pip install -r requirements-paper2agent.txt
+
+# Optional installations:
+# python -m spacy download en_core_web_sm  # English language model
+# python -m spacy download en_core_web_lg  # Large English model
+# python -m nltk.downloader punkt stopwords wordnet  # NLTK data
+
+# System Requirements:
+# - 8GB+ RAM for NLP models
+# - 16GB+ RAM for large language models
+# - SSD storage recommended for fast I/O
+# - Internet connection for paper retrieval
+
+# Performance Notes:
+# - Use async operations for I/O-bound tasks
+# - Cache processed papers to avoid reprocessing
+# - Consider GPU acceleration for large NLP models
+# - Use multiprocessing for CPU-bound text processing
