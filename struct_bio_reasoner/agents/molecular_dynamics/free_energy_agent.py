@@ -1,13 +1,8 @@
 """
-FEAgent Adapter for StructBioReasoner
+FEAgent (Free Energy) Adapter for StructBioReasoner
 
-This module provides an adapter that wraps FEAgent components (Builder, MDSimulator, MDCoordinator)
-to work seamlessly within StructBioReasoner's agent framework.
-
-The adapter translates between:
-- Academy's @action pattern → StructBioReasoner's async methods
-- FEAgent's Handle communication → Direct method calls  
-- MD simulation results → ProteinHypothesis objects
+This module provides an adapter for MM-PBSA free energy calculations
+using the SharedParslMixin to avoid nested Parsl configuration collisions.
 """
 
 from dataclasses import asdict, dataclass, field
@@ -16,61 +11,68 @@ import asyncio
 import logging
 import MDAnalysis as mda
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, TYPE_CHECKING
 from datetime import datetime
+
 from ...utils.parsl_settings import LocalCPUSettings
 
-# FEAgent imports (from https://github.com/msinclair-py/MDAgent)
+# FEAgent imports
 try:
     from academy.exchange import LocalExchangeFactory
     from academy.manager import Manager
     from concurrent.futures import ThreadPoolExecutor
-    
-    # Import FEAgent components
-    # Note: These would need to be installed from the FEAgent repository
-    # For now, we'll create a compatibility layer
+
     MDAGENT_AVAILABLE = True
 except ImportError:
     MDAGENT_AVAILABLE = False
     logging.warning("FEAgent not available. Install from https://github.com/msinclair-py/MDAgent")
 
 from ...data.protein_hypothesis import EnergeticAnalysis, ProteinHypothesis
+from ..shared_parsl_mixin import SharedParslMixin
+
+if TYPE_CHECKING:
+    from ...workflows.advanced_workflow import SharedParslContext
+
 
 @dataclass
 class FEConfig:
-    selections: list=field(default_factory=lambda: ['chain A', 'not chain A'])
-    out: Path=Path('.')
-    n_cpus: int=200,
-    amberhome: str=''
+    """Configuration for free energy calculations."""
+    selections: List = field(default_factory=lambda: ['chain A', 'not chain A'])
+    out: Path = Path('.')
+    n_cpus: int = 200
+    amberhome: str = ''
 
-class FEAgent:
+
+class FEAgent(SharedParslMixin):
     """
-    Adapter that wraps FEAgent components to work within StructBioReasoner.
-    
-    This adapter enables StructBioReasoner to use FEAgent's proven MD simulation
-    workflow while maintaining compatibility with the hypothesis-centric design.
-    
-    Key Features:
-    - Wraps FEAgent's Builder, MDSimulator, and MDCoordinator
-    - Converts MD results to ProteinHypothesis objects
-    - Supports both implicit and explicit solvent models
-    - Integrates with StructBioReasoner's role-based orchestration
+    Free energy calculation agent using MM-PBSA.
+
+    This agent uses SharedParslMixin to support:
+    1. Shared Parsl context from workflow (prevents nested config collisions)
+    2. Standalone mode for testing (original behavior)
     """
-    
-    def __init__(self, 
-                 agent_id: str,
-                 config: Dict[str, Any],
-                 parsl_config: dict[str, Any]):
+
+    def __init__(
+        self,
+        agent_id: str,
+        config: Dict[str, Any],
+        parsl_config: Dict[str, Any]
+    ):
         """
         Initialize FEAgent adapter.
-        
+
         Args:
+            agent_id: Unique identifier for this agent
             config: Configuration dictionary with FEAgent settings
+            parsl_config: Parsl configuration dictionary
         """
+        # Initialize the mixin
+        super().__init__()
+
         self.agent_id = agent_id
         self.agent_type = "free_energy"
         self.specialization = "mmpbsa"
-        
+
         # FEAgent configuration
         self.fe_config = config.get("free_energy", asdict(FEConfig()))
 
@@ -82,60 +84,64 @@ class FEAgent:
 
         parsl_config['cores_per_worker'] = self.fe_config['cpus']
         parsl_config['max_workers_per_node'] = self.fe_config['cpus_per_node'] // self.fe_config['cpus']
-        # set these to disallow numpy from screwing up our calculations
+        # Set thread limits to avoid numpy interference
         parsl_config['worker_init'] += '; export OPENBLAS_NUM_THREADS=1'
         parsl_config['worker_init'] += '; export MKL_NUM_THREADS=1'
         parsl_config['worker_init'] += '; export OMP_NUM_THREADS=1'
 
         self.parsl_config = parsl_config
-        
+
         # FEAgent components (initialized in initialize())
-        self.manager = None
         self.fe_handle = None
         self.coordinator_handle = None
-        
+
         # State tracking
         self.active_calculations = {}
         self.completed_calculations = {}
-        
+
         self.logger = logging.getLogger(__name__)
-        
         self.logger.info(f"FEAgent initialized")
 
-    async def initialize(self,
-                         parsl: Optional[dict] = None) -> bool:
+    async def initialize(
+        self,
+        parsl: Optional[Dict[str, Any]] = None,
+        shared_context: Optional['SharedParslContext'] = None
+    ) -> bool:
         """
         Initialize FEAgent components.
+
+        Args:
+            parsl: Optional parsl config overrides (for backwards compatibility)
+            shared_context: Optional shared Parsl context from workflow
 
         Returns:
             True if initialization successful, False otherwise
         """
         try:
-            # Import FEAgent components
-            # Note: FEAgent should be installed and available in Python path
-            # The agents are defined in agents.py at the root of FEAgent repo
-            # Try importing from mdagent package (if installed as package)
             from MDAgent.core.mmpbsa_agent import FECoordinator
 
-            # Create Academy manager using async context manager pattern
-            # This ensures the exchange client is properly initialized
-            self.manager = await Manager.from_exchange_factory(
-                factory=LocalExchangeFactory(),
-                executors=ThreadPoolExecutor(),
+            # Initialize Academy manager using mixin
+            self.manager = await self._initialize_manager()
+
+            # Prepare data dict for mixin
+            data = {}
+            if parsl is not None:
+                data['parsl'] = parsl
+            if shared_context is not None:
+                data['_shared_parsl_context'] = shared_context
+
+            # Get Parsl settings using the mixin (key fix!)
+            parsl_settings = await self._get_parsl_settings(
+                data=data,
+                shared_context=shared_context,
+                settings_class=LocalCPUSettings,
+                parsl_config=self.parsl_config,
+                agent_id=self.agent_id,
             )
 
-            # Enter the manager context to initialize exchange client
-            await self.manager.__aenter__()
-
-            parsl_config = self.parsl_config
-            if parsl is not None:
-                for k, v in parsl.values():
-                    parsl_config[k] = v
-
-            # worker_init, nodes, max_workers_per_node, cores_per_worker
-            parsl_settings = LocalCPUSettings(**parsl_config).config_factory(Path.cwd())
-
+            self.logger.info(f'Parsl settings obtained (shared: {self.is_using_shared_parsl})')
             self.logger.info('Attempting to launch FEAgent')
+
             self.coordinator_handle = await self.manager.launch(
                 FECoordinator,
                 args=(parsl_settings,)
@@ -148,39 +154,38 @@ class FEAgent:
         except Exception as e:
             self.logger.error(f"Failed to initialize FEAgent: {e}")
             self.initialized = False
+
             # Clean up manager if it was created
-            if self.manager:
-                try:
-                    await self.manager.__aexit__(None, None, None)
-                except:
-                    pass
-                self.manager = None
+            await self._cleanup_manager()
             return False
-    
-    async def run_calculations(self,
-                               sim_path: Union[Path, list[Path]],
-                               protein_name: str = "unknown",
-                               custom_sim_kwargs: Optional[Dict[str, Any]] = None,
-                               parsl: Optional[dict] = None) -> Dict[str, Any]:
+
+    async def run_calculations(
+        self,
+        sim_path: Union[Path, List[Path]],
+        protein_name: str = "unknown",
+        custom_sim_kwargs: Optional[Dict[str, Any]] = None,
+        parsl: Optional[Dict[str, Any]] = None,
+        shared_context: Optional['SharedParslContext'] = None
+    ) -> Dict[str, Any]:
         """
-        Run complete MD simulation using FEAgent coordinator.
+        Run MM-PBSA free energy calculations.
 
         Args:
-            pdb_path: Path to input PDB file or list of PDB files
+            sim_path: Path(s) to simulation directories
             protein_name: Name of the protein
-            custom_build_kwargs: Custom build parameters (optional)
             custom_sim_kwargs: Custom simulation parameters (optional)
+            parsl: Optional parsl config overrides
+            shared_context: Optional shared Parsl context
 
         Returns:
-            Simulation results dictionary
+            Free energy calculation results
         """
-        if not await self.is_ready(parsl):
+        if not await self.is_ready(parsl, shared_context):
             self.logger.error("FEAgent adapter not ready")
             return {}
-        
+
         try:
-            # This looks weird but ensures we only run dirs with simulations
-            # in them. Skips over failed runs, or extraneous dirs
+            # Find directories with completed simulations
             if isinstance(sim_path, list):
                 paths = []
                 for path in sim_path:
@@ -188,13 +193,13 @@ class FEAgent:
             else:
                 paths = [path.parent for path in sim_path.glob('*/prod.dcd')]
 
-            # Interpret config for each system
+            # Build configuration for each system
             fe_kwargss = await self._unpack_dataclass_config(paths)
 
             results = await self.coordinator_handle.deploy(
                 paths=paths,
                 fe_kwargss=fe_kwargss,
-            ) # list of dicts with `path`, `success` and `fe`
+            )
 
             analysis = {}
             for result in results:
@@ -202,10 +207,12 @@ class FEAgent:
                     path = str(result['path'])
                     mean, std = result['fe']
 
-                    analysis[path] = {'mean': mean,
-                                      'std': std,
-                                      'unit': 'kcal/mol'} 
-            
+                    analysis[path] = {
+                        'mean': mean,
+                        'std': std,
+                        'unit': 'kcal/mol'
+                    }
+
             await self.cleanup()
             return analysis
 
@@ -215,9 +222,11 @@ class FEAgent:
             self.logger.error(traceback.format_exc())
             return {}
 
-    async def _unpack_dataclass_config(self,
-                                       paths: list[Path]) -> list[dict[str, Any]]:
-        """"""
+    async def _unpack_dataclass_config(
+        self,
+        paths: List[Path]
+    ) -> List[Dict[str, Any]]:
+        """Build configuration for each simulation path."""
         fe_kwargss = []
         for path in paths:
             dict_copy = self.fe_config.copy()
@@ -241,19 +250,32 @@ class FEAgent:
 
         return fe_kwargss
 
-    async def is_ready(self,
-                       parsl: Optional[dict] = None) -> bool:
-        if not hasattr(self, 'initialized'):
-            await self.initialize(parsl)
+    async def is_ready(
+        self,
+        parsl: Optional[Dict[str, Any]] = None,
+        shared_context: Optional['SharedParslContext'] = None
+    ) -> bool:
+        """
+        Check if adapter is ready, initializing if needed.
+
+        Args:
+            parsl: Optional parsl config overrides
+            shared_context: Optional shared Parsl context from workflow
+
+        Returns:
+            True if adapter is ready
+        """
+        if not hasattr(self, 'initialized') or not self.initialized:
+            await self.initialize(parsl, shared_context)
         return self.initialized
 
-    def format_for_cpptraj(self,
-                           resids: list[int]) -> str:
-        """"""
+    def format_for_cpptraj(self, resids: List[int]) -> str:
+        """Format residue IDs for cpptraj selection."""
         string = ':'
         cur = resids[0] - 1
         start = resids[0]
         end = None
+
         for resid in resids:
             if resid - cur > 1:
                 end = cur
@@ -261,115 +283,94 @@ class FEAgent:
                 start = resid
 
             cur = resid
-        
+
         end = resids[-1]
         string += f'{start}-{end}'
 
         return string
 
     def _create_placeholder_analysis(self) -> Dict[str, Any]:
-        """
-        Create placeholder analysis when detailed analysis is not available.
-
-        Returns:
-            Placeholder analysis dictionary
-        """
+        """Create placeholder analysis when detailed analysis is not available."""
         return {
             'status': 'placeholder',
             'message': 'Detailed trajectory analysis not available (MDAgent not installed)',
             'free_energy': {'': {'mean': 0.0, 'std': 0.0, 'unit': 'kcal/mol'}},
         }
 
-    def _calculate_confidence(self, trajectory_analysis: Dict[str, Any]) -> float:
-        """
-        Calculate confidence score based on trajectory analysis quality.
-
-        Args:
-            trajectory_analysis: Trajectory analysis results
-
-        Returns:
-            Confidence score (0.0 to 1.0)
-        """
-        if trajectory_analysis.get('status') == 'placeholder':
-            return 0.5
-
-        confidence = 0.8  # Base confidence
-
-        # Clamp to [0, 1]
-        return max(0.0, min(1.0, confidence))
-    
     def get_capabilities(self) -> Dict[str, Any]:
-        """
-        Get FEAgent adapter capabilities.
-        
-        Returns:
-            Dictionary describing adapter capabilities
-        """
+        """Get FEAgent adapter capabilities."""
         return {
             "agent_type": self.agent_type,
             "specialization": self.specialization,
             "mdagent_available": MDAGENT_AVAILABLE,
-            "capabilities": [
-                "mmpbsa"
-            ],
+            "capabilities": ["mmpbsa"],
             "integration_features": [
                 "hypothesis_generation",
                 "result_analysis",
                 "trajectory_processing"
             ]
         }
-    
+
     async def cleanup(self) -> None:
         """Clean up FEAgent resources."""
         try:
-            # Exit and close Academy manager context
-            if self.manager:
-                try:
-                    await self.manager.__aexit__(None, None, None)
-                    self.logger.info("Academy manager context exited successfully")
-                except Exception as e:
-                    self.logger.warning(f"Error exiting manager context: {e}")
-                finally:
-                    self.manager = None
-                    self.fe_handle = None
-                    delattr(self, 'initialized')
+            # Release accelerators if using shared context
+            await self._release_accelerators(self.agent_id)
+
+            # Clean up Academy manager using mixin
+            await self._cleanup_manager()
+
+            self.fe_handle = None
+            self.coordinator_handle = None
 
             self.logger.info("FEAgent adapter cleanup completed")
 
         except Exception as e:
             self.logger.error(f"FEAgent adapter cleanup failed: {e}")
 
-    async def analyze_hypothesis(self,
-                                 hypothesis: ProteinHypothesis,
-                                 task_params: dict[str, Any]) -> EnergeticAnalysis:
+    async def analyze_hypothesis(
+        self,
+        hypothesis: ProteinHypothesis,
+        task_params: Dict[str, Any]
+    ) -> EnergeticAnalysis:
+        """
+        Analyze hypothesis by calculating binding free energy.
+
+        Args:
+            hypothesis: Input protein hypothesis
+            task_params: Task parameters including simulation paths
+
+        Returns:
+            Energetic analysis results
+        """
         paths = task_params['simulation_paths']
-        if 'parsl' in task_params:
-            parsl = task_params.pop('parsl')
-        else:
-            parsl = None
 
-        energies = await self.run_calculations( 
-            sim_path = paths,
-            protein_name = "unknown",
-            parsl = parsl
+        # Extract shared context if present
+        shared_context = task_params.pop('_shared_parsl_context', None)
+        parsl = task_params.pop('parsl', None)
+
+        energies = await self.run_calculations(
+            sim_path=paths,
+            protein_name="unknown",
+            parsl=parsl,
+            shared_context=shared_context
         )
-
 
         analysis = EnergeticAnalysis(
             protein_id='',
             binding_affinities=energies,
             force_field='amber19',
         )
-    
+
         analysis.confidence_score = self._calculate_confidence(analysis)
         analysis.tools_used = self._get_tools_used()
 
         return analysis
 
-    def _calculate_confidence(self,
-                              analysis: EnergeticAnalysis) -> float:
-        # TODO: compute this based on RMSD/RMSF threshholds
+    def _calculate_confidence(self, analysis: EnergeticAnalysis) -> float:
+        """Calculate confidence score for analysis."""
         return 0.75
 
-    def _get_tools_used(self) -> list[str]:
+    def _get_tools_used(self) -> List[str]:
+        """Get list of tools used."""
         return ['cpptraj', 'ambertools']

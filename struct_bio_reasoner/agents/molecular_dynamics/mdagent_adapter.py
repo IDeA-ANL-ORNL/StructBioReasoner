@@ -4,30 +4,26 @@ MDAgent Adapter for StructBioReasoner
 This module provides an adapter that wraps MDAgent components (Builder, MDSimulator, MDCoordinator)
 to work seamlessly within StructBioReasoner's agent framework.
 
-The adapter translates between:
-- Academy's @action pattern → StructBioReasoner's async methods
-- MDAgent's Handle communication → Direct method calls  
-- MD simulation results → ProteinHypothesis objects
+The adapter uses SharedParslMixin to avoid nested Parsl configuration collisions
+when running within the hierarchical workflow.
 """
 
 import dill as pickle
 import asyncio
 import logging
-from ...utils.parsl_settings import AuroraSettings, LocalSettings
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, TYPE_CHECKING
 import numpy as np
 from datetime import datetime
+
+from ...utils.parsl_settings import AuroraSettings, LocalSettings
 
 # MDAgent imports (from https://github.com/msinclair-py/MDAgent)
 try:
     from academy.exchange import LocalExchangeFactory
     from academy.manager import Manager
     from concurrent.futures import ThreadPoolExecutor
-    
-    # Import MDAgent components
-    # Note: These would need to be installed from the MDAgent repository
-    # For now, we'll create a compatibility layer
+
     MDAGENT_AVAILABLE = True
 except ImportError:
     MDAGENT_AVAILABLE = False
@@ -35,62 +31,72 @@ except ImportError:
 
 from ...core.base_agent import BaseAgent
 from ...data.protein_hypothesis import SimAnalysis, ProteinHypothesis
+from ..shared_parsl_mixin import SharedParslMixin
+
+if TYPE_CHECKING:
+    from ...workflows.advanced_workflow import SharedParslContext
 
 
-class MDAgentAdapter:
+class MDAgentAdapter(SharedParslMixin):
     """
     Adapter that wraps MDAgent components to work within StructBioReasoner.
-    
-    This adapter enables StructBioReasoner to use MDAgent's proven MD simulation
-    workflow while maintaining compatibility with the hypothesis-centric design.
-    
+
+    This adapter uses SharedParslMixin to support:
+    1. Shared Parsl context from workflow (prevents nested config collisions)
+    2. Standalone mode for testing (original behavior)
+
     Key Features:
     - Wraps MDAgent's Builder, MDSimulator, and MDCoordinator
     - Converts MD results to ProteinHypothesis objects
     - Supports both implicit and explicit solvent models
     - Integrates with StructBioReasoner's role-based orchestration
     """
-    
-    def __init__(self, 
-                 agent_id: str,
-                 config: Dict[str, Any],
-                 parsl_config: Dict[str, Any]):
+
+    def __init__(
+        self,
+        agent_id: str,
+        config: Dict[str, Any],
+        parsl_config: Dict[str, Any]
+    ):
         """
         Initialize MDAgent adapter.
-        
+
         Args:
+            agent_id: Unique identifier for this agent
             config: Configuration dictionary with MDAgent settings
+            parsl_config: Parsl configuration dictionary
         """
+        # Initialize the mixin
+        super().__init__()
+
         self.agent_id = agent_id
         self.config = config
-
         self.agent_type = "md_simulation"
         self.specialization = "mdagent_backend"
         self.logger = logging.getLogger(__name__)
-        
+
         # MDAgent configuration
         self.mdagent_config = self.config.get("mdagent", {})
         self.solvent_model = self.mdagent_config.get("solvent_model", "explicit")
         self.force_field = self.mdagent_config.get("force_field", "amber14")
         self.water_model = self.mdagent_config.get("water_model", "tip3p")
         self.amberhome = self.mdagent_config.get('amberhome', None)
-        
+
         # Simulation parameters
         self.equil_steps = self.mdagent_config.get("equil_steps", 10_000)
         self.prod_steps = self.mdagent_config.get("prod_steps", 20_000)
-        
+
         p_steps = self.prod_steps * 4 / 1000000
         self.logger.info(f'Will run MD for {p_steps} ns')
-        
+
         # MDAgent components (initialized in initialize())
-        self.manager = None
         self.builder_handle = None
         self.simulator_handle = None
         self.coordinator_handle = None
 
         # Load parsl kwargs
         self.parsl_config = parsl_config
-        
+
         # State tracking
         self.active_simulations = {}
         self.completed_simulations = {}
@@ -99,15 +105,20 @@ class MDAgentAdapter:
 
     def __del__(self):
         """Destructor to ensure manager is cleaned up."""
-        # Note: This is a safety net. Proper cleanup should use async cleanup() method
-        if hasattr(self, 'manager') and self.manager is not None:
+        if hasattr(self, '_manager') and self._manager is not None:
             self.logger.warning("MDAgentAdapter deleted without proper cleanup - manager still active")
-            # We can't call async cleanup from __del__, so just log a warning
 
-    async def initialize(self,
-                         parsl: Optional[dict] = None) -> bool:
+    async def initialize(
+        self,
+        parsl: Optional[Dict[str, Any]] = None,
+        shared_context: Optional['SharedParslContext'] = None
+    ) -> bool:
         """
         Initialize MDAgent components.
+
+        Args:
+            parsl: Optional parsl config overrides (for backwards compatibility)
+            shared_context: Optional shared Parsl context from workflow
 
         Returns:
             True if initialization successful, False otherwise
@@ -118,11 +129,7 @@ class MDAgentAdapter:
             return False
 
         try:
-            # Import MDAgent components
-            # Note: MDAgent should be installed and available in Python path
-            # The agents are defined in agents.py at the root of MDAgent repo
             try:
-                # Try importing from mdagent package (if installed as package)
                 from MDAgent.core.agents_no_FE import Builder, MDSimulator, MDCoordinator
                 from molecular_simulations.build import ImplicitSolvent, ExplicitSolvent
                 from molecular_simulations.simulate import ImplicitSimulator, Simulator
@@ -133,35 +140,36 @@ class MDAgentAdapter:
                 self.initialized = False
                 return False
 
-            # Create Academy manager using async context manager pattern
-            # This ensures the exchange client is properly initialized
-            self.manager = await Manager.from_exchange_factory(
-                factory=LocalExchangeFactory(),
-                executors=ThreadPoolExecutor(),
-            )
+            # Initialize Academy manager using mixin
+            self.manager = await self._initialize_manager()
 
-            # Enter the manager context to initialize exchange client
-            await self.manager.__aenter__()
-            
-            parsl_config = self.parsl_config
+            # Prepare data dict for mixin
+            data = {}
             if parsl is not None:
-                for k, v in parsl.values():
-                    parsl_config[k] = v
+                data['parsl'] = parsl
+            if shared_context is not None:
+                data['_shared_parsl_context'] = shared_context
 
             # Launch MDAgent components
             self.builder_handle = await self.manager.launch(
-                Builder, args=(
-                    ImplicitSolvent, ExplicitSolvent
-                )
+                Builder, args=(ImplicitSolvent, ExplicitSolvent)
             )
             self.simulator_handle = await self.manager.launch(
-                MDSimulator, args=(
-                    ImplicitSimulator, Simulator
-                )
+                MDSimulator, args=(ImplicitSimulator, Simulator)
             )
-            self.parsl_settings = LocalSettings(**parsl_config).config_factory(Path.cwd())
 
-            self.logger.info('launching coordinator')
+            # Get Parsl settings using the mixin (key fix!)
+            self.parsl_settings = await self._get_parsl_settings(
+                data=data,
+                shared_context=shared_context,
+                settings_class=LocalSettings,
+                parsl_config=self.parsl_config,
+                agent_id=self.agent_id,
+            )
+
+            self.logger.info(f'Parsl settings obtained (shared: {self.is_using_shared_parsl})')
+            self.logger.info('Launching coordinator')
+
             self.coordinator_handle = await self.manager.launch(
                 MDCoordinator,
                 args=(self.builder_handle, self.simulator_handle, self.parsl_settings)
@@ -174,29 +182,24 @@ class MDAgentAdapter:
         except Exception as e:
             self.logger.error(f"Failed to initialize MDAgent: {e}")
             self.initialized = False
-            # Clean up manager if it was created
-            if self.manager:
-                try:
-                    await self.manager.__aexit__(None, None, None)
-                    self.logger.info('Academy manager context exited successfully')
-                except Exception as e:
-                    self.logger.warning(f'Error exiting manager context: {e}')
-                finally: 
-                    self.manager = None
 
+            # Clean up manager if it was created
+            await self._cleanup_manager()
             return False
-    
-    
-    async def run_md_simulation(self,
-                                root_path: Path,
-                               pdb_path: Union[Path, List[Path]],
-                               protein_name: str = "unknown",
-                               custom_build_kwargs: Optional[Dict[str, Any]] = None,
-                               custom_sim_kwargs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+
+    async def run_md_simulation(
+        self,
+        root_path: Path,
+        pdb_path: Union[Path, List[Path]],
+        protein_name: str = "unknown",
+        custom_build_kwargs: Optional[Dict[str, Any]] = None,
+        custom_sim_kwargs: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Run complete MD simulation using MDAgent coordinator.
 
         Args:
+            root_path: Root path for output
             pdb_path: Path to input PDB file or list of PDB files
             protein_name: Name of the protein
             custom_build_kwargs: Custom build parameters (optional)
@@ -208,7 +211,7 @@ class MDAgentAdapter:
         if not await self.is_ready():
             self.logger.error("MDAgent adapter not ready")
             return {}
-        
+
         # Create simulation directory
         sim_id = f"mdagent_{protein_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         for pdb in pdb_path:
@@ -220,7 +223,7 @@ class MDAgentAdapter:
             'protein': True,
             'out': 'system.pdb',
         }
-        
+
         if 'amberhome' not in build_kwargs:
             build_kwargs['amberhome'] = self.amberhome
 
@@ -234,13 +237,13 @@ class MDAgentAdapter:
         sim_paths = [Path(root_path) / f'mdagent_{i}' for i in range(len(pdb_path))]
         for sim_path in sim_paths:
             sim_path.mkdir(parents=True, exist_ok=True)
-        
+
         build_kwargs = [build_kwargs.copy() for _ in range(len(sim_paths))]
         sim_kwargs = [sim_kwargs.copy() for _ in range(len(sim_paths))]
-        
+
         # Run MDAgent workflow
         self.logger.info(f"Starting MDAgent simulation: {sim_id}")
-        
+
         results = await self.coordinator_handle.deploy_md(
             paths=sim_paths,
             initial_pdbs=pdb_path,
@@ -250,13 +253,11 @@ class MDAgentAdapter:
 
         # Clean up agent/parsl
         await self.cleanup()
-        
-        self.logger.info(f"MDAgent simulation completed")
 
+        self.logger.info(f"MDAgent simulation completed")
         self.logger.info(f'MD results: {results}')
         return results
 
-    
     def _calculate_confidence(self, trajectory_analysis: Dict[str, Any]) -> float:
         """
         Calculate confidence score based on trajectory analysis quality.
@@ -289,14 +290,9 @@ class MDAgentAdapter:
 
         # Clamp to [0, 1]
         return max(0.0, min(1.0, confidence))
-    
+
     def get_capabilities(self) -> Dict[str, Any]:
-        """
-        Get MDAgent adapter capabilities.
-        
-        Returns:
-            Dictionary describing adapter capabilities
-        """
+        """Get MDAgent adapter capabilities."""
         return {
             "agent_type": self.agent_type,
             "specialization": self.specialization,
@@ -318,65 +314,91 @@ class MDAgentAdapter:
                 "trajectory_processing"
             ]
         }
-    
+
     async def cleanup(self) -> None:
         """Clean up MDAgent resources."""
         try:
-            # Exit and close Academy manager context
-            if self.manager:
-                try:
-                    await self.manager.__aexit__(None, None, None)
-                    self.logger.info("Academy manager context exited successfully")
-                except Exception as e:
-                    self.logger.warning(f"Error exiting manager context: {e}")
-                finally:
-                    self.manager = None
-                    self.builder_handle = None
-                    self.simulator_handle = None
-                    self.coordinator_handle = None
-                    delattr(self, 'initialized')
+            # Release accelerators if using shared context
+            await self._release_accelerators(self.agent_id)
+
+            # Clean up Academy manager using mixin
+            await self._cleanup_manager()
+
+            self.builder_handle = None
+            self.simulator_handle = None
+            self.coordinator_handle = None
 
             self.logger.info("MDAgent adapter cleanup completed")
 
         except Exception as e:
             self.logger.error(f"MDAgent adapter cleanup failed: {e}")
 
-    async def analyze_hypothesis(self,
-                                 hypothesis: ProteinHypothesis,
-                                 task_params: dict[str, Any]) -> SimAnalysis:
-        #### Rewrite this according to how binder analysis adds to hypothesis
+    async def analyze_hypothesis(
+        self,
+        hypothesis: ProteinHypothesis,
+        task_params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Analyze hypothesis by running MD simulation.
+
+        Args:
+            hypothesis: Protein hypothesis to analyze
+            task_params: Task parameters including simulation paths
+
+        Returns:
+            Simulation analysis results
+        """
         self.logger.info('We are about to run MD')
+
+        # Extract shared context if present
+        shared_context = task_params.pop('_shared_parsl_context', None)
+        parsl = task_params.pop('parsl', None)
+
+        # Ensure we're initialized with proper context
+        if not await self.is_ready(parsl, shared_context):
+            self.logger.error("MDAgent adapter not ready")
+            return {}
+
         structures = [Path(p) for p in task_params['simulation_paths']]
         out = Path(task_params['root_output_path'])
         prod_steps = task_params.get('steps', self.prod_steps)
-        
         solvent = task_params.get('solvent', 'explicit')
 
-        # TODO: get kwargs for build/sim from task_params
-        sim_results = await self.run_md_simulation( 
+        sim_results = await self.run_md_simulation(
             root_path=out,
             pdb_path=structures,
-            protein_name = "unknown",
-            custom_build_kwargs = {'protein': True,
-                                   'solvent': solvent},
-            custom_sim_kwargs = {'equil_steps': self.equil_steps,
-                                 'prod_steps': prod_steps,
-                                 'n_equil_cycles': 2,
-                                 'platform': 'OpenCL',
-                                 'solvent': solvent},
+            protein_name="unknown",
+            custom_build_kwargs={'protein': True, 'solvent': solvent},
+            custom_sim_kwargs={
+                'equil_steps': self.equil_steps,
+                'prod_steps': prod_steps,
+                'n_equil_cycles': 2,
+                'platform': 'OpenCL',
+                'solvent': solvent
+            },
         )
-        
+
         return {'paths': sim_results}
 
-    async def is_ready(self) -> bool:
-        if not hasattr(self, 'initialized'):
-            await self.initialize()
+    async def is_ready(
+        self,
+        parsl: Optional[Dict[str, Any]] = None,
+        shared_context: Optional['SharedParslContext'] = None
+    ) -> bool:
+        """
+        Check if adapter is ready, initializing if needed.
+
+        Args:
+            parsl: Optional parsl config overrides
+            shared_context: Optional shared Parsl context from workflow
+
+        Returns:
+            True if adapter is ready
+        """
+        if not hasattr(self, 'initialized') or not self.initialized:
+            await self.initialize(parsl, shared_context)
         return self.initialized
 
-    def _calculate_confidence(self,
-                              analysis: SimAnalysis) -> float:
-        # TODO: compute this based on RMSD/RMSF threshholds
-        return 0.75
-
-    def _get_tools_used(self) -> list[str]:
+    def _get_tools_used(self) -> List[str]:
+        """Get list of tools used."""
         return ['openmm', 'mdanalysis']

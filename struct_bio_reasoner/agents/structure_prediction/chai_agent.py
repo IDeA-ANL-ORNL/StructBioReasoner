@@ -1,5 +1,10 @@
-from academy.exchange import LocalExchangeFactory
-from academy.manager import Manager
+"""
+Chai Agent for StructBioReasoner
+
+This agent wraps Chai-1 structure prediction components using the
+SharedParslMixin to avoid nested Parsl configuration collisions.
+"""
+
 from concurrent.futures import ThreadPoolExecutor
 import dill as pickle
 import asyncio
@@ -8,19 +13,46 @@ import uuid
 import numpy as np
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from datetime import datetime
+
+from academy.exchange import LocalExchangeFactory
+from academy.manager import Manager
 
 from ...data.protein_hypothesis import ProteinHypothesis, FoldAnalysis
 from ...core.base_agent import BaseAgent
+from ..shared_parsl_mixin import SharedParslMixin
 
-class ChaiAgent:
-    """"""
-    def __init__(self, 
-                 agent_id: str,
-                 config: dict[str, Any],
-                 parsl_config: dict[str, Any]):
-        """"""
+if TYPE_CHECKING:
+    from ...workflows.advanced_workflow import SharedParslContext
+
+
+class ChaiAgent(SharedParslMixin):
+    """
+    Chai-1 structure prediction agent.
+
+    This agent uses SharedParslMixin to support:
+    1. Shared Parsl context from workflow (prevents nested config collisions)
+    2. Standalone mode for testing (original behavior)
+    """
+
+    def __init__(
+        self,
+        agent_id: str,
+        config: Dict[str, Any],
+        parsl_config: Dict[str, Any]
+    ):
+        """
+        Initialize Chai agent.
+
+        Args:
+            agent_id: Unique identifier for this agent
+            config: Agent configuration dictionary
+            parsl_config: Parsl configuration dictionary
+        """
+        # Initialize the mixin
+        super().__init__()
+
         self.agent_id = agent_id
         self.config = config
         self.logger = logging.getLogger(__name__)
@@ -33,33 +65,47 @@ class ChaiAgent:
             'cofolding'
         ]
 
-        self.parsl_config = parsl_config #self.config.get('parsl', {})
-        self.manager = None
+        self.parsl_config = parsl_config
+        self.coordinator = None
 
-    async def initialize(self,
-                         data: dict[str, Any]):
+    async def initialize(
+        self,
+        data: Optional[Dict[str, Any]] = None,
+        shared_context: Optional['SharedParslContext'] = None
+    ) -> bool:
         """
         Initialize Chai components.
+
+        Args:
+            data: Optional initialization data (may contain parsl overrides, cwd, etc.)
+            shared_context: Optional shared Parsl context from workflow
 
         Returns:
             True if initialization successful, False otherwise
         """
+        data = data or {}
+
         try:
             from bindcraft.core.agentic_parsl import ForwardFoldingAgent
             from bindcraft.core.folding import Chai
-            from parsl import Config
             from ...utils.parsl_settings import LocalSettings
-            
-            parsl_config = self.parsl_config
 
-            if 'parsl' in data:
-                parsl = data.pop('parsl')
-                for k, v in parsl.values():
-                    parsl_config[k] = v
-            
-            parsl_settings = LocalSettings(**parsl_config).config_factory(Path.cwd())
-            
-            self.logger.info(f'{data=}')
+            # If shared_context provided, add it to data
+            if shared_context is not None:
+                data['_shared_parsl_context'] = shared_context
+
+            # Get Parsl settings using the mixin (key fix!)
+            parsl_settings = await self._get_parsl_settings(
+                data=data,
+                shared_context=shared_context,
+                settings_class=LocalSettings,
+                parsl_config=self.parsl_config,
+                agent_id=self.agent_id,
+            )
+
+            self.logger.info(f'Parsl settings obtained (shared: {self.is_using_shared_parsl})')
+
+            # Determine working directories
             cwd = data.get('cwd', None)
             if cwd is None:
                 fasta_dir = self.fasta_dir
@@ -73,32 +119,28 @@ class ChaiAgent:
 
             device = self.config.get('device', 'cuda:0')
 
-            # Initialize algorithm instances with required parameters
+            # Initialize Chai algorithm
             chai = Chai(
                 fasta_dir=fasta_dir,
                 out=fold_dir,
                 diffusion_steps=100,
-                device=device  # or 'cpu' if GPU not available
+                device=device
             )
 
-            self.manager = await Manager.from_exchange_factory(
-                factory=LocalExchangeFactory(),
-                executors=ThreadPoolExecutor(),
-            )
-
-            await self.manager.__aenter__()
+            # Initialize Academy manager using mixin
+            self.manager = await self._initialize_manager()
 
             try:
-                # Launch coordinator with handles to other agents
+                # Launch coordinator
                 self.coordinator = await self.manager.launch(
                     ForwardFoldingAgent,
-                    args=(chai,
-                          parsl_settings,
-                         ),
+                    args=(chai, parsl_settings),
                 )
 
             except Exception as e:
                 self.logger.exception("An error occurred with the ForwardFoldingAgent")
+                raise
+
         except ImportError as e:
             self.logger.error(f'Cannot import Chai components: {e}')
             self.logger.info('Make sure Chai is installed and in PYTHONPATH')
@@ -108,48 +150,75 @@ class ChaiAgent:
 
         self.logger.info(f'Successfully imported Chai components.')
         self.initialized = True
-        
+
         return True
 
-    async def is_ready(self,
-                       data: dict[str, Any]) -> bool:
+    async def is_ready(
+        self,
+        data: Optional[Dict[str, Any]] = None,
+        shared_context: Optional['SharedParslContext'] = None
+    ) -> bool:
+        """
+        Check if agent is ready, initializing if needed.
+
+        Args:
+            data: Optional initialization data
+            shared_context: Optional shared Parsl context from workflow
+
+        Returns:
+            True if agent is ready
+        """
         self.logger.info('Checking if we are initialized')
-        if not hasattr(self, 'initialized'):
-            await self.initialize(data)
+        if not hasattr(self, 'initialized') or not self.initialized:
+            await self.initialize(data, shared_context)
         return self.initialized
 
     async def cleanup(self):
+        """Clean up Chai agent resources."""
         try:
-            if self.manager:
-                try:
-                    await self.manager.__aexit__(None, None, None)
-                    self.logger.info('Academy manager context exited successfully')
-                except Exception as e:
-                    self.logger.warning(f'Error exiting manager context: {e}')
-                finally:
-                    self.manager = None
-                    delattr(self, 'initialized')
+            # Release accelerators if using shared context
+            await self._release_accelerators(self.agent_id)
 
+            # Clean up Academy manager using mixin
+            await self._cleanup_manager()
+
+            self.coordinator = None
             self.logger.info('Chai agent cleanup completed')
 
         except Exception as e:
             self.logger.error(f'Chai agent cleanup failed: {e}')
 
-    def get_capabilities(self) -> list[str]:
+    def get_capabilities(self) -> List[str]:
+        """Get agent capabilities."""
         return self.capabilities
 
-    async def generate_binder_hypothesis(self, 
-                                         data: dict[str, Any]) -> Optional[ProteinHypothesis]:
-        """"""
-        if not await self.is_ready(data):
+    async def generate_binder_hypothesis(
+        self,
+        data: Dict[str, Any]
+    ) -> Optional[ProteinHypothesis]:
+        """
+        Generate structure predictions.
+
+        Args:
+            data: Input data including sequences and optional parsl/context
+
+        Returns:
+            Generated hypothesis or None on failure
+        """
+        # Extract shared context if present
+        shared_context = data.pop('_shared_parsl_context', None)
+
+        if not await self.is_ready(data, shared_context):
             self.logger.error('Chai agent not ready')
             return None
 
         return await self._generate_binder_hypothesis(data)
 
-    async def _generate_binder_hypothesis(self,
-                                          data: dict[str, Any]) -> Optional[ProteinHypothesis]:
-        """"""
+    async def _generate_binder_hypothesis(
+        self,
+        data: Dict[str, Any]
+    ) -> Optional[ProteinHypothesis]:
+        """Internal hypothesis generation."""
         constraints = data.get('constraints', [None] * len(data['sequences']))
 
         # Run the workflow
@@ -164,19 +233,26 @@ class ChaiAgent:
         await self.cleanup()
 
         return analysis
-    
-    async def collate_results(self,
-                              results: list[dict[str, Any]]) -> dict[str, Any]:
-        analysis = {'total_models': len(results),
-                    'unique_models': len(results[0].keys()),
-                    'best_models': [],
-                    'scores': {}}
+
+    async def collate_results(
+        self,
+        results: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Collate folding results."""
+        analysis = {
+            'total_models': len(results),
+            'unique_models': len(results[0].keys()) if results else 0,
+            'best_models': [],
+            'scores': {}
+        }
+
         for result in results:
             best_score = None
             best_model = None
             scores = {}
+
             for key, val in result.items():
-                if best_score == None:
+                if best_score is None:
                     best_score = val['scores']['aggregate_score']
                     best_model = val['model']
                 elif best_score < val['scores']['aggregate_score']:
@@ -190,29 +266,40 @@ class ChaiAgent:
 
         return analysis
 
-    async def analyze_hypothesis(self,
-                                 hypothesis: ProteinHypothesis,
-                                 task_params: dict[str, Any]) -> FoldAnalysis:
+    async def analyze_hypothesis(
+        self,
+        hypothesis: ProteinHypothesis,
+        task_params: Dict[str, Any]
+    ) -> FoldAnalysis:
+        """
+        Analyze hypothesis by performing structure prediction.
+
+        Args:
+            hypothesis: Input protein hypothesis
+            task_params: Task parameters including sequences
+
+        Returns:
+            Fold analysis results
+        """
         result = await self.generate_binder_hypothesis(task_params)
 
-        # Write result to file
         analysis = FoldAnalysis(
             folding_algorithm='Chai-1',
-            unique_models=result['unique_models'], # integer
-            total_models=result['total_models'],   # integer
-            best_models=result['best_models'],     # list[Path]
-            scores=result['scores']                # dict[int, dict[str, float]]
-        )                                          # {0: {'aggregate_score': 0.82, ...},
-                                                   #  1: {..., 'ptm': 0.92, ...}}
+            unique_models=result['unique_models'],
+            total_models=result['total_models'],
+            best_models=result['best_models'],
+            scores=result['scores']
+        )
 
         analysis.confidence_score = self._calculate_confidence(analysis)
         analysis.tools_used = self._get_tools_used()
 
         return analysis
 
-    def _calculate_confidence(self,
-                              analysis: FoldAnalysis) -> float:
+    def _calculate_confidence(self, analysis: FoldAnalysis) -> float:
+        """Calculate confidence score for analysis."""
         return 0.75
 
-    def _get_tools_used(self) -> list[str]:
+    def _get_tools_used(self) -> List[str]:
+        """Get list of tools used."""
         return ['chai']
