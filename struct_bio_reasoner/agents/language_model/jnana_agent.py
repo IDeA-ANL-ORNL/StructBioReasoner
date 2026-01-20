@@ -1,9 +1,7 @@
 """
-Academy wrapper on LLM interface to inject into StructBioReasoner workflow.
-
+Academy wrapper on LLM interface (Jnana) to inject into StructBioReasoner workflow.
 This module implements the reasoner agent within the agentic workflow
 using Academy agents, enabling dynamic decision-making and adaptive optimization.
-
 """
 
 import asyncio
@@ -15,25 +13,22 @@ from parsl import Config
 from parsl import HighThroughputExecutor
 from parsl.providers import LocalProvider
 from parsl.launchers import MpiExecLauncher
-
 from academy.agent import Agent, action
 from academy.handle import Handle
 from academy.exchange import LocalExchangeFactory
 from academy.manager import Manager
 from concurrent.futures import ThreadPoolExecutor
-
-from jnana.core.model_manager import UnifiedModelManager
-
 from ...data.protein_hypothesis import  ProteinHypothesis
-#BinderAnalysis,
 from ...core.base_agent import BaseAgent
 
+from struct_bio_reasoner.prompts.recommender_prompts import RecommenderPromptManager 
+from struct_bio_reasoner.prompts.prompts import get_prompt_manager, config_master
+from struct_bio_reasoner.utils.llm_interface import create_llm
 import json
 import os
 from argparse import ArgumentParser
 from datetime import datetime
 from pathlib import Path
-
 import numpy as np
 import openai
 import requests
@@ -41,110 +36,105 @@ from dotenv import load_dotenv
 from pydantic import Field
 from pydantic import model_validator
 
-from distllm.generate.prompts import IdentityPromptTemplate
-from distllm.generate.prompts import IdentityPromptTemplateConfig
-from distllm.rag.search import Retriever
-from distllm.rag.search import RetrieverConfig
-from distllm.utils import BaseConfig
-from .rag_utils import *
-
 logger = logging.getLogger(__name__)
 
-#class ChatAppConfig(BaseConfig):
-#    """Configuration for the evaluation suite."""
-#
-#    rag_configs: RetrievalAugmentedGenerationConfig = Field(
-#        ...,
-#        description='Settings for this RAG application.',
-#    )
-#    save_conversation_path: Path = Field(
-#        ...,
-#        description='Directory to save the output files.',
-#    )
-#
-#class ConversationPromptTemplate(PromptTemplate):
-#    """Conversation prompt template for RAG.
-#
-#    Includes the entire conversation history plus the new user question,
-#    and optionally the retrieved context.
-#    """
-#
-#    def __init__(self, conversation_history: list[tuple[str, str]]):
-#        # conversation_history is a list of (role, text)
-#        self.conversation_history = conversation_history
-#
-#    def preprocess(
-#        self,
-#        texts: list[str],
-#        contexts: list[list[str]] | None = None,
-#        scores: list[list[float]] | None = None,
-#    ) -> list[str]:
-#        """
-#        Preprocess the texts before sending to the model.
-#
-#        We assume `texts` has exactly one element: the latest user query.
-#        We build a single string that contains the entire conversation plus
-#        the new question. If any retrieval contexts are found, we append them.
-#        """
-#        if not texts:
-#            return ['']  # No user input, return empty prompt.
-#
-#        # The latest user query:
-#        user_input = texts[0]
-#
-#        # Build the conversation string
-#        conversation_str = ''
-#        for speaker, text in self.conversation_history:
-#            conversation_str += f'{speaker}: {text}\n'
-#        # Add the new user question
-#        conversation_str += f'User: {user_input}\nAssistant:'
-#
-#        # Optionally, append retrieved context if it exists
-#        if contexts and len(contexts) > 0 and len(contexts[0]) > 0:
-#            # contexts[0] is the top-k retrieval results for this query
-#            conversation_str += '\n\n[Context from retrieval]\n'
-#            for doc in contexts[0]:
-#                conversation_str += f'{doc}\n'
-#
-#        return [conversation_str]
 
-
-class RAGAgent(Agent):
+class JnanaAgent(Agent):
     '''
     Agent responsible for running RAG
     '''
     def __init__(self,
-                config_inp):
-        print(config_inp)
-        self.config = ChatAppConfig.from_dict(config_inp)
-        self.rag_model = self.config.rag_configs.get_rag_model()
-        self.conversation_history = []
-        print(self.config)
+                config_inp,
+                ):
+        self.config = config_inp
+        self.research_goal = self.config['research_goal']
+        self.enabled_agents = self.config['enabled_agents']
+        self.llm_provider = self.config['llm_provider']
+        self.rec_prompt_man = RecommenderPromptManager(
+                                research_goal,
+                                enabled_agents)
+
+        self.rec_schema = {
+            'next_task': 'string',
+            'change_parameters': 'boolean',
+            'rationale': 'string',
+            }
+
+        self.plan_schema = {
+            'new_config': 'placeholder',
+            'rationale': 'string'
+            }
+        self.llm = create_llm(self.llm_provider)
+        
+    def fill_prompt_template(
+        self,
+        system_str: str='system',
+        agent_type='recommender',
+        role='Recommend next runs to make'
+        ):
+        return
+
     @action
-    async def rag_with_model(self,
-                        user_input):
-        self.conversation_history.append(('User', user_input))  
-        conversation_template = ConversationPromptTemplate(
-            self.conversation_history,
+    async def generate_recommendation(
+              self,
+              results,
+              previous_run,
+              agent_prompt_manager
+              ):
+
+        """
+        Generate a protein-specific hypothesis.
+
+        Args:
+            results
+        Returns:
+            Generated recommendation
+        """
+        agent_prompt_manager.input_json = results
+        agent_prompt_manager.conclusion_prompt()
+        
+        self.rec_prompt_man.recommend_prompt(
+            previous_run,
+            agent_prompt_manager.prompt_c
             )
 
-        # Ask the RAG model to generate a response
-        response_list = self.rag_model.generate(
-            texts=[user_input],  # retrieve only on the new user input
-            prompt_template=conversation_template,
-            retrieval_top_k=200,
-            retrieval_score_threshold=0.1,
-            debug_retrieval=True,  # Enable debug mode to see retrieval details
-        )
-        # There's only one element in response_list
-        response = response_list[0]
-        
-        # Add the model's response to the conversation
-        self.conversation_history.append(('Assistant', response))
-        logger.info(f"RAG generation: Generating {len(response_list)} responses")
-        return response
+        system_prompt = self.fill_prompt_template(
+                        'system',
+                        agent_type='recommender',
+                        role='Recommend next runs to make')
 
-class RAGWrapper:
+        response_data = self.llm.generate_with_json_output(
+                        prompt = self.rec_prompt_man.prompt_r,
+                        schema = self.rec_schema,
+                        system_prompt = system_prompt,
+                        tools=None)
+        
+        return response_data
+        
+    @action
+    async def plan_run(
+              self,
+              previous_run,
+              recommendation,
+              agent_prompt_manager,
+              ):
+        agent_prompt_manager.running_prompt()
+        system_prompt = self.fill_prompt_template(
+                            system='system',
+                            agent_type = 'recommender',
+                            role='Recommend next runs to make')
+
+        self.plan_schema['new_config'] = config_master[recommendation['next_task']]
+        response_data = self.llm.generate_with_json_output(
+                        prompt=prompt,
+                        schema=schema,
+                        system_prompt = system_prompt,
+                        tools=None,
+                        )
+        return response_data
+
+
+class JnanaWrapper:
     '''
     Wrapper on top of academy 
     for StructBioReasoner
@@ -153,25 +143,21 @@ class RAGWrapper:
     def __init__(self,
                  agent_id:str,
                  config: dict[str, Any],
-                 model_manager: UnifiedModelManager):
+                 research_goal: str,
+                 enabled_agents: list[str]
+                 ):
         
         self.agent_id = agent_id
         self.config = config
-        self.model_manager = model_manager
         self.logger = logging.getLogger(__name__)
         self.generated_hypotheses = []
-
-        self.capabilities = [
-            'rag_generation',
-            'literature_scanning',
-            'hypothesis_generation'
-            ]
                                                                
-        self.rag_config = config#config.get('rag')
-        self.manager = None
+        self.jnana_config = config
+        self.research_goal = research_goal
+        self.enabled_agents = enabled_agents
 
     async def initialize(self):
-        logger.info('Initializing RAG algorithms')
+        logger.info('Initializing Jnana agent')
         self.manager = await Manager.from_exchange_factory(
                 factory=LocalExchangeFactory(),
                 executors = ThreadPoolExecutor(),
@@ -179,11 +165,13 @@ class RAGWrapper:
         await self.manager.__aenter__()
 
         try:
-            self.rag_coord = await self.manager.launch(
-                RAGAgent,
-                args=(self.rag_config,),
+            self.jnana_coord = await self.manager.launch(
+                JnanaAgent,
+                args=(
+                    self.jnana_config,
+                    ),
             )
-            logger.info('Launching RAG')
+            logger.info('Launching Jnana')
             self.initialized = True
         except Exception as e:
             self.logger.exception("An error occurred with the RAGAgent")
@@ -191,7 +179,7 @@ class RAGWrapper:
         return True
 
     async def is_ready(self) -> bool:
-        self.logger.info('Checking if we are initialized')
+        self.logger.debug('Checking if we are initialized')
         if not hasattr(self, 'initialized'):
             await self.initialize()
             
@@ -209,55 +197,67 @@ class RAGWrapper:
                     self.manager = None
                     delattr(self, 'initialized')
 
-            self.logger.info('RAG agent cleanup completed')
+            self.logger.info('Jnana agent cleanup completed')
 
         except Exception as e:
-            self.logger.error(f'RAG agent cleanup failed: {e}')
+            self.logger.error(f'Jnana agent cleanup failed: {e}')
 
     def write_checkpoint(self, results: dict[str, Any]):
         #Use timestemp tom get unique name
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        checkpoint_file = f'hiperrag_checkpoint_{timestamp}.pkl'
+        checkpoint_file = f'jnana_checkpoint_{timestamp}.pkl'
         pickle.dump(results, open(checkpoint_file, 'wb'))
         return checkpoint_file
 
-    def get_capabilities(self) -> list[str]:
-        return self.capabilities
-
-    async def generate_rag_hypothesis(self,
+    async def generate_jnana_hypothesis(self,
                             data: dict[str, Any]) -> str:
         if not await self.is_ready():
-            self.logger.error('RAG agent not ready')
+            self.logger.error('Jnana agent not ready')
             return None
-        rag_results =  await self._generate_rag_hypothesis(data)
-        self.logger.info(f"{rag_results=}")
-        return await self.postprocess(rag_results)
+        jnana_results =  await self._generate_jnana_hypothesis(data)
+        self.logger.debug(f"{jnana_results=}")
+        return await jnana_results
 
-    async def _generate_rag_hypothesis(self,
+    async def _generate_jnana_hypothesis(self,
                     data: dict[str, Any]) -> dict[str, Any]:
         '''
-        call RAGAgent with input data
+        call Jnana agent with input data
         data includes user prompt
         '''
-        user_prompt = data['prompt']
-        response = await self.rag_coord.rag_with_model(
-                            user_prompt)
+        results = data['results']
+        previous_run = data['previous_run']
+        agent_prompt_manager = data['agent_prompt_manager']
+        recommendation = await self.jnana_coord.generate_recommendation(
+                        results = results,
+                        previous_run = previous_run,
+                        agent_prompt_manager = agent_prompt_manager
+        )
+
+        recommended_config = await self.jnana_coord.plan_run(
+                            previous_run = previous_run,
+                            recommendation = recommendation,
+                            agent_prompt_manager = agent_prompt_manager)
+
+        results = {
+                      'previous_run': previous_run,
+                      'recommendation': recommendation,
+                      'plan': recommended_config  
+                    }
+
         await self.cleanup()
-        results = {'prompt': user_prompt,
-                    'response': response}
         return results
     
     async def postprocess(self,
                             results: dict[str, Any]) -> ProteinHypothesis:
         hypothesis_content = f"""
-        Prompt: {results['prompt']}.
-        Content from RAG: {results['response']}
+        Recommendation: {results['recommendation']}.
+        Plan for new run: {results['plan']}
         """
 
         hypothesis = ProteinHypothesis(
-            title='RAG literature scanning generation',
+            title='Jnana recommendation',
             content=hypothesis_content.strip(),
-            description=f'RAG generates this hypothesis based on {results["prompt"]}',
+            description=f'Jnana generates this hypothesis based on the previous run: {results["previous_run"]}',
             hypothesis_type='',
             generation_timestamp=datetime.now().isoformat(),
             metadata=results,
