@@ -8,7 +8,7 @@
 cd /lus/flare/projects/FoundEpidem/avasan/IDEAL/Agentics/Jnana
 uv pip install -e .
 
-cd /lus/flare/projects/FoundEpidem/avasan/IDEAL/Agentics/StructBioReasoner
+cd /flare/FoundEpidem/avasan/IDEAL/Agentics/StructBioReasoner_Update/StructBioReasoner
 uv pip install -e .
 
 cd /lus/flare/projects/FoundEpidem/avasan/IDEAL/Agentics/MDAgent

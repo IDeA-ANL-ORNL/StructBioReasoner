@@ -27,6 +27,7 @@ from ..agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
 from ..agents.molecular_dynamics.free_energy_agent import FEAgent
 from ..agents.structure_prediction.chai_agent import ChaiAgent
 from ..agents.analysis.trajectory_analysis import TrajectoryAnalysisAgent
+from ..agents.language_model.jnana_agent import JnanaWrapper
 from ..prompts.prompts import get_prompt_manager
 try:
     from ..agents.hiper_rag.rag_agent import RAGWrapper 
@@ -157,6 +158,8 @@ class BinderDesignSystem(JnanaSystem):
             self.history['key_items'].append(key_items)
         if recommendations is not None:
             self.history['recommendations'].append(recommendations)
+        elif recommendations is None:
+            self.history['recommendations'].append('No recommendation')
         if decision is not None:
             self.history['decisions'].append(decision)
         elif decision is None:
@@ -249,13 +252,24 @@ class BinderDesignSystem(JnanaSystem):
 
         # Initialize design-specific components
         
+        self._extract_target_sequence(self.research_goal)
         await self._initialize_design_agents()
-
+        await self._initialize_jnana_agent()
         await self._initialize_knowledge_foundation()
 
         self.design_system_ready = True
         self.logger.info("BinderDesignSystem started successfully")
     
+    async def _initialize_jnana_agent(self):
+        self.logger.info("Initializing LLM agent")
+        jnana_ag_config = self.binder_config.get('jnana', {})
+        self.jnana_agent = JnanaWrapper(
+                            agent_id = 'jnana',
+                            config = jnana_ag_config,
+                            research_goal = self.research_goal,
+                            enabled_agents = self.enable_agents,
+                            target_prot = self.target_prot)
+
     async def _initialize_design_agents(self):
         """Initialize protein-specific agents."""
         self.logger.info("Initializing protein agents...")

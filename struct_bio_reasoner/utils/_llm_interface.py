@@ -9,7 +9,7 @@ import json
 import requests
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any, Union, Tuple
-from struct_bio_reasoner.utils.inference_auth_token import get_access_token
+from .inference_auth_token import get_access_token
 
 
 import logging
@@ -905,7 +905,7 @@ class alcfLLM(LLMInterface):
 class vllmLLM(LLMInterface):
     """Implementation for OpenAI's API."""
 
-    def __init__(self, api_key: str = 'EMPTY', model: str = "openai/gpt-oss-120b", model_adapter: Optional[Dict] = None, base_url: str = 'http://10.113.40.1:8000/v1'):#str='http://10.113.40.1:8000/v1'):
+    def __init__(self, api_key: str = 'EMPTY', model: str = "openai/gpt-oss-120b", model_adapter: Optional[Dict] = None):
         """
         Initialize the OpenAI LLM interface.
 
@@ -918,13 +918,7 @@ class vllmLLM(LLMInterface):
         self.model = model
         self.model_adapter = model_adapter
         
-        ip_w_port = base_url.split('/')[-2]
-        ip = ip_w_port.split(':')[0]
-        os.environ['no_proxy'] = f'{ip},localhost,127.0.0.1'
-        for envvar in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']:
-            os.environ.pop(envvar, None)
-
-        self.client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=60.0)
+        self.client = openai.OpenAI(base_url="http://localhost:8000/v1", api_key=api_key)
 
     def generate(self, prompt: str, system_prompt: Optional[str] = None,
                  temperature: float = 0.7, max_tokens: int = 1024) -> str:
@@ -988,116 +982,7 @@ class vllmLLM(LLMInterface):
             return parsed_response, prompt_tokens, completion_tokens
         except Exception as e:
             raise ValueError(f"Failed to parse JSON response: {e}. Response was: {response.choices[0].message.content}")
-
-class huggingfaceLLM(LLMInterface):
-    """Implementation for hugging face API."""
-
-    def __init__(self, api_key: Optional[str] = None, model: str = "openai/gpt-oss-120b", model_adapter: Optional[Dict] = None):
-        """
-        Initialize the OpenAI LLM interface.
-
-        Args:
-            api_key: no longer used, kept for compatibility
-            model: Model identifier to use
-            model_adapter: Optional configuration for model adaptation
-        """
-        super().__init__(model, model_adapter)
-
-        from transformers import pipeline
-
-        self.model_adapter = model_adapter
-
-        device_map = {
-            'model.embed_tokens': 0,
-            'lm_head': 11,
-        }
-
-        device_map.update({
-            f'model.layers.{i}': i//4 + 1
-            for i in range(36)
-        })
-
-        self.client = pipeline(
-            "text-generation",
-            model=model,
-            torch_dtype="auto",
-            device_map=device_map
-        )
-
-    def generate(self, prompt: str, system_prompt: Optional[str] = None,
-                 temperature: float = 0.7, max_tokens: int = 1024) -> str:
-        """Generate a response from OpenAI."""
-        messages = []
-
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-
-        messages.append({"role": "user", "content": prompt})
-
-        response = self.client(
-            messages,
-            temperature=temperature,
-            max_new_tokens=max_tokens,
-        )
-
-        last_message = response[0]['generated_text'][-1]
-        # final_content = last_message.get('content', last_message.get('reasoning_content'))
-
-        return last_message
-
-
-    def generate_reponse(self, prompt: str, system_prompt: Optional[str] = None,
-                 temperature: float = 0.7, max_tokens: int = 1024) -> str:
-        """Generate a response from OpenAI."""
-        if system_prompt is None:
-            system_prompt = "No reasoning. Final answer only."
-        else:
-            system_prompt = system_prompt + "No reasoning. Final answer only."
-        response = self.generate(prompt, system_prompt, temperature, max_tokens)
-
-        return response
-
-    def generate_with_json_output(self, prompt: str, json_schema: Dict,
-                                 system_prompt: Optional[str] = None,
-                                 temperature: float = 0.7, max_tokens: int = 1024,
-                                 tools: Optional[List[Dict]] = None) -> Tuple[Dict, int, int]:
-        """Generate a structured JSON response from OpenAI."""
-        schema_prompt = f"""
-        Your response must be formatted as a JSON object according to this schema:
-        {json_schema}
-
-        Ensure your response can be parsed by Python's json.loads().
-        """
-
-        system_prompt = system_prompt or schema_prompt
-
-        response = self.generate_reponse(prompt, system_prompt, temperature, max_tokens)
-
-        # Extract JSON string and parse
-        try:
-            parsed_response = parse_hf_json_response(response['content'])
-
-            # Get token counts from OpenAI response
-            prompt_tokens = 0 # response.usage.prompt_tokens
-            completion_tokens = 0 # response.usage.completion_tokens
-
-            self.total_calls += 1
-            self.total_prompt_tokens += prompt_tokens
-            self.total_completion_tokens += completion_tokens
-
-            return parsed_response, prompt_tokens, completion_tokens
-        except Exception as e:
-            raise ValueError(f"Failed to parse JSON response: {e}. Response was: {response['content']}")
-
-    def parse_hf_json_response(self, response: str) -> Dict:
-        """Parse a JSON response from Hugging Face LLM output."""
-        if '```json' in response:
-            json_str = response.split('```json')[1].rsplit('```')[0]
-        elif '```' in response:
-            json_str = response.split('```')[1]
-        else:
-            json_str = response.split('assistantfinal')[1].rsplit('```')[0]
-        return json.loads(json_str)
+ 
 
 
 def typify_schema(in_schema):
@@ -1149,7 +1034,7 @@ def translate_cerebras_schema(in_schema):
     return out_schema
 
 
-def _create_llm(provider: str, api_key: Optional[str] = None, model: Optional[str] = None, 
+def create_llm(provider: str, api_key: Optional[str] = None, model: Optional[str] = None, 
                base_url: Optional[str] = None, model_adapter: Optional[Dict[str, Any]] = None) -> LLMInterface:
     """
     Factory function to create LLM interfaces.
@@ -1202,72 +1087,8 @@ def _create_llm(provider: str, api_key: Optional[str] = None, model: Optional[st
     elif provider == "vllm":
         model = model or "openai/gpt-oss-120b"
         # base_url = base_url or "http://localhost:8000/v1"
-        llm = vllmLLM(model=model, model_adapter=model_adapter, base_url=base_url)
+        llm = vllmLLM(model=model, model_adapter=model_adapter)
     else:
         raise ValueError(f"Unsupported LLM provider: {provider}")
     
     return llm
-
-
-def create_llm(provider: str, api_key: Optional[str] = None, model: Optional[str] = None, 
-               base_url: Optional[str] = None, model_adapter: Optional[Dict[str, Any]] = None) -> LLMInterface:
-    """
-    Factory function to create LLM interfaces.
-
-    Args:
-        provider: The LLM provider ("anthropic", "gemini", "openai", "ollama", "llm_studio", "cerebras")
-        api_key: Optional API key (otherwise uses environment variables)
-        model: Optional model name (otherwise uses defaults)
-        base_url: Optional base URL for local LLM providers
-        model_adapter: Optional configuration for model adaptation
-
-    Returns:
-        An instance of the appropriate LLM interface
-    """
-    provider = provider.lower()
-
-    # Create the base LLM interface
-    llm = None
-    match provider:
-        case 'anthropic':
-            if anthropic is None:
-                raise ImportError("Anthropic package is not installed. Please install it with 'pip install anthropic'.")
-            model = model or "claude-3-7-sonnet-20250219"
-            llm = AnthropicLLM(api_key=api_key, model=model, model_adapter=model_adapter)
-        case 'gemini':
-            if genai is None:
-                raise ImportError("Google Generative AI package is not installed. Please install it with 'pip install google-generativeai'.")
-            model = model or "gemini-1.5-pro"
-            llm = GeminiLLM(api_key=api_key, model=model, model_adapter=model_adapter)
-        case 'openai':
-            if openai is None:
-                raise ImportError("OpenAI package is not installed. Please install it with 'pip install openai'.")
-            model = model or "gpt-4o"
-            llm = OpenAILLM(api_key=api_key, model=model, model_adapter=model_adapter)
-        case 'ollama':
-            model = model or "llama3"
-            ollama_url = base_url or "http://localhost:11434"
-            llm = OllamaLLM(model=model, base_url=ollama_url, api_key=api_key, model_adapter=model_adapter)
-        case 'llm_studio':
-            model = model or "default"
-            studio_url = base_url or "http://localhost:3000"
-            llm = LLMStudioLLM(model=model, base_url=studio_url, api_key=api_key, model_adapter=model_adapter)
-        case 'cerebras':
-            model = model or "cerebras_api_keyllama-4-scout-17b-16e-instruct"
-            llm = CerebrasLLM(api_key=api_key, model=model, model_adapter=model_adapter)
-        case 'alcf':
-            model = model or "openai/gpt-oss-120b"
-            # base_url = base_url or "https://inference-api.alcf.anl.gov/resource_server/sophia/vllm/v1"
-            llm = alcfLLM(model=model, model_adapter=model_adapter)
-        case 'vllm':
-            model = model or "openai/gpt-oss-120b"
-            # base_url = base_url or "http://localhost:8000/v1"
-            llm = vllmLLM(model=model, model_adapter=model_adapter)
-        case 'hugging_face':
-            model = model or 'openai/gpt-oss-120b'
-            llm = huggingfaceLLM(model=model, model_adapter=model_adapter)
-        case _:
-            raise ValueError(f"Unsupported LLM provider: {provider}")
-    
-    return llm
-
