@@ -26,7 +26,7 @@ Architecture:
     Executive Agent (strategic oversight)
         |
         v
-    Manager Agents (one per RAG hit)
+    Director Agents (one per RAG hit)
         |
         v
     Worker Agents (shared Parsl context - NO nested configs)
@@ -620,10 +620,20 @@ class AdvancedHierarchicalWorkflow:
             )
 
         parsl_config = AuroraSettings(**self.base_parsl_settings).config_factory(run_dir)
+
+        '''
+        TO-DO
+        Need two executors in AuroraSettings 1. CPU, 2. GPU
+        Add in decorators in each agent for each type of executor
+        '''
         return parsl_config
 
     def _create_exchange_factory(self):
         """Create the appropriate exchange factory."""
+        '''
+        TO-DO
+        convert this to globus exchange factory
+        '''
         if self.config.exchange.use_redis:
             return RedisExchangeFactory(
                 self.config.exchange.redis_host,
@@ -642,6 +652,11 @@ class AdvancedHierarchicalWorkflow:
 
             # Step 1: Initialize BinderDesignSystem
             logger.info("Step 1: Initializing BinderDesignSystem...")
+            '''
+            TO-DO
+            Get rid of the BinderDesignSystem
+            Start all agents in a more elegant way
+            '''
             self.binder_system = BinderDesignSystem(
                 config_path=self.config.paths.config,
                 jnana_config_path=self.config.paths.jnana_config,
@@ -672,7 +687,10 @@ class AdvancedHierarchicalWorkflow:
                 run_dir=run_dir,
             )
             logger.info("Single Parsl executor initialized (shared by all agents)")
-
+            '''
+            TO-DO
+            Change name of "manager" agent to "director"
+            '''
             # Step 3: Initialize Academy Manager
             logger.info("Step 3: Initializing Academy Manager...")
             exchange_factory = self._create_exchange_factory()
@@ -719,6 +737,12 @@ class AdvancedHierarchicalWorkflow:
 
     async def _launch_executive(self):
         """Launch the Executive Agent."""
+
+        '''
+        TO-DO
+        get rid of bidner_system and set
+        these agents in a different way
+        '''
         rag_agent = self.binder_system.design_agents.get('rag')
         folding_agent = self.binder_system.design_agents.get('structure_prediction')
         md_agent = self.binder_system.design_agents.get('molecular_dynamics')

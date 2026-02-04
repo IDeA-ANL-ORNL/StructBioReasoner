@@ -18,7 +18,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent.parent / "Jnana"))
 
 from jnana.core.jnana_system import JnanaSystem
 from jnana.protognosis.core.agent_core import ContextMemory 
-from jnana.protognosis.core.llm_interface import alcfLLM
+from struct_bio_reasoner.utils.llm_interface import alcfLLM
 # Import protein-specific components
 from ..data.protein_hypothesis import ProteinHypothesis
 from ..agents.analysis.trajectory_analysis import TrajectoryAnalysisAgent
@@ -73,7 +73,7 @@ class BinderConfig:
     })
     memory: ContextMemory=field(default_factory=lambda: ContextMemory())
 
-class BinderDesignSystem(JnanaSystem):
+class BinderDesignSystem():
     """
     Main binder design system extending Jnana.
     
@@ -106,7 +106,7 @@ class BinderDesignSystem(JnanaSystem):
         
         # Load protein-specific configuration
         self.memory_binder = ContextMemory()
-        self.memory_binder.set_research_goal(research_goal)
+        self.memory_binder.set_research_goal(research_goal, research_plan='')
         self.research_goal = research_goal
         self.binder_config = load_binder_config(config_path)
         self.global_cwd = self.binder_config.get("agents").get("computational_design").get("bindcraft").get("cwd")
@@ -114,17 +114,16 @@ class BinderDesignSystem(JnanaSystem):
         
         # Determine Jnana config path
         if not jnana_config_path:
-            jnana_config_path = self.binder_config.get("jnana", {}).get("config_path", 
-                                                                        "../Jnana/config/models.yaml")
+            jnana_config_path = self.binder_config.get("jnana", {}).get("config_path", "./config/jnana.yaml")
         
         # Handle Biomni configuration by modifying the Jnana config if needed
         self._prepare_jnana_config(jnana_config_path)
 
         # Initialize base Jnana system
-        super().__init__(
-            config_path=jnana_config_path,
-            **kwargs
-        )
+        #super().__init__(
+        #    config_path=jnana_config_path,
+        #    **kwargs
+        #)
         
         # Protein-specific configuration
         self.enable_tools = enable_tools or []
@@ -248,7 +247,7 @@ class BinderDesignSystem(JnanaSystem):
     async def start(self):
         """Start the protein engineering system."""
         # Start base Jnana system
-        await super().start()
+        #await super().start()
 
         # Initialize design-specific components
         
