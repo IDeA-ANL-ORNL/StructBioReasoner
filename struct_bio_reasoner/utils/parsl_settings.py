@@ -101,6 +101,58 @@ class LocalCPUSettings(BaseComputeSettings):
             ],
         )
 
+class HeterogeneousSettings(BaseComputeSettings):
+    available_accelerators: Union[int, Sequence[str]] = 12
+    worker_init: str = ''
+    nodes: int = 1
+    retries: int = 1
+    cores_per_worker: float = 1.0
+    max_workers_per_node: int = 1
+    worker_port_range: Tuple[int, int] = (10000, 20000)
+
+    def config_factory(self, run_dir: PathLike) -> Config:
+        executors = [
+                HighThroughputExecutor(
+                    provider=LocalProvider(
+                        nodes_per_block=self.nodes,
+                        init_blocks=1,
+                        max_blocks=1,
+                        launcher=MpiExecLauncher(
+                            bind_cmd="--cpu-bind", overrides=f"--depth=1 --ppn 1"
+                        ),  # Updates to the mpiexec command
+                        worker_init=self.worker_init,
+                    ),
+                    label='gpu',
+                    cpu_affinity='block',
+                    max_workers_per_node=self.available_accelerators,
+                    worker_debug=True,
+                    available_accelerators=self.available_accelerators,
+                    worker_port_range=self.worker_port_range,
+                ),
+                HighThroughputExecutor(
+                    provider=LocalProvider(
+                        nodes_per_block=self.nodes,
+                        init_blocks=1,
+                        max_blocks=1,
+                        launcher=MpiExecLauncher(
+                            bind_cmd="--cpu-bind", overrides=f"--depth=1 --ppn 1"
+                        ),  # Updates to the mpiexec command
+                        worker_init=self.worker_init,
+                    ),
+                    label='cpu',
+                    max_workers_per_node=self.max_workers_per_node,
+                    cores_per_worker=self.cores_per_worker,
+                    worker_debug=True,
+                    worker_port_range=self.worker_port_range,
+                ),
+        ]
+
+        return Config(
+            run_dir=str(run_dir/'runinfo'),
+            retries=self.retries,
+            executors=executors
+        )
+
 class PolarisSettings(BaseComputeSettings):
     label: str = 'htex'
     num_nodes: int = 1

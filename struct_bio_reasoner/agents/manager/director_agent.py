@@ -10,7 +10,9 @@ import logging
 import parsl
 from parsl import Config
 from pathlib import Path
+from struct_bio_reasoner.utils import HeterogeneousSettings
 from typing import Any, Optional, Literal
+
 
 @dataclass
 class AgentRegistry:
@@ -30,33 +32,17 @@ class AgentRegistry:
 
 class Director(Agent):
     def __init__(self,
-                 runtime_config: dict,
-                 parsl_config: Config):
-        super().__init__()
-        self.config = runtime_config
+                 runtime_config: dict[str, Any],
+                 parsl_config: Config,):
+        self.runtime_config = runtime_config
         self.parsl_config = parsl_config
         self.agent_registry = AgentRegistry()
 
-    async def initialize(self):
-        self.manager = await Manager.from_exchange_factory(
-            factory = LocalExchangeFactory(),
-            executors = ThreadPoolExecutor(),
-        )
-
-        await self.manager.__aenter__()
-
-        await self.load_agents(self.config)
-    
-    async def cleanup(self):
-        try:
-            self.manager.__aexit__(None, None, None)
-        except:
-            continue
-        finally:
-            self.manager = None
+        super().__init__()
 
     async def agent_on_startup(self) -> None:
         self.dfk = parsl.load(self.parsl_config)
+        self.load_agents()
 
     async def agent_on_shutdown(self):
         if self.dfk:
@@ -65,19 +51,22 @@ class Director(Agent):
 
         parsl.clear()
 
-    async def load_agents(self,
-                          config):
+    def load_from_configuration(self,
+                                config: str):
+        """"""
+
+    async def load_agents(self):
         """"""
         self.agents = {}
-        for agent, args in config.items():
-            self.agents[agent] = await self.manager.agent_launch_alongside(
+        for agent, args in self.config.items():
+            self.agents[agent] = await self.agent_launch_alongside(
                     self.agent_registry.get(agent),
                     args=(
                         *args
                     )
             )
 
-    async def test(self):
+    async def agentic_test(self):
         """Test main loop"""
         previous_run = 'starting'
         results = {'results': 'none'}
@@ -97,7 +86,7 @@ class Director(Agent):
 
         results = await self.tool_call(tool, plan) # do tool call
 
-    async def main(self):
+    async def agentic_run(self):
         """Main while loop logic"""
         previous_run = 'starting'
         results = {'results': 'none'}
@@ -146,3 +135,36 @@ class Director(Agent):
         """Access correct subagent based on the `tool` key. Pass in
         the inputs in the form of **kwargs."""
         return await self.agents[tool].run(**plan)
+    
+async def main():
+    config = ''
+    runtime_config = yaml.safe_load(config)
+    parsl_settings = config['parsl']
+    parsl_config = HeterogeneousSettings(**parsl_settings).config_factory(Path.cwd())
+
+    manager = await Manager.from_exchange_factory(
+        factory = LocalExchangeFactory(),
+        executors = ThreadPoolExecutor(),
+    )
+
+    await manager.__aenter__()
+
+    director = await manager.launch(
+        DirectorAgent,
+        args=(
+            runtime_config,
+            parsl_config,
+        ),
+    )
+
+    director.agentic_test()
+
+    try:
+        await manager.__aexit__(None, None, None)
+    except:
+        continue
+    finally:
+        manager = None
+
+if __name__ == '__main__':
+    asyncio.run(main())
