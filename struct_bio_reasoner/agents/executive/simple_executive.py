@@ -36,39 +36,54 @@ class Executive(Agent):
         self.parsl_settings = parsl_settings
 
         self.agent_registry = AgentRegistry()
+        self.directors = {}
 
         super().__init__()
 
     async def agent_on_startup(self):
+        # probably do something with parsl here unless we launch
+        # directors directly with academy
         pass
 
     async def agent_on_shutdown(self):
+        # probably kill parsl here unless this is also an academy
+        # endeavor
         pass
 
-    @loop
-    async def perform_experiment(self):
+    async def perfom_experiment(self):
+        await self.initialize()
+        
+        # is this how you use a timer loop?
+        while await self.manage_directors():
+            continue
+
+    async def initialize(self):
         await self.launch_reasoner()
+        # initial reasoning here
+        # launch initial directors here
 
-        while True:
-            if self.time % self.check_interval == 0:
-                for director in self.directors:
-                    signal = await self.evaluate_director(director)
+    @timer(interval=600) # seconds
+    async def manage_directors(self):
+        for director in self.directors.values():
+            signal = await self.evaluate_director(director)
 
-                    match signal:
-                        case 'KILL':
-                            self.available_resources.append(
-                                await self.kill_director(director)
-                            )
-                        case 'ADVISE':
-                            await self.advise_director(director)
-                        case _:
-                            continue
+            match signal:
+                case 'KILL':
+                    self.available_resources.append(
+                        await self.kill_director(director)
+                    )
+                case 'ADVISE':
+                    await self.advise_director(director)
+                case _:
+                    continue
 
-            if self.available_resources:
-                await self.launch_director(self.available_resources)
+        if self.available_resources:
+            await self.launch_director(self.available_resources)
 
-            if await self.end_experiment():
-                break
+        if await self.end_experiment():
+            return False
+
+        return True
 
     @action
     async def launch_reasoner(self):
@@ -80,6 +95,7 @@ class Executive(Agent):
         
     @action
     async def launch_director(self):
+        # how do we do this?
         pass
 
     @action
@@ -95,21 +111,19 @@ class Executive(Agent):
     @action
     async def evaluate_director(self,
                                 director: Agent) -> None:
+        # how do we do this?
         status = director.check_status()
         recommendation = self.reasoner.generate_recommendation(
             status,
-            previous_run=,
-            history=,
+            previous_run='',
+            history='',
         )
 
         return recommendation[0]
 
     @action
-    async def reason(self):
-        pass
-
-    @action
     async def end_experiment(self):
+        # what is the kill signal?
         pass
 
 async def main(configuration_file: str):
