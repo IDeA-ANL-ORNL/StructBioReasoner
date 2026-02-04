@@ -13,7 +13,6 @@ from pathlib import Path
 from struct_bio_reasoner.utils import HeterogeneousSettings
 from typing import Any, Optional, Literal
 
-
 @dataclass
 class AgentRegistry:
     reasoner: "struct_bio_reasoner.agents.language_model.jnana_agent:JnanaAgent"
@@ -38,6 +37,9 @@ class Director(Agent):
         self.parsl_config = parsl_config
         self.agent_registry = AgentRegistry()
 
+        self.previous_run = 'starting'
+        self.history = []
+
         super().__init__()
 
     async def agent_on_startup(self) -> None:
@@ -54,6 +56,7 @@ class Director(Agent):
     def load_from_configuration(self,
                                 config: str):
         """"""
+        pass
 
     async def load_agents(self):
         """"""
@@ -88,27 +91,20 @@ class Director(Agent):
 
     async def agentic_run(self):
         """Main while loop logic"""
-        previous_run = 'starting'
         results = {'results': 'none'}
-        history = ''
         while True:
             reasoner_input = {
                 'results': results,
-                'previous_run': previous_run,
-                'history': history,
+                'previous_run': self.previous_run,
+                'history': self.history,
             }
-            response = await self.query_reasoner(reasoner_input) # gets prompt for tool call
 
-            # unpack reasoning trace
-            previous_run = response['previous_run']
-            tool = response['tool']
-            plan = response['plan']
+            tool, plan = await self.query_reasoner(reasoner_input) # gets prompt for tool call
 
             results = await self.tool_call(tool, plan) # do tool call
 
-    @action
     async def query_reasoner(self,
-                             data: dict[str, Any]) -> dict[str, Any]:
+                             data: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         recommendation = await self.agents['reasoner'].generate_recommendation(
             results=data['results'],
             previous_run=data['previous_run'],
@@ -120,21 +116,30 @@ class Director(Agent):
             history=data['history']
         )
 
-        return {
-            'previous_run': data['previous_run'],
-            'history': data['history'].append(data['previous_run']),
-            'recommendation': recommendation,
-            'tool': recommendation['recommendation']['next_task'],
-            'plan', config
-        }
+        self.previous_run = data['previous_run']
+        self.history.append(data['history'])
 
-    @action
+        return recommendation['recommendation']['next_task'], config
+
     async def tool_call(self,
                         tool: str,
                         plan: dict[str, Any]):
         """Access correct subagent based on the `tool` key. Pass in
         the inputs in the form of **kwargs."""
         return await self.agents[tool].run(**plan)
+
+    @action
+    async def check_status(self) -> str:
+        """"""
+        status = await self.agents['reasoner'].evaluate_history(self.history)
+        return status
+
+    @action
+    async def receive_instruction(self,
+                                  instruction: str):
+        """Receive instructions from Executive agent. Utilize this in the next
+        reasoning trace to guide next task(s)."""
+        pass
     
 async def main():
     config = ''

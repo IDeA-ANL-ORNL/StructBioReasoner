@@ -14,7 +14,10 @@ from .protein_utils import (
 )
 from .parsl_settings import (
     AuroraSettings,
-    PolarisSettings
+    HeterogeneousSettings,
+    LocalSettings,
+    LocalCPUSettings,
+    PolarisSettings,
 )
 
 # Hotspot analysis utilities

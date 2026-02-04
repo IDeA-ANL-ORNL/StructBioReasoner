@@ -90,6 +90,14 @@ class JnanaAgent(Agent):
         return
 
     @action
+    async def evaluate_history(
+        self,
+        history
+    ):
+        """"""
+        pass
+
+    @action
     async def generate_recommendation(
               self,
               results,
