@@ -37,6 +37,7 @@ class Executive(Agent):
 
         self.agent_registry = AgentRegistry()
         self.directors = {}
+        self.available_resources = []
 
         super().__init__()
 
@@ -55,7 +56,9 @@ class Executive(Agent):
         
         # is this how you use a timer loop?
         while await self.manage_directors():
-            continue
+            pass
+
+        await self.summarize_experiment()
 
     async def initialize(self):
         await self.launch_reasoner()
@@ -85,7 +88,6 @@ class Executive(Agent):
 
         return True
 
-    @action
     async def launch_reasoner(self):
         self.reasoner = await self.agent_launch_alongside(
             self.agent_registry['reasoner'],
@@ -93,22 +95,18 @@ class Executive(Agent):
             ),
         )
         
-    @action
     async def launch_director(self):
         # how do we do this?
         pass
 
-    @action
     async def kill_director(self,
                             director: Agent) -> None:
         await director.agent_shutdown()
 
-    @action
     async def advise_director(self,
                               director: Agent):
         await director.receive_instruction(instruction)
 
-    @action
     async def evaluate_director(self,
                                 director: Agent) -> None:
         # how do we do this?
@@ -121,9 +119,12 @@ class Executive(Agent):
 
         return recommendation[0]
 
-    @action
     async def end_experiment(self):
         # what is the kill signal?
+        pass
+
+    async def summarize_experiment(self):
+        # use reasoner to do this
         pass
 
 async def main(configuration_file: str):
@@ -134,9 +135,12 @@ async def main(configuration_file: str):
     director_config = config['director']
     parsl_config = director_config['parsl']
 
+    # what does this config need to look like?
     allocation_config = Config(
+
     )
 
+    # do these settings make sense for the redisexchange?
     manager = await Manager.from_exchange_factory(
         factory = RedisExchangeFactory('localhost', 6379),
         executors = ParslPoolExecutor(allocation_config),
