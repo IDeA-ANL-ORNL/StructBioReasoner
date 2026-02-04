@@ -1,16 +1,12 @@
 from academy.agent import Agent, action
-from academy.exchange import LocalExchangeFactory
-from academy.handle import Handle
 from academy.manager import Manager
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, fields
 import importlib
 import logging
 import parsl
 from parsl import Config
 from pathlib import Path
-from struct_bio_reasoner.utils import HeterogeneousSettings
 from typing import Any, Optional, Literal
 
 @dataclass
@@ -52,11 +48,6 @@ class Director(Agent):
             self.dfk = None
 
         parsl.clear()
-
-    def load_from_configuration(self,
-                                config: str):
-        """"""
-        pass
 
     async def load_agents(self):
         """"""
@@ -139,37 +130,5 @@ class Director(Agent):
                                   instruction: str):
         """Receive instructions from Executive agent. Utilize this in the next
         reasoning trace to guide next task(s)."""
+        # Somehow incorporate a signal from upstream reasoning into the next task
         pass
-    
-async def main():
-    config = ''
-    runtime_config = yaml.safe_load(config)
-    parsl_settings = config['parsl']
-    parsl_config = HeterogeneousSettings(**parsl_settings).config_factory(Path.cwd())
-
-    manager = await Manager.from_exchange_factory(
-        factory = LocalExchangeFactory(),
-        executors = ThreadPoolExecutor(),
-    )
-
-    await manager.__aenter__()
-
-    director = await manager.launch(
-        DirectorAgent,
-        args=(
-            runtime_config,
-            parsl_config,
-        ),
-    )
-
-    director.agentic_test()
-
-    try:
-        await manager.__aexit__(None, None, None)
-    except:
-        continue
-    finally:
-        manager = None
-
-if __name__ == '__main__':
-    asyncio.run(main())

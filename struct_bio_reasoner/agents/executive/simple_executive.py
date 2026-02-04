@@ -1,55 +1,28 @@
-from academy.agent import Agent, action
 from academy.exchange import RedisExchangeFactory
+from academy.handle import Handle
 from academy.manager import Manager
 import asyncio
-from dataclasses import dataclass, fields
-import importlib
 import parsl
 from parsl import Config, python_app
 from parsl.concurrent import ParslPoolExecutor
 from pathlib import Path
+from time import sleep
 from typing import Any
+from struct_bio_reasoner.agents.language_model.jnana_agent import JnanaAgent
+from struct_bio_reasoner.agents.manager.director_agent import Director
+from struct_bio_reasoner.utils import HeterogeneousSettings
 
-@dataclass
-class AgentRegistry:
-    reasoner: "struct_bio_reasoner.agents.language_model.jnana_agent:JnanaAgent"
-    director: "struct_bio_reasoner.agents.manager.director_agent:Director"
-
-    def get(self, label: str) -> type:
-        path = getattr(self, label)
-        module_path, class_name = path.split(':')
-        return getattr(importlib.import_module(module_path), class_name)
-
-    def available(self) -> list[str]:
-        return [f.name for f in fields(self)]
-
-class Executive(Agent):
+class Executive:
     def __init__(self,
-                 executive_config: dict[str, Any],
-                 allocation_config: Config,
-                 director_config: dict[str, Any],
-                 parsl_settings: dict[str, Any],
-                ):
-        self.config = executive_config
-        self.allocation_config = allocation_config
-        self.directory_config = director_config
-        self.parsl_settings = parsl_settings
+                 configuration_file: str):
+        full_configuration = yaml.safe_load(configuration_file)
+        self.config = full_configuration['executive']
+        self.allocation_config = self.config['parsl']
+        self.director_config = full_configuration['director']
+        self.parsl_factory = HeterogeneousSettings(**self.director_config['parsl'])
 
-        self.agent_registry = AgentRegistry()
         self.directors = {}
-        self.available_resources = []
-
-        super().__init__()
-
-    async def agent_on_startup(self):
-        # probably do something with parsl here unless we launch
-        # directors directly with academy
-        pass
-
-    async def agent_on_shutdown(self):
-        # probably kill parsl here unless this is also an academy
-        # endeavor
-        pass
+        self.available_ids = []
 
     async def perfom_experiment(self):
         await self.initialize()
@@ -57,54 +30,79 @@ class Executive(Agent):
         # is this how you use a timer loop?
         while await self.manage_directors():
             pass
+            sleep(self.config['check_interval'])
 
         await self.summarize_experiment()
 
     async def initialize(self):
+        # what does this config need to look like?
+        allocation_config = Config(
+            
+        )
+
+        # do these settings make sense for the redisexchange?
+        self.manager = await Manager.from_exchange_factory(
+            factory = RedisExchangeFactory('localhost', 6379),
+            executors = ParslPoolExecutor(allocation_config),
+        )
+
+        await self.manager.__aenter__()
+
+        # how do we handle this now?
         await self.launch_reasoner()
         # initial reasoning here
-        # launch initial directors here
+        # launch initial directors here based on resources in allocation + parsl
 
-    @timer(interval=600) # seconds
     async def manage_directors(self):
-        for director in self.directors.values():
+        for director_id, director in self.directors.items():
             signal = await self.evaluate_director(director)
 
             match signal:
                 case 'KILL':
-                    self.available_resources.append(
-                        await self.kill_director(director)
-                    )
+                    # maybe return director history to inform next director
+                    await self.kill_director(director)
+                    self.available_ids.append(director_id)
                 case 'ADVISE':
+                    # somehow generate instruction for director
                     await self.advise_director(director)
                 case _:
                     continue
 
-        if self.available_resources:
-            await self.launch_director(self.available_resources)
+        while self.available_ids:
+            director_id = self.available_ids.pop()
+            self.directors[director_id] = await self.launch_director()
 
         if await self.end_experiment():
             return False
 
         return True
 
-    async def launch_reasoner(self):
+    async def launch_reasoner(self) -> None:
+        # NOTE: rework this
         self.reasoner = await self.agent_launch_alongside(
             self.agent_registry['reasoner'],
             args=(
             ),
         )
         
-    async def launch_director(self):
-        # how do we do this?
-        pass
+    async def launch_director(self) -> Handle:
+        director_handle = self.manager.launch(
+            Director,
+            args=(
+                self.director_config,
+                self.parsl_factory,
+            ),
+        )
+
+        return director_handle
 
     async def kill_director(self,
                             director: Agent) -> None:
         await director.agent_shutdown()
 
     async def advise_director(self,
-                              director: Agent):
+                              director: Agent,
+                              instruction: str) -> None:
         await director.receive_instruction(instruction)
 
     async def evaluate_director(self,
@@ -125,43 +123,8 @@ class Executive(Agent):
 
     async def summarize_experiment(self):
         # use reasoner to do this
+        self.manager.__aexit__()
         pass
-
-async def main(configuration_file: str):
-    config = yaml.safe_load(configuration_file)
-
-    executive_config = config['executive']
-    allocation_settings = executive_config['parsl']
-    director_config = config['director']
-    parsl_config = director_config['parsl']
-
-    # what does this config need to look like?
-    allocation_config = Config(
-
-    )
-
-    # do these settings make sense for the redisexchange?
-    manager = await Manager.from_exchange_factory(
-        factory = RedisExchangeFactory('localhost', 6379),
-        executors = ParslPoolExecutor(allocation_config),
-        
-    )
-
-    await manager.__aenter__()
-
-    executive = await manager.launch(
-        Executive,
-        args=(
-            executive_config,
-            allocation_config,
-            director_config,
-            parsl_config,
-        ),
-    )
-
-    await executive.perform_experiment()
-
-    await manager.__aexit__()
 
 if __name__ == '__main__':
     asyncio.run(
