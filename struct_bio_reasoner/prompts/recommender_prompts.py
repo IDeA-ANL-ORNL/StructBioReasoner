@@ -33,7 +33,7 @@ class RecommenderPromptManager:
                 "Your recommendation must include:\n\n"
                 f"1. **Next run suggestion:**\n"
                 f"2. **Next run parameters:**\n"
-                f"   - Should paramaters: change, not change (in those exact words)\n"
+                f"   - Should parameters: change, not change (in those exact words)\n"
                 f"2. **Rationale for the run choice:**\n"
                 f"   - Why should I make this run choice and change or not change params"
             )

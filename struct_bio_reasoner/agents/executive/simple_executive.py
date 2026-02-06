@@ -48,10 +48,14 @@ class Executive:
 
         await self.manager.__aenter__()
 
-        # how do we handle this now?
-        await self.launch_reasoner()
-        # initial reasoning here
-        # launch initial directors here based on resources in allocation + parsl
+        self.available_resources = [x for x in range(1, )]
+
+        self.directors[0] = await self.launch_director()
+        self.directors[0].executive_reasoning()
+
+        while self.available_resources:
+            director_id = self.available_resources.pop()
+            self.directors[director_id] = await self.launch_director()
 
     async def manage_directors(self):
         for director_id, director in self.directors.items():
@@ -77,14 +81,6 @@ class Executive:
 
         return True
 
-    async def launch_reasoner(self) -> None:
-        # NOTE: rework this
-        self.reasoner = await self.agent_launch_alongside(
-            self.agent_registry['reasoner'],
-            args=(
-            ),
-        )
-        
     async def launch_director(self) -> Handle:
         director_handle = self.manager.launch(
             Director,
@@ -123,6 +119,7 @@ class Executive:
 
     async def summarize_experiment(self):
         # use reasoner to do this
+        self.directors[0].agents['reasoner'].executive_reasoning()
         self.manager.__aexit__()
         pass
 

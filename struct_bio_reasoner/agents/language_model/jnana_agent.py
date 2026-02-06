@@ -90,11 +90,20 @@ class JnanaAgent(Agent):
         return
 
     @action
+    async def query(
+        self,
+        prompt
+    ):
+        """Send a prescribed prompt to the Reasoner and return the response."""
+        pass
+
+    @action
     async def evaluate_history(
         self,
-        history
+        history: str
     ):
-        """"""
+        """Examine a director's history with the reasoner and return a decision signal
+        and explanation of the decision."""
         pass
 
     @action

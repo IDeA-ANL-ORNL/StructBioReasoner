@@ -120,6 +120,13 @@ class Director(Agent):
         return await self.agents[tool].run(**plan)
 
     @action
+    async def executive_reasoning(self,
+                                  prompt: str):
+        """Hook into the reasoning agent for the executive agent.
+        """
+        response = await self.agents['reasoner'].query()
+
+    @action
     async def check_status(self) -> str:
         """"""
         status = await self.agents['reasoner'].evaluate_history(self.history)

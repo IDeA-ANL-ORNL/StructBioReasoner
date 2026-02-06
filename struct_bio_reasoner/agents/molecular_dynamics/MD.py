@@ -52,7 +52,7 @@ class MDCoordinator(Agent):
         return [path for path in paths if path]
 
     @action
-    async def deploy_md(
+    async def run(
         self,
         paths: list[Path],
         initial_pdbs: list[Path],
