@@ -36,9 +36,6 @@ class Chai(Folding):
 
         self.devshm = Path('/dev/shm')
 
-        self.fasta_dir.mkdir(exist_ok=True, parents=True)
-        self.out.mkdir(exist_ok=True, parents=True)
-
     def prepare(self,
                 seqs: list[str],
                 out: Path) -> Path:
@@ -77,6 +74,10 @@ class Chai(Folding):
                  seqs: list[str],
                  name: str,
                  constraints: Optional[list[dict]]=None) -> dict[str, Any]:
+        # these dirs may have changed, ensure they exist
+        self.fasta_dir.mkdir(exist_ok=True, parents=True)
+        self.out.mkdir(exist_ok=True, parents=True)
+        
         out = self.devshm / name
         out.mkdir(exist_ok=True, parents=True)
         fasta = self.prepare(seqs, out)

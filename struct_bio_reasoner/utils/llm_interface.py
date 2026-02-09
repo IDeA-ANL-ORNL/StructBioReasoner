@@ -1148,69 +1148,11 @@ def translate_cerebras_schema(in_schema):
 
     return out_schema
 
-
-def _create_llm(provider: str, api_key: Optional[str] = None, model: Optional[str] = None, 
-               base_url: Optional[str] = None, model_adapter: Optional[Dict[str, Any]] = None) -> LLMInterface:
-    """
-    Factory function to create LLM interfaces.
-
-    Args:
-        provider: The LLM provider ("anthropic", "gemini", "openai", "ollama", "llm_studio", "cerebras")
-        api_key: Optional API key (otherwise uses environment variables)
-        model: Optional model name (otherwise uses defaults)
-        base_url: Optional base URL for local LLM providers
-        model_adapter: Optional configuration for model adaptation
-
-    Returns:
-        An instance of the appropriate LLM interface
-    """
-    provider = provider.lower()
-
-    # Create the base LLM interface
-    llm = None
-    
-    if provider == "anthropic":
-        if anthropic is None:
-            raise ImportError("Anthropic package is not installed. Please install it with 'pip install anthropic'.")
-        model = model or "claude-3-7-sonnet-20250219"
-        llm = AnthropicLLM(api_key=api_key, model=model, model_adapter=model_adapter)
-    elif provider == "gemini":
-        if genai is None:
-            raise ImportError("Google Generative AI package is not installed. Please install it with 'pip install google-generativeai'.")
-        model = model or "gemini-1.5-pro"
-        llm = GeminiLLM(api_key=api_key, model=model, model_adapter=model_adapter)
-    elif provider == "openai":
-        if openai is None:
-            raise ImportError("OpenAI package is not installed. Please install it with 'pip install openai'.")
-        model = model or "gpt-4o"
-        llm = OpenAILLM(api_key=api_key, model=model, model_adapter=model_adapter)
-    elif provider == "ollama":
-        model = model or "llama3"
-        ollama_url = base_url or "http://localhost:11434"
-        llm = OllamaLLM(model=model, base_url=ollama_url, api_key=api_key, model_adapter=model_adapter)
-    elif provider == "llm_studio":
-        model = model or "default"
-        studio_url = base_url or "http://localhost:3000"
-        llm = LLMStudioLLM(model=model, base_url=studio_url, api_key=api_key, model_adapter=model_adapter)
-    elif provider == "cerebras":
-        model = model or "cerebras_api_keyllama-4-scout-17b-16e-instruct"
-        llm = CerebrasLLM(api_key=api_key, model=model, model_adapter=model_adapter)
-    elif provider == "alcf":
-        model = model or "openai/gpt-oss-120b"
-        # base_url = base_url or "https://inference-api.alcf.anl.gov/resource_server/sophia/vllm/v1"
-        llm = alcfLLM(model=model, model_adapter=model_adapter)
-    elif provider == "vllm":
-        model = model or "openai/gpt-oss-120b"
-        # base_url = base_url or "http://localhost:8000/v1"
-        llm = vllmLLM(model=model, model_adapter=model_adapter, base_url=base_url)
-    else:
-        raise ValueError(f"Unsupported LLM provider: {provider}")
-    
-    return llm
-
-
-def create_llm(provider: str, api_key: Optional[str] = None, model: Optional[str] = None, 
-               base_url: Optional[str] = None, model_adapter: Optional[Dict[str, Any]] = None) -> LLMInterface:
+def create_llm(provider: str, 
+               api_key: Optional[str] = None, 
+               model: Optional[str] = None, 
+               base_url: Optional[str] = None, 
+               model_adapter: Optional[dict[str, Any]] = None) -> LLMInterface:
     """
     Factory function to create LLM interfaces.
 

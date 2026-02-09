@@ -25,7 +25,7 @@ from .quality_control import SequenceQualityControl
 
 logger = logging.getLogger(__name__)
 
-@parsl.python_app
+@parsl.python_app(executors=['gpu', 'htex'])
 def fold_sequence_task(
     fold_alg: Folding,
     sequence: str,
@@ -41,7 +41,7 @@ def fold_sequence_task(
         result = fold_alg(sequence, label, seq_label, constraints)
     return result
 
-@parsl.python_app
+@parsl.python_app(executors=['gpu', 'htex'])
 def inverse_fold_task(
     inv_fold_alg: InverseFolding,
     input_path: Path,
@@ -59,7 +59,7 @@ def inverse_fold_task(
 
     return sequences
 
-@parsl.python_app
+@parsl.python_app(executors=['cpu', 'htex'])
 def qc_task(
     qc_alg: SequenceQualityControl,
     seqs: list[str],
@@ -67,7 +67,7 @@ def qc_task(
     for seq in seqs:
         pass # NOTE: finish this
 
-@parsl.python_app
+@parsl.python_app(executors=['cpu', 'htex'])
 def energy_task(
     energy_alg: EnergyCalculation,
     structure: Path,

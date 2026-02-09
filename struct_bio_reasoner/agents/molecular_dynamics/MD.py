@@ -6,7 +6,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-class MDCoordinator(Agent):
+class MDAgent(Agent):
     """Coordinator that orchestrates Parsl tasks."""
     def __init__(
         self, 

@@ -13,8 +13,8 @@ from typing import Any, Optional, Literal
 class AgentRegistry:
     reasoner: "struct_bio_reasoner.agents.language_model.jnana_agent:JnanaAgent"
     bindcraft: "struct_bio_reasoner.agents.computational_design.bindcraft_coordinator:BindCraftCoordinator"
-    md: "struct_bio_reasoner.agents.molecular_dynamics.MD:MDCoordinator"
-    mmpbsa: "struct_bio_reasoner.agents.molecular_dynamics.mmpbsa_agent:FECoordinator"
+    md: "struct_bio_reasoner.agents.molecular_dynamics.MD:MDAgent"
+    mmpbsa: "struct_bio_reasoner.agents.molecular_dynamics.mmpbsa_agent:FEAgent"
     folding: "struct_bio_reasoner.agents.structure_prediction.chai_agent:ChaiAgent"
 
     def get(self, label: str) -> type:
@@ -60,8 +60,9 @@ class Director(Agent):
                     )
             )
 
-    async def agentic_test(self):
+    async def agentic_test(self) -> tuple[dict, Any]:
         """Test main loop"""
+        # TODO: Hook in research goal; override reasoner output; do tool call
         previous_run = 'starting'
         results = {'results': 'none'}
         history = ''
@@ -79,6 +80,8 @@ class Director(Agent):
         plan = response['plan']
 
         results = await self.tool_call(tool, plan) # do tool call
+
+        return response, results
 
     async def agentic_run(self):
         """Main while loop logic"""

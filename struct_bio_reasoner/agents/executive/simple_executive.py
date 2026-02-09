@@ -51,7 +51,7 @@ class Executive:
         self.available_resources = [x for x in range(1, )]
 
         self.directors[0] = await self.launch_director()
-        self.directors[0].executive_reasoning()
+        await self.directors[0].executive_reasoning()
 
         while self.available_resources:
             director_id = self.available_resources.pop()
@@ -82,7 +82,7 @@ class Executive:
         return True
 
     async def launch_director(self) -> Handle:
-        director_handle = self.manager.launch(
+        director_handle = await self.manager.launch(
             Director,
             args=(
                 self.director_config,
@@ -104,8 +104,8 @@ class Executive:
     async def evaluate_director(self,
                                 director: Agent) -> None:
         # how do we do this?
-        status = director.check_status()
-        recommendation = self.reasoner.generate_recommendation(
+        status = await director.check_status()
+        recommendation = await self.reasoner.generate_recommendation(
             status,
             previous_run='',
             history='',
@@ -114,14 +114,15 @@ class Executive:
         return recommendation[0]
 
     async def end_experiment(self):
-        # what is the kill signal?
-        pass
+        for director in self.directors.values():
+            await self.kill_director(director)
 
     async def summarize_experiment(self):
         # use reasoner to do this
-        self.directors[0].agents['reasoner'].executive_reasoning()
-        self.manager.__aexit__()
-        pass
+        summary = await self.directors[0].agents['reasoner'].executive_reasoning()
+        await self.manager.__aexit__()
+
+        return summary
 
 if __name__ == '__main__':
     asyncio.run(

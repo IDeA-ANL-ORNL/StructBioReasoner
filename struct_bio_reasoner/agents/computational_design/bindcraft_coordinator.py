@@ -225,7 +225,7 @@ class BindCraftCoordinator(Agent):
             }
     
     @action
-    async def run_full_workflow(
+    async def run(
         self,
         target_sequence: str,
         binder_sequence: str,
@@ -310,7 +310,6 @@ class BindCraftCoordinator(Agent):
         self.logger.info(f"Coordinator: Workflow complete. {results['rounds_completed']} rounds completed")
         return results
 
-    @action
     async def get_remodel_indices(self,
                                   pdb_file: Path):
         u = mda.Universe(str(pdb_file))
@@ -324,11 +323,12 @@ class ForwardFoldingAgent(Agent):
     Agent responsible for all folding tasks.
     """
     def __init__(self,
-                 fold_alg: Folding):
-        self.fold_alg = fold_alg
+                 fold_alg: str,
+                 fold_config: dict):
+        self.fold_alg = fold_alg(**fold_config)
     
     @action
-    async def fold_sequences(
+    async def run(
         self,
         sequences: list[str],
         names: list[str],
