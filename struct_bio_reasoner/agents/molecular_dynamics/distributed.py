@@ -11,12 +11,13 @@ def parsl_build(path: Path, pdb: Path, build_kwargs: dict[str, Any]) -> Path:
     
     solvent = build_kwargs.get('solvent', 'implicit')
     
-    if solvent == 'implicit':
-        builder = ImplicitSolvent(path=path, pdb=pdb, 
-                                  **build_kwargs)
-    else:  # explicit
-        builder = ExplicitSolvent(path=path, pdb=pdb,
-                                  **build_kwargs)
+    match solvent: 
+        case 'implicit':
+            builder = ImplicitSolvent(path=path, pdb=pdb, 
+                                      **build_kwargs)
+        case _:
+            builder = ExplicitSolvent(path=path, pdb=pdb,
+                                      **build_kwargs)
     
     try:
         builder.build()
@@ -32,12 +33,13 @@ def parsl_simulate(path: Path, sim_kwargs: dict[str, Any]) -> Path:
     solvent = sim_kwargs.get('solvent', 'implicit')
     del sim_kwargs['solvent'] # not actually a kwarg of simulator
     
-    if solvent == 'implicit':
-        simulator = ImplicitSimulator(path, 
-                                      **sim_kwargs)
-    else:  # explicit
-        simulator = Simulator(path,
-                              **sim_kwargs)
+    match solvent:
+        case 'implicit':
+            simulator = ImplicitSimulator(path, 
+                                          **sim_kwargs)
+        case _:
+            simulator = Simulator(path,
+                                  **sim_kwargs)
     
     try:
         simulator.run()
@@ -77,7 +79,7 @@ def prepare_mmpbsa(path: Path) -> dict[str, Any]:
 
     last_protein_resid = oxts.unique_residue_indices[0]
     sel1 = [resid for resid in protein.unique_residue_indices if resid <= last_protein_resid]
-    sel2 = resid for resid in protein.unique_residue_indices if resid not in sel1]
+    sel2 = [resid for resid in protein.unique_residue_indices if resid not in sel1]
 
     def format_for_cpptraj(resids: list[int]) -> str:
         string = ':'
@@ -101,4 +103,4 @@ def prepare_mmpbsa(path: Path) -> dict[str, Any]:
     sel1 = format_for_cpptraj(sel1)
     sel2 = format_for_cpptraj(sel2)
 
-    return {'top': top, 'dcd': dcd, 'selections': [sel1, sel2], 'out' path}
+    return {'top': top, 'dcd': dcd, 'selections': [sel1, sel2], 'out': path}

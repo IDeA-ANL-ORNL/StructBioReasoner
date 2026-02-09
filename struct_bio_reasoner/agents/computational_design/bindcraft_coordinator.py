@@ -1,5 +1,4 @@
 from academy.agent import Agent, action
-from academy.handle import Handle
 import asyncio
 import logging
 import MDAnalysis as mda
@@ -8,9 +7,9 @@ from parsl import Config
 from pathlib import Path
 from typing import Any, Optional
 from .distributed import fold_sequence_task, inverse_fold_task, energy_task
-from .folding import Folding
-from .inverse_folding import InverseFolding
 from .energy import EnergyCalculation, SimpleEnergy
+from .folding import Folding, ChaiBinder
+from .inverse_folding import InverseFolding, ProteinMPNN
 from .quality_control import SequenceQualityControl
 
 Result = dict[int, dict[str, Any]]
@@ -19,25 +18,66 @@ class BindCraftCoordinator(Agent):
     """Coordinator agent that orchestrates the peptide design workflow."""
     def __init__(
         self,
-        fold_alg: Folding,
-        inv_fold_alg: InverseFolding,
-        energy_alg: EnergyCalculation,
-        qc_alg: SequenceQualityControl,
-        nseqs: int,
+        root_dir: str,
+        fold_backend: str,
+        inv_fold_backend: str,
+        device: str,
+        inverse_folding: dict,
+        quality_control: dict,
+        nseq: int,
         retries: int,
-        energy_threshold: int=-10,
     ) -> None:
         super().__init__()
-        self.fold_alg = fold_alg
-        self.inv_fold_alg = inv_fold_alg
-        self.energy_alg = energy_alg
-        self.qc_alg = qc_alg
-        self.nseqs = nseqs
+
+        self.root_dir = Path(root_dir)
+        self.device = device
+        self.inverse_folding = inverse_folding
+        self.quality_control = quality_control
+        self.nseq = nseq
         self.retries = retries
-        self.energy_threshold = energy_threshold
+        
+        match fold_backend:
+            case 'chai':
+                self.fold_alg = ChaiBinder
+            case _: # for now the default
+                self.fold_alg = ChaiBinder
+
+        match inv_fold_backend:
+            case 'proteinmpnn':
+                self.inv_fold_alg = ProteinMPNN 
+            case _:
+                self.inv_fold_alg = ProteinMPNN
+
 
         self.logger = logging.getLogger(__name__)
 
+    async def agent_on_startup(self):
+        self.fold_handle = self.agent_launch_alongside(
+            self.fold_alg,
+            args=(
+                self.root_dir / 'bindcraft' / 'fastas', 
+                self.root_dir / 'bindcraft' / 'folds',
+                100,
+                self.device,
+            ),
+        )
+
+        self.inv_fold_handle = self.agent_launch_alongside(
+            self.inv_fold_alg,
+            args=None,
+            kwargs=self.inverse_folding,
+        )
+
+        self.qc_handle = self.agent_launch_alongside(
+            SequenceQualityControl,
+            args=None,
+            kwargs=self.quality_control,
+        )
+
+        self.energy_handle = self.agent_launch_alongside(
+            SimpleEnergy,
+        )
+        
     @action
     async def prepare_run(self,
                           target_sequence: str,
@@ -47,7 +87,7 @@ class BindCraftCoordinator(Agent):
         label = 'trial_0'
         seq_label = 'seq_0'
 
-        structure = self.fold_alg(sequences, label, seq_label)
+        structure = self.fold_handle(sequences, label, seq_label)
         self.logger.info(f'Initial structure folded: {structure}')
 
         return structure
@@ -68,7 +108,7 @@ class BindCraftCoordinator(Agent):
             seqs = [target_sequence, seq]
             futures.append(
                 asyncio.wrap_future(
-                    fold_sequence_task(self.fold_alg, seqs, label, seq_label, constraints)
+                    fold_sequence_task(self.fold_handle, seqs, label, seq_label, constraints)
                 )
             )
 
@@ -95,7 +135,7 @@ class BindCraftCoordinator(Agent):
 
         sequences = await asyncio.wrap_future(
             inverse_fold_task(
-                inv_fold_alg=self.inv_fold_alg,
+                inv_fold_alg=self.inv_fold_handle,
                 input_path=fasta_in,
                 pdb_path=pdb_path,
                 output_path=fasta_out,
@@ -113,7 +153,7 @@ class BindCraftCoordinator(Agent):
 
         filtered = []
         for seq in sequences:
-            if self.qc_alg(seq):
+            if self.qc_handle(seq):
                 filtered.append(seq)
 
         self.logger.info(f'Quality control: {len(filtered)} / {len(sequences)} sequences passed QC')
@@ -128,7 +168,7 @@ class BindCraftCoordinator(Agent):
         vals = list(folded_structures.values())
         structures = [Path(val['structure']) for val in vals]
         self.logger.info(f'Computing {len(structures)} calculations')
-        futures = [asyncio.wrap_future(energy_task(self.energy_alg, structure)) 
+        futures = [asyncio.wrap_future(energy_task(self.energy_handle, structure)) 
                    for structure in structures]
 
         energies = await asyncio.gather(*futures)
@@ -325,7 +365,7 @@ class ForwardFoldingAgent(Agent):
     def __init__(self,
                  fold_alg: str,
                  fold_config: dict):
-        self.fold_alg = fold_alg(**fold_config)
+        self.fold_handle = fold_alg(**fold_config)
     
     @action
     async def run(
@@ -347,7 +387,7 @@ class ForwardFoldingAgent(Agent):
 
             futures.append(
                 asyncio.wrap_future(
-                    fold_sequence_task(self.fold_alg, sequence, name, constraint)
+                    fold_sequence_task(self.fold_handle, sequence, name, constraint)
                 )
             )
 
@@ -359,7 +399,7 @@ class ForwardFoldingAgent(Agent):
 class InverseFoldingAgent:
     def __init__(self,
                  inv_fold_alg: InverseFolding):
-        self.inv_fold_alg = inv_fold_alg
+        self.inv_fold_handle = inv_fold_alg
 
     @action
     async def generate_sequences(
@@ -373,7 +413,7 @@ class InverseFoldingAgent:
         logger.info(f"Inverse folding: Generating sequences")
         
         sequences = await asyncio.wrap_future(inverse_fold_task(
-            inv_fold_alg=self.inv_fold_alg,
+            inv_fold_alg=self.inv_fold_handle,
             input_path=fasta_in,
             pdb_path=pdb_path,
             output_path=fasta_out,
@@ -414,9 +454,9 @@ class QualityControlAgent(Agent):
 class AnalysisAgent(Agent):
     """Agent responsible for structure analysis and filtering."""
 
-    def __init__(self, energy_alg: EnergyCalculation) -> None:
+    def __init__(self, energy_handle: EnergyCalculation) -> None:
         super().__init__()
-        self.energy_alg = energy_alg
+        self.energy_handle = energy_alg
 
     @action
     async def evaluate_structures(
@@ -433,7 +473,7 @@ class AnalysisAgent(Agent):
         for idx, struct_data in folded_structures.items():
             logger.info(f'Analyzing: {idx}, {struct_data["structure"]}')
             try:
-                energy = self.energy_alg(Path(struct_data["structure"]))
+                energy = self.energy_handle(Path(struct_data["structure"]))
                 struct_data["energy"] = energy
                 
                 if energy < energy_threshold:

@@ -27,7 +27,7 @@ class JnanaAgent(Agent):
                  llm_provider: str,
                  target_protein: str):
         self.research_goal = research_goal
-        self.enabled_agents = enabled_agent
+        self.enabled_agents = enabled_agents
         self.llm_provider = llm_provider
         self.target_protein = target_protein
 
@@ -103,7 +103,7 @@ class JnanaAgent(Agent):
                                     num_history = 3)
 
         agent_prompt_manager.conclusion_prompt()
-        logger.debug(agent_prompt_manager.prompt_c=)
+        logger.debug(agent_prompt_manager.prompt_c)
         
         self.recommender_manager.recommend_prompt(
             previous_run,
@@ -116,7 +116,7 @@ class JnanaAgent(Agent):
                         agent_type='recommender',
                         role='Recommend next runs to make')
 
-        logger.debug(self.rec_prompt_man.prompt_r)
+        logger.debug(self.recommender_manager.prompt_r)
         response_data = self.llm.generate_with_json_output(
                         prompt = self.recommender_manager.prompt_r,
                         json_schema = self.recommendation_schema,

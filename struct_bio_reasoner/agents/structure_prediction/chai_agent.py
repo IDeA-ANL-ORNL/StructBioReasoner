@@ -1,6 +1,7 @@
-from academy import Agent, action
+from academy.agent import Agent, action
 import asyncio
 import logging
+from pathlib import Path
 from typing import Optional
 from struct_bio_reasoner.agents.computational_design.folding import Chai
 from struct_bio_reasoner.agents.computational_design.distributed import fold_sequence_task
@@ -17,7 +18,7 @@ class ChaiAgent(Agent):
         diffusion_steps: int=100,
         device: str='cuda'
     ):
-        self.root = root_path
+        self.root = Path(root_path) # in case it's not already a Path
         self.chai = Chai(
             fasta_dir=self.root / '0' / 'fastas',
             out=self.root / '0' / 'folds',

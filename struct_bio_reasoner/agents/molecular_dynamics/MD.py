@@ -10,8 +10,24 @@ class MDAgent(Agent):
     """Coordinator that orchestrates Parsl tasks."""
     def __init__(
         self, 
+        solvent_model: str,
+        equil_steps: int,
+        prod_steps: int,
+        amberhome: str,
+        platform: str,
     ) -> None:
         super().__init__()
+        self.build_kwargs = {
+            'protein': True,
+            'solvent': solvent_model,
+            'amberhome': amberhome,
+        }
+        self.sim_kwargs = {
+            'equil_steps': equil_steps,
+            'prod_steps': prod_steps,
+            'platform': platform,
+            'solvent': solvent_model
+        }
 
     @action
     async def build_system(

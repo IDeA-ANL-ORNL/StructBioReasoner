@@ -11,11 +11,11 @@ from typing import Any, Optional, Literal
 
 @dataclass
 class AgentRegistry:
-    reasoner: "struct_bio_reasoner.agents.language_model.jnana_agent:JnanaAgent"
-    bindcraft: "struct_bio_reasoner.agents.computational_design.bindcraft_coordinator:BindCraftCoordinator"
-    md: "struct_bio_reasoner.agents.molecular_dynamics.MD:MDAgent"
-    mmpbsa: "struct_bio_reasoner.agents.molecular_dynamics.mmpbsa_agent:FEAgent"
-    folding: "struct_bio_reasoner.agents.structure_prediction.chai_agent:ChaiAgent"
+    reasoner: str='struct_bio_reasoner.agents.language_model.jnana_agent:JnanaAgent'
+    bindcraft: str='struct_bio_reasoner.agents.computational_design.bindcraft_coordinator:BindCraftCoordinator'
+    md: str='struct_bio_reasoner.agents.molecular_dynamics.MD:MDAgent'
+    mmpbsa: str='struct_bio_reasoner.agents.molecular_dynamics.mmpbsa_agent:FEAgent'
+    folding: str='struct_bio_reasoner.agents.structure_prediction.chai_agent:ChaiAgent'
 
     def get(self, label: str) -> type:
         path = getattr(self, label)
@@ -36,11 +36,13 @@ class Director(Agent):
         self.previous_run = 'starting'
         self.history = []
 
+        self.logger = logging.getLogger(__name__)
+
         super().__init__()
 
     async def agent_on_startup(self) -> None:
         self.dfk = parsl.load(self.parsl_config)
-        self.load_agents()
+        await self.load_agents()
 
     async def agent_on_shutdown(self):
         if self.dfk:
@@ -52,17 +54,21 @@ class Director(Agent):
     async def load_agents(self):
         """"""
         self.agents = {}
-        for agent, args in self.config.items():
-            self.agents[agent] = await self.agent_launch_alongside(
+        available_agents = self.agent_registry.available()
+        for agent, kwargs in self.runtime_config.items():
+            print(kwargs)
+            if agent in available_agents:
+                self.agents[agent] = await self.agent_launch_alongside(
                     self.agent_registry.get(agent),
-                    args=(
-                        *args
-                    )
-            )
+                    args=None,
+                    kwargs=kwargs,
+                )
 
+        self.logger.info(f'Loaded {len(self.agents)} agents!')
+
+    @action
     async def agentic_test(self) -> tuple[dict, Any]:
         """Test main loop"""
-        # TODO: Hook in research goal; override reasoner output; do tool call
         previous_run = 'starting'
         results = {'results': 'none'}
         history = ''
@@ -73,6 +79,7 @@ class Director(Agent):
             'history': history,
         }
         response = await self.query_reasoner(reasoner_input) # gets prompt for tool call
+        self.logger.info(response)
 
         # unpack reasoning trace
         previous_run = response['previous_run']
@@ -83,6 +90,7 @@ class Director(Agent):
 
         return response, results
 
+    @action
     async def agentic_run(self):
         """Main while loop logic"""
         results = {'results': 'none'}
