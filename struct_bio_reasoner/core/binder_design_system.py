@@ -27,7 +27,7 @@ from ..agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
 from ..agents.molecular_dynamics.free_energy_agent import FEAgent
 from ..agents.structure_prediction.chai_agent import ChaiAgent
 from ..agents.analysis.trajectory_analysis import TrajectoryAnalysisAgent
-from ..agents.language_model.jnana_agent import JnanaWrapper
+#from ..agents.language_model.jnana_agent import JnanaWrapper
 from ..prompts.prompts import get_prompt_manager
 try:
     from ..agents.hiper_rag.rag_agent import RAGWrapper 
@@ -253,7 +253,7 @@ class BinderDesignSystem():
         
         self._extract_target_sequence(self.research_goal)
         await self._initialize_design_agents()
-        await self._initialize_jnana_agent()
+        #await self._initialize_jnana_agent()
         await self._initialize_knowledge_foundation()
 
         self.design_system_ready = True

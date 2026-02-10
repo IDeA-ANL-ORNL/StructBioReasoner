@@ -635,7 +635,7 @@ class AgenticBinderPipelineWithCheckpointing:
                     'history': self.system.history}
 
 
-        jnana_results = self.system.jnana_agent.generate_jnana_hypothesis(task_params)
+        jnana_results = await self.system.jnana_agent.generate_jnana_hypothesis(task_params)
         recommendation = jnana_results['recommendation']['recommendation']
         next_task = recommendation['next_task']
         recommended_plan = jnana_results['plan']
@@ -1030,7 +1030,7 @@ class AgenticBinderPipelineWithCheckpointing:
 
         # Iterations 1+: LLM-guided agentic loop
         while self.iteration_count < self.max_iterations:
-            try:
+            if True:
                 iteration_result = await self.run_iteration(
                     hypothesis=hypothesis,
                     previous_task=previous_task,
@@ -1084,7 +1084,7 @@ class AgenticBinderPipelineWithCheckpointing:
                     )
                     self._save_checkpoint(checkpoint)
 
-            except Exception as e:
+            if False:#except Exception as e:
                 next_task = 'computational_design'
                 logger.error('Exception during while loop: {e}')
                 continue
