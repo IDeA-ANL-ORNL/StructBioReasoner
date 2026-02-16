@@ -34,6 +34,8 @@ from typing import Dict, Any, List, Optional, Union, Tuple
 from pathlib import Path
 import numpy as np
 
+from struct_bio_reasoner.models import PipelineMetrics
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,15 +82,8 @@ class MetricEvaluator:
         self.enable_wandb = enable_wandb
         self.wandb_config = wandb_config or {}
         
-        # Initialize metrics dictionary
-        self.metrics = {
-            'decision_list': [],
-            'best_binder_energy': [],
-            'best_binder_free_energy': [],
-            'best_binder_sequence': [],
-            'binder_rmsds': [],
-            'binder_rmsfs': []
-        }
+        # Initialize metrics
+        self.metrics = PipelineMetrics()
         
         # W&B run object
         self.wandb_run = None
@@ -138,25 +133,25 @@ class MetricEvaluator:
         """
         # Map decision to index
         decision_idx = self.AGENT_MAPPING.get(decision, -1)
-        self.metrics['decision_list'].append(decision_idx)
+        self.metrics.decision_list.append(decision_idx)
 
         logger.info(f"Updating metrics for decision: {decision} (index: {decision_idx})")
 
         # Extract binder energy and sequence
         if binder_results is not None:
             energy, sequence = self._extract_binder_info(binder_results)
-            self.metrics['best_binder_energy'].append(energy)
-            self.metrics['best_binder_sequence'].append(sequence)
+            self.metrics.best_binder_energy.append(energy)
+            self.metrics.best_binder_sequence.append(sequence)
         else:
-            self.metrics['best_binder_energy'].append(None)
-            self.metrics['best_binder_sequence'].append(None)
+            self.metrics.best_binder_energy.append(None)
+            self.metrics.best_binder_sequence.append(None)
 
         # Extract free energy
         if fe_results is not None:
             free_energy = self._extract_free_energy(fe_results)
-            self.metrics['best_binder_free_energy'].append(free_energy)
+            self.metrics.best_binder_free_energy.append(free_energy)
         else:
-            self.metrics['best_binder_free_energy'].append(None)
+            self.metrics.best_binder_free_energy.append(None)
 
         # Extract RMSD and RMSF from MD results or analysis results
         rmsd, rmsf = None, None
@@ -172,8 +167,8 @@ class MetricEvaluator:
             if analysis_rmsf is not None:
                 rmsf = analysis_rmsf
 
-        self.metrics['binder_rmsds'].append(rmsd)
-        self.metrics['binder_rmsfs'].append(rmsf)
+        self.metrics.binder_rmsds.append(rmsd)
+        self.metrics.binder_rmsfs.append(rmsf)
 
     def _extract_binder_info(self, binder_results: Any) -> Tuple[Optional[float], Optional[str]]:
         """
@@ -361,7 +356,7 @@ class MetricEvaluator:
         Returns:
             Dictionary with all tracked metrics
         """
-        return self.metrics.copy()
+        return self.metrics.model_dump()
 
     def log_to_wandb(self, step: Optional[int] = None, additional_metrics: Optional[Dict[str, Any]] = None):
         """
@@ -382,62 +377,62 @@ class MetricEvaluator:
             log_dict = {}
 
             # Log the most recent values
-            if self.metrics['decision_list']:
-                log_dict['decision'] = self.metrics['decision_list'][-1]
+            if self.metrics.decision_list:
+                log_dict['decision'] = self.metrics.decision_list[-1]
 
-            if self.metrics['best_binder_energy']:
-                energy = self.metrics['best_binder_energy'][-1]
+            if self.metrics.best_binder_energy:
+                energy = self.metrics.best_binder_energy[-1]
                 if energy is not None:
                     log_dict['best_binder_energy'] = energy
 
-            if self.metrics['best_binder_free_energy']:
-                fe = self.metrics['best_binder_free_energy'][-1]
+            if self.metrics.best_binder_free_energy:
+                fe = self.metrics.best_binder_free_energy[-1]
                 if fe is not None:
                     log_dict['best_binder_free_energy'] = fe
 
-            if self.metrics['binder_rmsds']:
-                rmsd = self.metrics['binder_rmsds'][-1]
+            if self.metrics.binder_rmsds:
+                rmsd = self.metrics.binder_rmsds[-1]
                 if rmsd is not None:
                     log_dict['binder_rmsd'] = rmsd
 
-            if self.metrics['binder_rmsfs']:
-                rmsf = self.metrics['binder_rmsfs'][-1]
+            if self.metrics.binder_rmsfs:
+                rmsf = self.metrics.binder_rmsfs[-1]
                 if rmsf is not None:
                     log_dict['binder_rmsf'] = rmsf
 
             # Log sequence length instead of full sequence
-            if self.metrics['best_binder_sequence']:
-                seq = self.metrics['best_binder_sequence'][-1]
+            if self.metrics.best_binder_sequence:
+                seq = self.metrics.best_binder_sequence[-1]
                 if seq is not None:
                     log_dict['binder_sequence_length'] = len(seq)
 
             # Add cumulative statistics
-            log_dict['total_iterations'] = len(self.metrics['decision_list'])
+            log_dict['total_iterations'] = len(self.metrics.decision_list)
 
             # Count decisions by type
             for agent_name, agent_idx in self.AGENT_MAPPING.items():
-                count = self.metrics['decision_list'].count(agent_idx)
+                count = self.metrics.decision_list.count(agent_idx)
                 log_dict[f'decision_count_{agent_name}'] = count
 
             # Add best energy so far
-            energies = [e for e in self.metrics['best_binder_energy'] if e is not None]
+            energies = [e for e in self.metrics.best_binder_energy if e is not None]
             if energies:
                 log_dict['best_energy_overall'] = min(energies)
                 log_dict['mean_energy'] = np.mean(energies)
 
             # Add best free energy so far
-            free_energies = [fe for fe in self.metrics['best_binder_free_energy'] if fe is not None]
+            free_energies = [fe for fe in self.metrics.best_binder_free_energy if fe is not None]
             if free_energies:
                 log_dict['best_free_energy_overall'] = min(free_energies)
                 log_dict['mean_free_energy'] = np.mean(free_energies)
 
             # Add RMSD/RMSF statistics
-            rmsds = [r for r in self.metrics['binder_rmsds'] if r is not None]
+            rmsds = [r for r in self.metrics.binder_rmsds if r is not None]
             if rmsds:
                 log_dict['mean_rmsd'] = np.mean(rmsds)
                 log_dict['std_rmsd'] = np.std(rmsds)
 
-            rmsfs = [r for r in self.metrics['binder_rmsfs'] if r is not None]
+            rmsfs = [r for r in self.metrics.binder_rmsfs if r is not None]
             if rmsfs:
                 log_dict['mean_rmsf'] = np.mean(rmsfs)
                 log_dict['std_rmsf'] = np.std(rmsfs)
@@ -468,32 +463,32 @@ class MetricEvaluator:
             summary_dict = {}
 
             # Total iterations
-            summary_dict['total_iterations'] = len(self.metrics['decision_list'])
+            summary_dict['total_iterations'] = len(self.metrics.decision_list)
 
             # Decision distribution
             for agent_name, agent_idx in self.AGENT_MAPPING.items():
-                count = self.metrics['decision_list'].count(agent_idx)
+                count = self.metrics.decision_list.count(agent_idx)
                 summary_dict[f'total_{agent_name}_decisions'] = count
 
             # Best metrics
-            energies = [e for e in self.metrics['best_binder_energy'] if e is not None]
+            energies = [e for e in self.metrics.best_binder_energy if e is not None]
             if energies:
                 summary_dict['final_best_energy'] = min(energies)
                 summary_dict['final_mean_energy'] = np.mean(energies)
                 summary_dict['final_std_energy'] = np.std(energies)
 
-            free_energies = [fe for fe in self.metrics['best_binder_free_energy'] if fe is not None]
+            free_energies = [fe for fe in self.metrics.best_binder_free_energy if fe is not None]
             if free_energies:
                 summary_dict['final_best_free_energy'] = min(free_energies)
                 summary_dict['final_mean_free_energy'] = np.mean(free_energies)
                 summary_dict['final_std_free_energy'] = np.std(free_energies)
 
-            rmsds = [r for r in self.metrics['binder_rmsds'] if r is not None]
+            rmsds = [r for r in self.metrics.binder_rmsds if r is not None]
             if rmsds:
                 summary_dict['final_mean_rmsd'] = np.mean(rmsds)
                 summary_dict['final_std_rmsd'] = np.std(rmsds)
 
-            rmsfs = [r for r in self.metrics['binder_rmsfs'] if r is not None]
+            rmsfs = [r for r in self.metrics.binder_rmsfs if r is not None]
             if rmsfs:
                 summary_dict['final_mean_rmsf'] = np.mean(rmsfs)
                 summary_dict['final_std_rmsf'] = np.std(rmsfs)
@@ -530,14 +525,7 @@ class MetricEvaluator:
         """
         Reset all metrics to empty lists.
         """
-        self.metrics = {
-            'decision_list': [],
-            'best_binder_energy': [],
-            'best_binder_free_energy': [],
-            'best_binder_sequence': [],
-            'binder_rmsds': [],
-            'binder_rmsfs': []
-        }
+        self.metrics = PipelineMetrics()
         logger.info("Metrics reset")
 
     def save_metrics(self, filepath: Union[str, Path]):
@@ -552,21 +540,8 @@ class MetricEvaluator:
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)
 
-        # Convert to JSON-serializable format
-        metrics_to_save = {}
-        for key, values in self.metrics.items():
-            if key == 'best_binder_sequence':
-                # Save sequences as-is
-                metrics_to_save[key] = values
-            else:
-                # Convert None and numpy types to JSON-compatible
-                metrics_to_save[key] = [
-                    float(v) if isinstance(v, (np.integer, np.floating)) else v
-                    for v in values
-                ]
-
         with open(filepath, 'w') as f:
-            json.dump(metrics_to_save, f, indent=2)
+            json.dump(self.metrics.model_dump(), f, indent=2)
 
         logger.info(f"Metrics saved to {filepath}")
 
@@ -584,7 +559,7 @@ class MetricEvaluator:
         with open(filepath, 'r') as f:
             loaded_metrics = json.load(f)
 
-        self.metrics = loaded_metrics
+        self.metrics = PipelineMetrics.model_validate(loaded_metrics)
 
         logger.info(f"Metrics loaded from {filepath}")
 

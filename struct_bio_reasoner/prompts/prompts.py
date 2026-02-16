@@ -6,69 +6,10 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 from dataclasses import dataclass
+
+from struct_bio_reasoner.models import config_master
+
 logger = logging.getLogger(__name__)
-
-config_master = {
-    'rag': {'prompt': 'string'},
-
-    'rag_output': {'interactions': 'list[string]',
-                   'interacting_protein_uniprot_ids': 'list[string]',
-                   'cancer_pathways': 'list[string]',
-                   'interaction_types': 'list[string]',
-                   'therapeutic_rationales': 'list[string]'},
-
-    'computational_design': {
-                    "binder_sequence": 'string',
-                    'num_rounds': 'int',
-                     'batch_size': 'int', 
-                     'max_retries': 'int', 
-                     'sampling_temp': 'float', 
-                     'qc_kwargs': {'max_repeat': 'int', 
-                                   'max_appearance_ratio': 'float', 
-                                   'max_charge': 'int', 
-                                   'max_charge_ratio': 'float', 
-                                   'max_hydrophobic_ratio': 'float', 
-                                   'min_diversity': 'int'},
-
-                    'constraint': {'residues_bind': 'list[string]'}
-                    },
-
-    'structure_prediction': {'sequences': 'list[list[str]]', 'names': 'list[str]'},
-
-    'molecular_dynamics': {'simulation_paths': 'list[str]', 'root_output_path': 'str', 'steps': 'int'},
-    
-    'analysis': {
-        'data_type': 'str',
-        'analysis_type': 'str',
-        'distance_cutoff': 'float'
-    },
-    '_analysis': {
-        'static': {
-            'basic': {
-                'paths': 'list[str]',
-                'kwargs': {'distance_cutoff': 'float'}
-            },
-            'advanced': {
-                'paths': 'list[str]',
-                'kwargs': {'placeholder': 'None'}
-            },
-        },
-        'dynamic': {
-            'basic': {
-                'paths': 'list[str]',
-                'kwargs': {'placeholder': 'None'}
-            },
-            'advanced': {
-                'paths': 'list[str]',
-                'kwargs': {'distance_cutoff': 'float', 'n_top': 'int'}
-            },
-        }
-    },
-
-    'free_energy': {
-        'simulation_paths': 'list[str]',
-    }
-}
 
 # Create empty PromptManager class as a template and define other classes to inherit from it
 class PromptManager:

@@ -8,7 +8,7 @@ from parsl.concurrent import ParslPoolExecutor
 from pathlib import Path
 from time import sleep
 from typing import Any
-from struct_bio_reasoner.agents.language_model.jnana_agent import JnanaAgent
+from struct_bio_reasoner.agents.language_model.pydantic_ai_agent import ReasonerAgent
 from struct_bio_reasoner.agents.manager.director_agent import Director
 from struct_bio_reasoner.utils import HeterogeneousSettings
 
@@ -111,7 +111,7 @@ class Executive:
             history='',
         )
 
-        return recommendation[0]
+        return recommendation
 
     async def end_experiment(self):
         for director in self.directors.values():

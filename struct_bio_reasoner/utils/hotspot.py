@@ -13,7 +13,8 @@ import logging
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass
+
+from pydantic import BaseModel, ConfigDict
 
 try:
     import MDAnalysis as mda
@@ -29,8 +30,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class HotspotResidue:
+class HotspotResidue(BaseModel):
     """Data class for hotspot residue information."""
     resid: int
     resname: str
@@ -39,23 +39,16 @@ class HotspotResidue:
     avg_distance: float
     rmsf_value: float
     score: float  # Combined hotspot score
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
-        return {
-            'resid': self.resid,
-            'resname': self.resname,
-            'chain': self.chain,
-            'contact_frequency': self.contact_frequency,
-            'avg_distance': self.avg_distance,
-            'rmsf_value': self.rmsf_value,
-            'score': self.score
-        }
+        return self.model_dump()
 
 
-@dataclass
-class HotspotAnalysisResult:
+class HotspotAnalysisResult(BaseModel):
     """Results from hotspot analysis."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     hotspot_residues: List[HotspotResidue]
     contact_matrix: np.ndarray
     rmsf_per_residue: np.ndarray

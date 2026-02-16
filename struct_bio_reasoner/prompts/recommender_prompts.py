@@ -1,20 +1,18 @@
 import json
-import asyncio
 import logging
-import yaml
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
-from datetime import datetime
-from dataclasses import dataclass
+
+from pydantic import BaseModel, Field
+
 logger = logging.getLogger(__name__)
 
-@dataclass
-class RecommenderPromptManager:
+
+class RecommenderPromptManager(BaseModel):
     research_goal: str
-    enabled_agents: list[str] #= ['computational_design', 'molecular_dynamics', 'rag', 'analysis', 'free_energy', 'stop']
-    def __post_init__(self):
-        self.prompt_r = None
-    def recommend_prompt(self, 
+    enabled_agents: list[str]
+
+    prompt_r: str | None = Field(default=None, exclude=True)
+
+    def recommend_prompt(self,
                     previous_run,
                     previous_conclusion,
                     history
@@ -29,7 +27,7 @@ class RecommenderPromptManager:
                 f"Please base this recommendation on previous run + conclusion and history.\n\n"
                 f"Previous run type: {previous_run}\n\n"
                 f"Previous run conclusion: {previous_conclusion}\n\n"
-                f"History: {history_str}\n\n" 
+                f"History: {history_str}\n\n"
                 "Your recommendation must include:\n\n"
                 f"1. **Next run suggestion:**\n"
                 f"2. **Next run parameters:**\n"

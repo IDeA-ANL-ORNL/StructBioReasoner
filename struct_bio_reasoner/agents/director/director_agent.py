@@ -1,7 +1,6 @@
 from academy.agent import Agent, action
 from academy.manager import Manager
 import asyncio
-from dataclasses import dataclass, fields
 import importlib
 import logging
 import parsl
@@ -9,13 +8,15 @@ from parsl import Config
 from pathlib import Path
 from typing import Any, Optional, Literal
 
-@dataclass
-class AgentRegistry:
-    reasoner: str='struct_bio_reasoner.agents.language_model.jnana_agent:JnanaAgent'
-    bindcraft: str='struct_bio_reasoner.agents.computational_design.bindcraft_coordinator:BindCraftCoordinator'
-    md: str='struct_bio_reasoner.agents.molecular_dynamics.MD:MDAgent'
-    mmpbsa: str='struct_bio_reasoner.agents.molecular_dynamics.mmpbsa_agent:FEAgent'
-    folding: str='struct_bio_reasoner.agents.structure_prediction.chai_agent:ChaiAgent'
+from pydantic import BaseModel
+
+
+class AgentRegistry(BaseModel):
+    reasoner: str = 'struct_bio_reasoner.agents.language_model.pydantic_ai_agent:ReasonerAgent'
+    bindcraft: str = 'struct_bio_reasoner.agents.computational_design.bindcraft_coordinator:BindCraftCoordinator'
+    md: str = 'struct_bio_reasoner.agents.molecular_dynamics.MD:MDAgent'
+    mmpbsa: str = 'struct_bio_reasoner.agents.molecular_dynamics.mmpbsa_agent:FEAgent'
+    folding: str = 'struct_bio_reasoner.agents.structure_prediction.chai_agent:ChaiAgent'
 
     def get(self, label: str) -> type:
         path = getattr(self, label)
@@ -23,7 +24,7 @@ class AgentRegistry:
         return getattr(importlib.import_module(module_path), class_name)
 
     def available(self) -> list[str]:
-        return [f.name for f in fields(self)]
+        return list(type(self).model_fields.keys())
 
 class Director(Agent):
     def __init__(self,
@@ -67,7 +68,7 @@ class Director(Agent):
         self.logger.info(f'Loaded {len(self.agents)} agents!')
 
     @action
-    async def agentic_test(self) -> tuple[dict, Any]:
+    async def agentic_test(self) -> tuple[str, Any]:
         """Test main loop"""
         previous_run = 'starting'
         results = {'results': 'none'}
@@ -78,17 +79,12 @@ class Director(Agent):
             'previous_run': previous_run,
             'history': history,
         }
-        response = await self.query_reasoner(reasoner_input) # gets prompt for tool call
-        self.logger.info(response)
+        tool, plan = await self.query_reasoner(reasoner_input)
+        self.logger.info(f"Next task: {tool}")
 
-        # unpack reasoning trace
-        previous_run = response['previous_run']
-        tool = response['tool']
-        plan = response['plan']
+        results = await self.tool_call(tool, plan)
 
-        results = await self.tool_call(tool, plan) # do tool call
-
-        return response, results
+        return tool, results
 
     @action
     async def agentic_run(self):
@@ -106,7 +102,7 @@ class Director(Agent):
             results = await self.tool_call(tool, plan) # do tool call
 
     async def query_reasoner(self,
-                             data: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+                             data: dict[str, Any]) -> tuple[str, BaseModel]:
         recommendation = await self.agents['reasoner'].generate_recommendation(
             results=data['results'],
             previous_run=data['previous_run'],
@@ -121,14 +117,15 @@ class Director(Agent):
         self.previous_run = data['previous_run']
         self.history.append(data['history'])
 
-        return recommendation['recommendation']['next_task'], config
+        return recommendation.recommendation.next_task, config
 
     async def tool_call(self,
                         tool: str,
-                        plan: dict[str, Any]):
+                        plan: BaseModel | dict[str, Any]):
         """Access correct subagent based on the `tool` key. Pass in
         the inputs in the form of **kwargs."""
-        return await self.agents[tool].run(**plan)
+        kwargs = plan.model_dump() if isinstance(plan, BaseModel) else plan
+        return await self.agents[tool].run(**kwargs)
 
     @action
     async def executive_reasoning(self,
