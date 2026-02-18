@@ -1,16 +1,18 @@
-from academy.exchange import RedisExchangeFactory
+from academy.exchange.cloud import HttpExchangeFactory
 from academy.handle import Handle
 from academy.manager import Manager
 import asyncio
+from globus_compute_sdk import Executor
 import parsl
 from parsl import Config, python_app
-from parsl.concurrent import ParslPoolExecutor
 from pathlib import Path
 from time import sleep
 from typing import Any
 from struct_bio_reasoner.agents.language_model.pydantic_ai_agent import ReasonerAgent
 from struct_bio_reasoner.agents.manager.director_agent import Director
 from struct_bio_reasoner.utils import HeterogeneousSettings
+
+EXCHANGE_ADDRESS = 'https://exchange.academy-agents.org'
 
 class Executive:
     def __init__(self,
@@ -20,6 +22,8 @@ class Executive:
         self.allocation_config = self.config['parsl']
         self.director_config = full_configuration['director']
         self.parsl_factory = HeterogeneousSettings(**self.director_config['parsl'])
+
+        self.globus_endpoint = self.config['globus_endpoint']
 
         self.directors = {}
         self.available_ids = []
@@ -35,15 +39,14 @@ class Executive:
         await self.summarize_experiment()
 
     async def initialize(self):
-        # what does this config need to look like?
-        allocation_config = Config(
-            
-        )
-
-        # do these settings make sense for the redisexchange?
         self.manager = await Manager.from_exchange_factory(
-            factory = RedisExchangeFactory('localhost', 6379),
-            executors = ParslPoolExecutor(allocation_config),
+            factory = HttpExchangeFactory(
+                EXCHANGE_ADDRESS,
+                auth_method='globus',
+            ),
+            executors = Executor(
+                endpoint_id=self.globus_endpoint,
+            ),
         )
 
         await self.manager.__aenter__()

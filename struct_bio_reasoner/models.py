@@ -8,7 +8,14 @@ this module — it must NOT import from them.
 
 from __future__ import annotations
 
-from enum import StrEnum
+import sys
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:
+    from enum import Enum
+
+    class StrEnum(str, Enum):
+        """Backport of StrEnum for Python <3.11."""
 from typing import Any
 
 from pydantic import BaseModel, Field, create_model
@@ -85,25 +92,13 @@ class ComputationalDesignConfig(BaseModel):
         default=2,
         description="Number of BindCraft optimization rounds to run",
     )
-    batch_size: int = Field(
-        default=50,
-        description="Number of sequences to generate per round",
-    )
-    max_retries: int = Field(
-        default=3,
-        description="Maximum retry attempts for failed design rounds",
-    )
-    sampling_temp: float = Field(
-        default=0.2,
-        description="Sampling temperature for sequence generation (0.0-1.0)",
-    )
-    qc_kwargs: QCKwargs = Field(
-        default_factory=QCKwargs,
-        description="Quality-control thresholds for filtering generated sequences",
-    )
-    constraint: Constraint = Field(
-        default_factory=Constraint,
+    constraints: dict = Field(
+        default_factory=dict,
         description="Binding constraints specifying target residues to interact with",
+    )
+    remodel_indices: list[int] = Field(
+        default_factory=list,
+        description="Residue indices to remodel. Empty list means auto-detect from structure",
     )
 
 

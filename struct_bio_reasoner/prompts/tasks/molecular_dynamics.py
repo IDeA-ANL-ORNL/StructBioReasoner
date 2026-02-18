@@ -11,12 +11,21 @@ class MolecularDynamicsTask(TaskDef):
         recommendation = ctx.input_json.get('recommendation', {})
         sh = serialize_history(ctx.history)
 
+        resource_block = ""
+        if ctx.resource_summary:
+            resource_block = (
+                f"\nCOMPUTE RESOURCES AVAILABLE:\n{ctx.resource_summary}\n"
+                f"Scale the number of parallel simulations to fit within "
+                f"the available accelerators. With limited walltime, prefer "
+                f"shorter simulation steps per job.\n"
+            )
+
         if ctx.prompt_type == 'hotspot_discovery':
             return f"""You are an expert in setting up molecular dynamics simulations.
 Here is the previous_run_type: {previous_run_type},
 and the recommendation: {recommendation.get('rationale', 'N/A')}
 Also evaluate the following history and decide how long to run the simulations for here.
-
+{resource_block}
 Instructions:
 - Suggest sufficiently long simulations to explore hotspots to target interactions between {ctx.target_prot} and interacting partners. 100-1000 ns
 
@@ -35,7 +44,7 @@ This is the history to evaluate:
 Here is the previous_run_type: {previous_run_type},
 and the recommendation: {recommendation.get('rationale', 'N/A')}
 Evaluate the following history and decide how long to run the simulations for here.
-
+{resource_block}
 Instructions:
 - At the beginning of the workflow we should run shorter simulations (10_000 to 50_000) to test if binder design is setup correctly.
 - Once enough binders (several thousand) have been identified, suggest longer simulations (1_000_000 to 2_500_000) to provide enough statistics

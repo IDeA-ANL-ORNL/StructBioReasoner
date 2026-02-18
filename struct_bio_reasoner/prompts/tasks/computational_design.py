@@ -14,11 +14,19 @@ class ComputationalDesignTask(TaskDef):
 
         sh = serialize_history(ctx.history)
 
+        resource_block = ""
+        if ctx.resource_summary:
+            resource_block = (
+                f"\nCOMPUTE RESOURCES AVAILABLE:\n{ctx.resource_summary}\n"
+                f"Keep num_rounds and batch sizes within what the available "
+                f"accelerators can handle concurrently.\n"
+            )
+
         return f"""You are an expert in computational peptide design optimization. Evaluate the current optimization progress and generate the next configuration.
 RECOMMENDATION FROM PREVIOUS RUN ({previous_run_type}):
 Task: {recommendation.get('next_task', 'N/A')}
 Rationale: {recommendation.get('rationale', 'N/A')}
-
+{resource_block}
 HISTORY OF DECISIONS (least recent first):
 {sh['decisions']}
 

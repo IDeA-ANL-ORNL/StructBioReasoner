@@ -6,7 +6,7 @@ import parsl
 from parsl import Config
 from pathlib import Path
 from typing import Any, Optional
-from .distributed import fold_sequence_task, inverse_fold_task, energy_task
+from .distributed import fold_sequence_task, inverse_fold_task, qc_task, energy_task
 from .energy import EnergyCalculation, SimpleEnergy
 from .folding import Folding, ChaiBinder
 from .inverse_folding import InverseFolding, ProteinMPNN
@@ -26,15 +26,19 @@ class BindCraftCoordinator(Agent):
         quality_control: dict,
         nseq: int,
         retries: int,
+        target_sequence: str = '',
     ) -> None:
         super().__init__()
 
         self.root_dir = Path(root_dir)
+        self.target_sequence = target_sequence
         self.device = device
         self.inverse_folding = inverse_folding
         self.quality_control = quality_control
         self.nseq = nseq
         self.retries = retries
+        self.energy_threshold = -10.0
+        self.do_seq_qc = quality_control.get('enabled', True)
         
         match fold_backend:
             case 'chai':
@@ -52,31 +56,20 @@ class BindCraftCoordinator(Agent):
         self.logger = logging.getLogger(__name__)
 
     async def agent_on_startup(self):
-        self.fold_handle = self.agent_launch_alongside(
-            self.fold_alg,
-            args=(
-                self.root_dir / 'bindcraft' / 'fastas', 
-                self.root_dir / 'bindcraft' / 'folds',
-                100,
-                self.device,
-            ),
+        # These are plain objects (not Academy agents) because they get passed
+        # to Parsl tasks which require picklable arguments.
+        self.fold_handle = self.fold_alg(
+            fasta_dir=self.root_dir / 'bindcraft' / 'fastas',
+            out=self.root_dir / 'bindcraft' / 'folds',
+            diffusion_steps=100,
+            device=self.device,
         )
 
-        self.inv_fold_handle = self.agent_launch_alongside(
-            self.inv_fold_alg,
-            args=None,
-            kwargs=self.inverse_folding,
-        )
+        self.inv_fold_handle = self.inv_fold_alg(**self.inverse_folding)
 
-        self.qc_handle = self.agent_launch_alongside(
-            SequenceQualityControl,
-            args=None,
-            kwargs=self.quality_control,
-        )
+        self.qc_handle = SequenceQualityControl(**self.quality_control)
 
-        self.energy_handle = self.agent_launch_alongside(
-            SimpleEnergy,
-        )
+        self.energy_handle = SimpleEnergy()
         
     @action
     async def prepare_run(self,
@@ -151,10 +144,13 @@ class BindCraftCoordinator(Agent):
                                sequences: list[str]) -> list[str]:
         self.logger.info(f'Quality control: Filtering {len(sequences)} sequences')
 
-        filtered = []
-        for seq in sequences:
-            if self.qc_handle(seq):
-                filtered.append(seq)
+        futures = [
+            asyncio.wrap_future(qc_task(self.qc_handle, seq))
+            for seq in sequences
+        ]
+        results = await asyncio.gather(*futures)
+
+        filtered = [seq for seq, passed in zip(sequences, results) if passed]
 
         self.logger.info(f'Quality control: {len(filtered)} / {len(sequences)} sequences passed QC')
 
@@ -205,7 +201,7 @@ class BindCraftCoordinator(Agent):
             filtered_sequences = []
             i = 0
 
-            while len(filtered_sequences) < self.nseqs and i < self.retries:
+            while len(filtered_sequences) < self.nseq and i < self.retries:
                 # Step 1: Inverse folding
                 generated_sequences = await self.generate_sequences(
                     fasta_in, pdb_path, fasta_out, remodel_indices
@@ -267,15 +263,23 @@ class BindCraftCoordinator(Agent):
     @action
     async def run(
         self,
-        target_sequence: str,
         binder_sequence: str,
-        fasta_base_path: Path,
-        pdb_base_path: Path,
-        constraints: Optional[dict]=None,
-        remodel_indices: Optional[list[int]]=None, 
         num_rounds: int = 3,
+        constraints: Optional[dict]=None,
+        remodel_indices: Optional[list[int]]=None,
     ) -> dict[str, Any]:
         """Run the complete peptide design workflow."""
+        target_sequence = self.target_sequence
+        fasta_base_path = self.root_dir / 'bindcraft' / 'fastas'
+        pdb_base_path = self.root_dir / 'bindcraft' / 'pdbs'
+        fasta_base_path.mkdir(parents=True, exist_ok=True)
+        pdb_base_path.mkdir(parents=True, exist_ok=True)
+
+        if remodel_indices is not None and len(remodel_indices) == 0:
+            remodel_indices = None
+        if not constraints:
+            constraints = None
+
         self.logger.info(f"Coordinator: Starting full workflow for {num_rounds} rounds")
 
         results = {
@@ -329,6 +333,7 @@ class BindCraftCoordinator(Agent):
                 remodel_indices,
                 trial,
                 constraints,
+                do_seq_qc=self.do_seq_qc,
             )
 
             results["all_cycles"].append(cycle_result)

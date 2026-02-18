@@ -35,6 +35,38 @@ class BaseComputeSettings(ABC, BaseSettings):
         Create new Parsl configuration.
         """
 
+    def _count_accelerators(self) -> int:
+        """Return the number of accelerators from the settings field."""
+        acc = getattr(self, 'available_accelerators', [])
+        if isinstance(acc, int):
+            return acc
+        return len(acc)
+
+    def resource_summary(self) -> str:
+        """Return a human-readable summary of available compute resources.
+
+        Used to inform LLM prompts so the reasoner can scale task
+        parameters (number of designs, simulation steps, etc.) to
+        match the actual allocation.
+        """
+        nodes = getattr(self, 'nodes', None) or getattr(self, 'num_nodes', 1)
+        accel_per_node = self._count_accelerators()
+        total_accel = nodes * accel_per_node
+        walltime = getattr(self, 'walltime', None)
+        platform = type(self).__name__.replace('Settings', '').lower()
+
+        lines = [
+            f"Platform: {platform}",
+            f"Nodes: {nodes}",
+            f"Accelerators per node: {accel_per_node}",
+            f"Total accelerators (GPUs/tiles): {total_accel}",
+            f"Max concurrent GPU tasks: ~{total_accel}",
+        ]
+        if walltime:
+            lines.append(f"Walltime: {walltime}")
+
+        return "\n".join(lines)
+
 class LocalSettings(BaseComputeSettings):
     available_accelerators: Union[int, Sequence[str]] = [f'{i}' for i in range(12)]
     worker_init: str = ''
@@ -256,4 +288,26 @@ class AuroraSettings(BaseComputeSettings):
             retries=self.retries,
             app_cache=True,
         )
+
+
+def resource_summary_from_config(parsl_dict: dict) -> str:
+    """Derive a resource summary string from the raw ``parsl`` section of a
+    YAML config dict.  This is useful when a ``BaseComputeSettings`` instance
+    is not available (e.g. the Director only has the parsed YAML).
+    """
+    nodes = parsl_dict.get('nodes', parsl_dict.get('num_nodes', 1))
+    acc = parsl_dict.get('available_accelerators', [])
+    accel_per_node = acc if isinstance(acc, int) else len(acc)
+    total = nodes * accel_per_node
+    walltime = parsl_dict.get('walltime')
+
+    lines = [
+        f"Nodes: {nodes}",
+        f"Accelerators per node: {accel_per_node}",
+        f"Total accelerators (GPUs/tiles): {total}",
+        f"Max concurrent GPU tasks: ~{total}",
+    ]
+    if walltime:
+        lines.append(f"Walltime: {walltime}")
+    return "\n".join(lines)
 

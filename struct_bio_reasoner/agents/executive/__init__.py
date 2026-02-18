@@ -6,7 +6,8 @@ The Executive Agent makes strategic decisions about resource allocation and
 Manager lifecycle.
 """
 
-from .executive_agent import ExecutiveAgent
+from .simple_executive import Executive
+from .test_executive import TestExecutive
 
-__all__ = ['ExecutiveAgent']
+__all__ = ['Executive', 'TestExecutive']
 

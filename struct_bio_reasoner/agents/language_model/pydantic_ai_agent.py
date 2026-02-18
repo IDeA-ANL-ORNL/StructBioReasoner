@@ -61,6 +61,7 @@ class ReasonerAgent(Agent):
         llm_provider: str,
         target_protein: str,
         *,
+        resource_summary: str = "",
         base_url: str = "https://inference-api.alcf.anl.gov/resource_server/sophia/vllm/v1",
         model_name: str = "openai/gpt-oss-120b",
         api_key: str = "placeholder",
@@ -71,6 +72,11 @@ class ReasonerAgent(Agent):
         self.enabled_agents = enabled_agents
         self.llm_provider = llm_provider
         self.target_protein = target_protein
+        self.resource_summary = resource_summary
+
+        # Default to ALCF Globus auth when provider is 'alcf'
+        if auth is None and llm_provider == "alcf":
+            auth = ALCFTokenAuth()
 
         # Build the pydantic-ai model
         http_client = httpx.AsyncClient(auth=auth, timeout=timeout)
@@ -105,6 +111,7 @@ class ReasonerAgent(Agent):
             target_prot=self.target_protein,
             prompt_type=prompt_type,
             history=history,
+            resource_summary=self.resource_summary,
         )
 
         conclusion_text = get_conclusion_prompt(previous_run, ctx)
@@ -116,6 +123,7 @@ class ReasonerAgent(Agent):
             previous_run=previous_run,
             previous_conclusion=conclusion_text,
             history=ctx.history,
+            resource_summary=self.resource_summary,
         )
 
         logger.debug(recommender_prompt)
@@ -156,6 +164,7 @@ class ReasonerAgent(Agent):
             target_prot=self.target_protein,
             prompt_type=prompt_type,
             history=history,
+            resource_summary=self.resource_summary,
         )
 
         running_text = get_running_prompt(next_task, ctx)

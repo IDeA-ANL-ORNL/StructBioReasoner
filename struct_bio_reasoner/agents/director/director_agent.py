@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Any, Optional, Literal
 
 from pydantic import BaseModel
+from struct_bio_reasoner.utils.parsl_settings import (
+    BaseComputeSettings,
+    resource_summary_from_config,
+)
 
 
 class AgentRegistry(BaseModel):
@@ -17,6 +21,21 @@ class AgentRegistry(BaseModel):
     md: str = 'struct_bio_reasoner.agents.molecular_dynamics.MD:MDAgent'
     mmpbsa: str = 'struct_bio_reasoner.agents.molecular_dynamics.mmpbsa_agent:FEAgent'
     folding: str = 'struct_bio_reasoner.agents.structure_prediction.chai_agent:ChaiAgent'
+
+    # Maps TaskName values from the LLM to agent registry labels
+    TASK_TO_AGENT: dict[str, str] = {
+        'computational_design': 'bindcraft',
+        'molecular_dynamics': 'md',
+        'structure_prediction': 'folding',
+        'free_energy': 'mmpbsa',
+        'rag': 'reasoner',
+        'analysis': 'reasoner',
+    }
+
+    def resolve_task(self, task_name) -> str:
+        """Translate a TaskName value to an agent registry label."""
+        key = task_name.value if hasattr(task_name, 'value') else task_name
+        return self.TASK_TO_AGENT.get(key, key)
 
     def get(self, label: str) -> type:
         path = getattr(self, label)
@@ -29,13 +48,23 @@ class AgentRegistry(BaseModel):
 class Director(Agent):
     def __init__(self,
                  runtime_config: dict[str, Any],
-                 parsl_config: Config,):
+                 parsl_config: Config | BaseComputeSettings,):
         self.runtime_config = runtime_config
         self.parsl_config = parsl_config
         self.agent_registry = AgentRegistry()
 
         self.previous_run = 'starting'
         self.history = []
+
+        # Derive a resource summary for LLM prompts
+        if isinstance(parsl_config, BaseComputeSettings):
+            self.resource_summary = parsl_config.resource_summary()
+        elif 'parsl' in runtime_config:
+            self.resource_summary = resource_summary_from_config(
+                runtime_config['parsl']
+            )
+        else:
+            self.resource_summary = ""
 
         self.logger = logging.getLogger(__name__)
 
@@ -55,10 +84,16 @@ class Director(Agent):
     async def load_agents(self):
         """"""
         self.agents = {}
+        self.target_protein = self.runtime_config.get('reasoner', {}).get('target_protein', '')
         available_agents = self.agent_registry.available()
         for agent, kwargs in self.runtime_config.items():
-            print(kwargs)
             if agent in available_agents:
+                # Inject target_protein into agents that need it
+                if agent == 'bindcraft':
+                    kwargs = {**kwargs, 'target_sequence': self.target_protein}
+                # Inject resource summary into the reasoner
+                if agent == 'reasoner':
+                    kwargs = {**kwargs, 'resource_summary': self.resource_summary}
                 self.agents[agent] = await self.agent_launch_alongside(
                     self.agent_registry.get(agent),
                     args=None,
@@ -124,8 +159,21 @@ class Director(Agent):
                         plan: BaseModel | dict[str, Any]):
         """Access correct subagent based on the `tool` key. Pass in
         the inputs in the form of **kwargs."""
-        kwargs = plan.model_dump() if isinstance(plan, BaseModel) else plan
-        return await self.agents[tool].run(**kwargs)
+        agent_key = self.agent_registry.resolve_task(tool)
+
+        # Extract the nested config — plan may arrive as a Pydantic model
+        # or as a plain dict after Academy serialization
+        if isinstance(plan, BaseModel):
+            config = plan.new_config if hasattr(plan, 'new_config') else plan
+            kwargs = config.model_dump() if isinstance(config, BaseModel) else config
+        elif isinstance(plan, dict):
+            config = plan.get('new_config', plan)
+            kwargs = config.model_dump() if isinstance(config, BaseModel) else config
+        else:
+            kwargs = plan
+
+        self.logger.debug(f"tool_call: agent_key={agent_key}, kwargs={kwargs}")
+        return await self.agents[agent_key].run(**kwargs)
 
     @action
     async def executive_reasoning(self,

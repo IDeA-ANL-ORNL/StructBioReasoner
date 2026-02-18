@@ -47,6 +47,7 @@ class PromptContext:
     prompt_type: str
     history: WorkflowHistory
     input_json: dict[str, Any] | list[dict]
+    resource_summary: str = ""
 
 
 def serialize_history(h: WorkflowHistory) -> dict[str, str]:
@@ -138,6 +139,7 @@ def build_prompt_context(
     target_prot: str,
     prompt_type: str,
     history: dict | WorkflowHistory,
+    resource_summary: str = "",
 ) -> PromptContext:
     """Build a ``PromptContext`` for the given task type."""
     hist = WorkflowHistory.from_raw(history)
@@ -147,6 +149,7 @@ def build_prompt_context(
         prompt_type=prompt_type,
         history=hist,
         input_json=input_json,
+        resource_summary=resource_summary,
     )
 
 

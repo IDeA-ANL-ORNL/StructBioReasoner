@@ -173,7 +173,7 @@ class ChaiBinder(Chai):
                  exp_label: str,
                  out_label: str,
                  constraints: Optional[dict]=None) -> Path:
-        (self.fasta_dir / exp_label).mkdir(exist_ok=True)
+        (self.fasta_dir / exp_label).mkdir(parents=True, exist_ok=True)
         fasta = self.prepare(seqs, exp_label, out_label)
         out = self.devshm / exp_label
         out.mkdir(exist_ok=True, parents=True)
@@ -192,7 +192,7 @@ class ChaiBinder(Chai):
                 constraint_path=constraints,
             )
 
-            (self.out / exp_label).mkdir(exist_ok=True)
+            (self.out / exp_label).mkdir(parents=True, exist_ok=True)
             pdb = self.postprocess(tmp, f'{exp_label}/{out_label}')
 
         return pdb

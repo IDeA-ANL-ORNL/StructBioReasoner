@@ -18,6 +18,7 @@ from .parsl_settings import (
     LocalSettings,
     LocalCPUSettings,
     PolarisSettings,
+    resource_summary_from_config,
 )
 
 # Hotspot analysis utilities
