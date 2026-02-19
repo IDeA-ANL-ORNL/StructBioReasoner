@@ -271,7 +271,7 @@ class BindCraftCoordinator(Agent):
         """Run the complete peptide design workflow."""
         target_sequence = self.target_sequence
         fasta_base_path = self.root_dir / 'bindcraft' / 'fastas'
-        pdb_base_path = self.root_dir / 'bindcraft' / 'pdbs'
+        pdb_base_path = self.root_dir / 'bindcraft' / 'folds'
         fasta_base_path.mkdir(parents=True, exist_ok=True)
         pdb_base_path.mkdir(parents=True, exist_ok=True)
 
@@ -292,8 +292,8 @@ class BindCraftCoordinator(Agent):
             "error_message": "",
         }
 
-        (fasta_base_path / 'trial_0').mkdir(exist_ok=True)
-        (pdb_base_path / 'trial_0').mkdir(exist_ok=True)
+        (fasta_base_path / 'trial_0').mkdir(exist_ok=True, parents=True)
+        (pdb_base_path / 'trial_0').mkdir(exist_ok=True, parents=True)
         structure = await self.refold_sequences(target_sequence, [binder_sequence], 0, constraints)
         self.logger.info(structure)
 

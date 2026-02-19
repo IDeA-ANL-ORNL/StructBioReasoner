@@ -1,3 +1,4 @@
+from academy.agent import Agent
 from academy.exchange.cloud import HttpExchangeFactory
 from academy.handle import Handle
 from academy.manager import Manager
@@ -9,7 +10,7 @@ from pathlib import Path
 from time import sleep
 from typing import Any
 from struct_bio_reasoner.agents.language_model.pydantic_ai_agent import ReasonerAgent
-from struct_bio_reasoner.agents.manager.director_agent import Director
+from struct_bio_reasoner.agents.director.director_agent import Director
 from struct_bio_reasoner.utils import HeterogeneousSettings
 
 EXCHANGE_ADDRESS = 'https://exchange.academy-agents.org'
