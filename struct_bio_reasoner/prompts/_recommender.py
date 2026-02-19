@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import json
-
 from struct_bio_reasoner.models import WorkflowHistory
+from struct_bio_reasoner.prompts._registry import serialize_history
 
 
 def build_recommender_prompt(
@@ -16,10 +15,15 @@ def build_recommender_prompt(
     resource_summary: str = "",
 ) -> str:
     """Build the recommender prompt (replaces RecommenderPromptManager)."""
-    if isinstance(history, WorkflowHistory):
-        history_str = json.dumps(history.model_dump(), indent=2, default=str)
-    else:
-        history_str = json.dumps(history, indent=2, default=str)
+    hist = WorkflowHistory.from_raw(history)
+    sh = serialize_history(hist)
+
+    history_block = (
+        f"HISTORY OF DECISIONS:\n{sh['decisions']}\n\n"
+        f"HISTORY OF RESULTS:\n{sh['results']}\n\n"
+        f"HISTORY OF CONFIGURATIONS:\n{sh['configurations']}\n\n"
+        f"KEY ITEMS:\n{sh['key_items']}"
+    )
 
     resource_block = ""
     if resource_summary:
@@ -39,5 +43,5 @@ def build_recommender_prompt(
         f"Please base this recommendation on previous run + conclusion and history.\n\n"
         f"Previous run type: {previous_run}\n\n"
         f"Previous run conclusion: {previous_conclusion}\n\n"
-        f"History: {history_str}\n\n"
+        f"{history_block}\n\n"
     )

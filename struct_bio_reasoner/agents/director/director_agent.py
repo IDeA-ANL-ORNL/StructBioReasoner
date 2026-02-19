@@ -64,6 +64,8 @@ class Director(Agent):
         self._director_id = runtime_config.get(
             'director_id', str(uuid.uuid4())
         )
+        self._max_history = runtime_config.get('max_history_length', 10)
+        self._pending_instruction: str | None = None
 
         # Derive a resource summary for LLM prompts
         if isinstance(parsl_config, BaseComputeSettings):
@@ -145,17 +147,58 @@ class Director(Agent):
     @action
     async def agentic_run(self):
         """Main while loop logic"""
+        await self._try_recover()
         results = {'results': 'none'}
         while True:
+            history = await self._get_history_for_prompt()
             reasoner_input = {
                 'results': results,
                 'previous_run': self.previous_run,
-                'history': self.history,
+                'history': history,
             }
+            if self._pending_instruction:
+                reasoner_input['executive_instruction'] = self._pending_instruction
+                self._pending_instruction = None
 
-            tool, plan = await self.query_reasoner(reasoner_input) # gets prompt for tool call
+            # Inject stop hint if DataAgent suggests convergence
+            if await self._check_should_stop():
+                reasoner_input['stop_hint'] = (
+                    "DataAgent analysis suggests no improvement in recent iterations. "
+                    "Consider recommending 'stop' if you agree."
+                )
 
-            results = await self.tool_call(tool, plan) # do tool call
+            tool, plan = await self.query_reasoner(reasoner_input)
+
+            # Check for stop signal
+            tool_str = tool.value if hasattr(tool, 'value') else str(tool)
+            if tool_str == 'stop':
+                self.logger.info("Reasoner recommended STOP — exiting agentic loop")
+                break
+
+            results = await self.tool_call(tool, plan)
+
+    async def _get_history_for_prompt(self) -> dict:
+        """Fetch windowed history from DataAgent (DB-primary)."""
+        try:
+            db_history = await self.agents['data'].get_director_history(
+                self._director_id, limit=self._max_history
+            )
+            return db_history
+        except Exception:
+            self.logger.debug("DB history fetch failed, using in-memory fallback", exc_info=True)
+            return self.history
+
+    async def _check_should_stop(self) -> bool:
+        """Ask DataAgent whether convergence criteria are met."""
+        try:
+            result = await self.agents['data'].should_stop(
+                self._director_id,
+                lookback=self._max_history,
+            )
+            return result.get("should_stop", False)
+        except Exception:
+            self.logger.debug("should_stop query failed", exc_info=True)
+            return False
 
     async def _emit(self, event: dict[str, Any]) -> None:
         """Fire-and-forget an event to the DataAgent.
@@ -179,6 +222,7 @@ class Director(Agent):
             results=data['results'],
             previous_run=data['previous_run'],
             history=data['history'],
+            executive_instruction=data.get('executive_instruction'),
         )
 
         rec_ms = int((time.monotonic() - t0) * 1000)
@@ -259,6 +303,8 @@ class Director(Agent):
 
         self.previous_run = data['previous_run']
         self.history.append(data['history'])
+        if len(self.history) > self._max_history:
+            self.history = self.history[-self._max_history:]
 
         # Stash plan_id for tool_call to reference
         self._last_plan_id = plan_id
@@ -352,9 +398,36 @@ class Director(Agent):
         return status
 
     @action
-    async def receive_instruction(self,
-                                  instruction: str):
-        """Receive instructions from Executive agent. Utilize this in the next
-        reasoning trace to guide next task(s)."""
-        # Somehow incorporate a signal from upstream reasoning into the next task
-        pass
+    async def receive_instruction(self, instruction: str):
+        """Receive instructions from Executive agent.
+
+        The instruction is stored and injected into the next reasoning
+        cycle via ``agentic_run`` → ``query_reasoner``.
+        """
+        self._pending_instruction = instruction
+        self.logger.info("Received executive instruction: %s", instruction[:120])
+
+    async def _try_recover(self) -> bool:
+        """Attempt to restore state from DataAgent after a crash/restart."""
+        try:
+            state = await self.agents['data'].get_recovery_state(self._director_id)
+        except Exception:
+            self.logger.debug("Recovery query failed", exc_info=True)
+            return False
+
+        if state.get('last_decision') is None:
+            return False
+
+        self.previous_run = state['last_decision'].get('next_task', 'starting')
+
+        # Seed history from DB
+        try:
+            db_history = await self.agents['data'].get_director_history(
+                self._director_id, limit=self._max_history
+            )
+            self.history = [db_history]  # wrap as single WorkflowHistory-shaped entry
+        except Exception:
+            pass
+
+        self.logger.info("Recovered state: previous_run=%s", self.previous_run)
+        return True

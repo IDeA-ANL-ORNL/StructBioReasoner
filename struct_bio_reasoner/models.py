@@ -234,8 +234,19 @@ class WorkflowHistory(BaseModel):
         """Coerce from plain dict, empty list, or existing instance."""
         if isinstance(data, cls):
             return data
-        if isinstance(data, list) and len(data) == 0:
-            return cls()
+        if isinstance(data, list):
+            if len(data) == 0:
+                return cls()
+            # Merge a list of WorkflowHistory-shaped dicts into one
+            merged = cls()
+            for entry in data:
+                if isinstance(entry, dict):
+                    for field_name in cls.model_fields:
+                        getattr(merged, field_name).extend(entry.get(field_name, []))
+                elif isinstance(entry, cls):
+                    for field_name in cls.model_fields:
+                        getattr(merged, field_name).extend(getattr(entry, field_name))
+            return merged
         if isinstance(data, dict):
             return cls(**{k: data.get(k, []) for k in cls.model_fields})
         return cls()

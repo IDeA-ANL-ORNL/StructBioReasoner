@@ -203,11 +203,11 @@ class DataAgent(Agent):
 
         return {
             "decisions": [
-                json.dumps({
+                {
                     "next_task": r.next_task,
                     "rationale": r.rationale,
                     "change_parameters": r.change_parameters,
-                })
+                }
                 for r in reversed(decisions)
             ],
             "results": [r.result_data for r in reversed(results)],
@@ -361,6 +361,62 @@ class DataAgent(Agent):
                 else None
             ),
         }
+
+    @action
+    async def should_stop(
+        self,
+        director_id: str,
+        lookback: int = 5,
+        stagnation_threshold: int = 3,
+    ) -> dict[str, Any]:
+        """Check if a Director should stop based on DB-derived heuristics.
+
+        Returns {"should_stop": bool, "reason": str}.
+        Criteria:
+        - Fewer than `lookback` decisions exist -> don't stop (too early)
+        - Last `stagnation_threshold` decisions all have same next_task -> stagnating
+        - All recent executions failed -> stop
+        """
+        async with self._session_factory() as session:
+            decisions = (
+                await session.execute(
+                    select(Decision.next_task, Decision.change_parameters)
+                    .where(Decision.director_id == director_id)
+                    .order_by(Decision.created_at.desc())
+                    .limit(lookback)
+                )
+            ).all()
+
+            if len(decisions) < lookback:
+                return {"should_stop": False, "reason": "insufficient_history"}
+
+            # Check task stagnation
+            recent_tasks = [d.next_task for d in decisions[:stagnation_threshold]]
+            if len(set(recent_tasks)) == 1 and not any(
+                d.change_parameters for d in decisions[:stagnation_threshold]
+            ):
+                return {
+                    "should_stop": True,
+                    "reason": f"task_stagnation: last {stagnation_threshold} all '{recent_tasks[0]}' with no param changes",
+                }
+
+            # Check all-failures
+            executions = (
+                await session.execute(
+                    select(TaskExecution.status)
+                    .where(TaskExecution.director_id == director_id)
+                    .order_by(TaskExecution.started_at.desc())
+                    .limit(lookback)
+                )
+            ).all()
+
+            if executions and all(e.status == "failed" for e in executions):
+                return {
+                    "should_stop": True,
+                    "reason": f"all_failed: last {len(executions)} executions failed",
+                }
+
+        return {"should_stop": False, "reason": "ok"}
 
     # ------------------------------------------------------------------
     # Read Path: Scientific Queries

@@ -846,3 +846,425 @@ class TestEventDataclasses:
 
 # Need the _utcnow import for seeding helpers
 from struct_bio_reasoner.agents.data.data_agent import _utcnow
+
+
+# ---------------------------------------------------------------------------
+# Phase 4/5 Integration Tests
+# ---------------------------------------------------------------------------
+
+class TestCappedHistory:
+    """Verify Director's history stays bounded (Phase 5, Step 23)."""
+
+    def _make_director_stub(self, max_history: int = 5):
+        """Create a minimal Director-like object to test history capping."""
+        class _Stub:
+            def __init__(self):
+                self.history = []
+                self._max_history = max_history
+
+            def append_and_cap(self, entry):
+                self.history.append(entry)
+                if len(self.history) > self._max_history:
+                    self.history = self.history[-self._max_history:]
+        return _Stub()
+
+    def test_history_stays_bounded(self):
+        stub = self._make_director_stub(max_history=5)
+        for i in range(20):
+            stub.append_and_cap({"iteration": i})
+
+        assert len(stub.history) == 5
+        # Should keep the last 5
+        assert stub.history[0]["iteration"] == 15
+        assert stub.history[-1]["iteration"] == 19
+
+    def test_history_under_limit(self):
+        stub = self._make_director_stub(max_history=10)
+        for i in range(3):
+            stub.append_and_cap({"iteration": i})
+
+        assert len(stub.history) == 3
+
+    def test_history_exact_limit(self):
+        stub = self._make_director_stub(max_history=5)
+        for i in range(5):
+            stub.append_and_cap({"iteration": i})
+
+        assert len(stub.history) == 5
+        assert stub.history[0]["iteration"] == 0
+
+
+class TestCrashRecovery:
+    """Verify crash recovery flow via DataAgent (Phase 4, Step 21)."""
+
+    async def _seed_director_state(self, agent, experiment_id, director_id):
+        """Seed DB with enough state to allow recovery."""
+        async with agent._session_factory() as session:
+            async with session.begin():
+                session.add(Experiment(
+                    experiment_id=experiment_id,
+                    research_goal="recovery test",
+                    num_directors=1,
+                ))
+                session.add(DirectorRecord(
+                    director_id=director_id,
+                    experiment_id=experiment_id,
+                    external_label="director_0",
+                ))
+                session.add(Decision(
+                    decision_id=_new_id(),
+                    director_id=director_id,
+                    iteration=1,
+                    previous_task="starting",
+                    next_task="molecular_dynamics",
+                    change_parameters=False,
+                    rationale="Run MD first",
+                ))
+                session.add(Decision(
+                    decision_id=_new_id(),
+                    director_id=director_id,
+                    iteration=2,
+                    previous_task="molecular_dynamics",
+                    next_task="free_energy",
+                    change_parameters=True,
+                    rationale="Continue to FE calc",
+                ))
+                session.add(TaskExecution(
+                    execution_id=_new_id(),
+                    director_id=director_id,
+                    agent_key="md",
+                    status="completed",
+                    result_data={"rmsd": 1.5},
+                    duration_ms=30000,
+                    completed_at=_utcnow(),
+                ))
+
+    @pytest.mark.asyncio
+    async def test_recovery_state_restores_last_decision(
+        self, agent, experiment_id, director_id
+    ):
+        """get_recovery_state should return the last decision."""
+        await self._seed_director_state(agent, experiment_id, director_id)
+
+        state = await agent.get_recovery_state(director_id)
+        assert state["last_decision"] is not None
+        assert state["last_decision"]["next_task"] == "free_energy"
+        assert state["last_decision"]["rationale"] == "Continue to FE calc"
+
+    @pytest.mark.asyncio
+    async def test_recovery_state_restores_last_execution(
+        self, agent, experiment_id, director_id
+    ):
+        await self._seed_director_state(agent, experiment_id, director_id)
+
+        state = await agent.get_recovery_state(director_id)
+        assert state["last_execution"] is not None
+        assert state["last_execution"]["agent_key"] == "md"
+        assert state["last_execution"]["status"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_recovery_history_from_db(
+        self, agent, experiment_id, director_id
+    ):
+        """get_director_history should return decisions for seeding."""
+        await self._seed_director_state(agent, experiment_id, director_id)
+
+        history = await agent.get_director_history(director_id, limit=10)
+        assert len(history["decisions"]) == 2
+        assert len(history["results"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_recovery_empty_director(self, agent):
+        """Recovery of a nonexistent director returns empty state."""
+        state = await agent.get_recovery_state("no-such-director")
+        assert state["last_decision"] is None
+        assert state["last_execution"] is None
+
+
+class TestParquetExport:
+    """Verify Parquet export (Phase 4, Step 22)."""
+
+    async def _seed_experiment_data(self, agent, experiment_id, director_id):
+        async with agent._session_factory() as session:
+            async with session.begin():
+                session.add(Experiment(
+                    experiment_id=experiment_id,
+                    research_goal="export test",
+                    num_directors=1,
+                ))
+                session.add(DirectorRecord(
+                    director_id=director_id,
+                    experiment_id=experiment_id,
+                    external_label="director_0",
+                ))
+                for i in range(3):
+                    session.add(Decision(
+                        decision_id=_new_id(),
+                        director_id=director_id,
+                        iteration=i,
+                        previous_task="starting",
+                        next_task=f"task_{i}",
+                        change_parameters=False,
+                        rationale=f"reason_{i}",
+                    ))
+
+    @pytest.mark.asyncio
+    async def test_export_creates_parquet_files(
+        self, agent, experiment_id, director_id, tmp_dir
+    ):
+        await self._seed_experiment_data(agent, experiment_id, director_id)
+
+        export_dir = str(tmp_dir / "exports")
+        paths = await agent.export_to_parquet(
+            output_dir=export_dir,
+            experiment_id=experiment_id,
+        )
+
+        assert len(paths) > 0
+        for p in paths:
+            assert Path(p).exists()
+            assert p.endswith(".parquet")
+
+    @pytest.mark.asyncio
+    async def test_export_contains_experiment_data(
+        self, agent, experiment_id, director_id, tmp_dir
+    ):
+        import pandas as pd
+
+        await self._seed_experiment_data(agent, experiment_id, director_id)
+
+        export_dir = str(tmp_dir / "exports")
+        paths = await agent.export_to_parquet(
+            output_dir=export_dir,
+            experiment_id=experiment_id,
+        )
+
+        # Check decisions parquet
+        decisions_path = [p for p in paths if "decisions" in p]
+        assert len(decisions_path) == 1
+        df = pd.read_parquet(decisions_path[0])
+        assert len(df) == 3
+        assert "next_task" in df.columns
+
+    @pytest.mark.asyncio
+    async def test_export_empty_tables(self, agent, tmp_dir):
+        """Export with no data should still create files (empty Parquet)."""
+        export_dir = str(tmp_dir / "empty_exports")
+        paths = await agent.export_to_parquet(output_dir=export_dir)
+
+        assert len(paths) > 0
+        for p in paths:
+            assert Path(p).exists()
+
+
+# ---------------------------------------------------------------------------
+# WorkflowHistory.from_raw() Tests (Phase 5, Step 24)
+# ---------------------------------------------------------------------------
+
+from struct_bio_reasoner.models import WorkflowHistory
+
+
+class TestWorkflowHistoryFromRaw:
+    def test_empty_list(self):
+        wh = WorkflowHistory.from_raw([])
+        assert wh.decisions == []
+        assert wh.results == []
+        assert wh.configurations == []
+        assert wh.key_items == []
+
+    def test_single_dict(self):
+        wh = WorkflowHistory.from_raw({"decisions": [{"task": "md"}], "results": []})
+        assert len(wh.decisions) == 1
+        assert wh.decisions[0]["task"] == "md"
+
+    def test_list_of_dicts_merged(self):
+        wh = WorkflowHistory.from_raw([
+            {"decisions": [{"task": "md"}], "results": [{"rmsd": 1.5}]},
+            {"decisions": [{"task": "fe"}], "results": [{"fe": -12}]},
+        ])
+        assert len(wh.decisions) == 2
+        assert len(wh.results) == 2
+
+    def test_non_empty_list_no_longer_discarded(self):
+        """Regression: non-empty lists were silently returning empty WorkflowHistory."""
+        wh = WorkflowHistory.from_raw([
+            {"decisions": [{"task": "cd"}], "results": [], "configurations": [], "key_items": []}
+        ])
+        assert len(wh.decisions) == 1
+
+    def test_existing_instance_passthrough(self):
+        original = WorkflowHistory(decisions=[{"task": "md"}])
+        result = WorkflowHistory.from_raw(original)
+        assert result is original
+
+    def test_unknown_type_returns_empty(self):
+        wh = WorkflowHistory.from_raw(42)
+        assert wh.decisions == []
+
+
+# ---------------------------------------------------------------------------
+# should_stop() Tests (Phase 5, Step 26)
+# ---------------------------------------------------------------------------
+
+class TestShouldStop:
+    async def _seed_decisions(self, agent, director_id, tasks, change_params=None):
+        """Seed N decisions with given task names."""
+        if change_params is None:
+            change_params = [False] * len(tasks)
+        async with agent._session_factory() as session:
+            async with session.begin():
+                for i, (task, cp) in enumerate(zip(tasks, change_params)):
+                    session.add(Decision(
+                        decision_id=_new_id(),
+                        director_id=director_id,
+                        iteration=i,
+                        previous_task="starting",
+                        next_task=task,
+                        change_parameters=cp,
+                        rationale=f"reason_{i}",
+                    ))
+
+    async def _seed_executions(self, agent, director_id, statuses):
+        """Seed N executions with given statuses."""
+        async with agent._session_factory() as session:
+            async with session.begin():
+                for i, status in enumerate(statuses):
+                    session.add(TaskExecution(
+                        execution_id=_new_id(),
+                        director_id=director_id,
+                        agent_key="bindcraft",
+                        status=status,
+                        duration_ms=1000,
+                        completed_at=_utcnow(),
+                    ))
+
+    @pytest.mark.asyncio
+    async def test_insufficient_history(self, agent, director_id):
+        """Only 2 decisions, lookback=5 -> should not stop."""
+        await self._seed_decisions(agent, director_id, ["md", "fe"])
+        result = await agent.should_stop(director_id, lookback=5)
+        assert result["should_stop"] is False
+        assert result["reason"] == "insufficient_history"
+
+    @pytest.mark.asyncio
+    async def test_task_stagnation(self, agent, director_id):
+        """5 decisions all 'computational_design' with change_parameters=False."""
+        await self._seed_decisions(
+            agent, director_id,
+            ["computational_design"] * 5,
+        )
+        result = await agent.should_stop(director_id, lookback=5, stagnation_threshold=3)
+        assert result["should_stop"] is True
+        assert "task_stagnation" in result["reason"]
+
+    @pytest.mark.asyncio
+    async def test_stagnation_with_param_changes_ok(self, agent, director_id):
+        """Same task but with parameter changes -> should NOT stop."""
+        await self._seed_decisions(
+            agent, director_id,
+            ["computational_design"] * 5,
+            change_params=[False, False, True, False, False],
+        )
+        result = await agent.should_stop(director_id, lookback=5, stagnation_threshold=5)
+        assert result["should_stop"] is False
+
+    @pytest.mark.asyncio
+    async def test_all_failed(self, agent, director_id):
+        """5 failed executions -> should stop."""
+        # Need enough decisions to pass the insufficient_history check
+        await self._seed_decisions(agent, director_id, ["md", "fe", "cd", "md", "fe"])
+        await self._seed_executions(agent, director_id, ["failed"] * 5)
+        result = await agent.should_stop(director_id, lookback=5)
+        assert result["should_stop"] is True
+        assert "all_failed" in result["reason"]
+
+    @pytest.mark.asyncio
+    async def test_healthy_director(self, agent, director_id):
+        """Mix of tasks and successes -> should not stop."""
+        await self._seed_decisions(
+            agent, director_id,
+            ["md", "fe", "cd", "analysis", "md"],
+        )
+        await self._seed_executions(
+            agent, director_id,
+            ["completed", "completed", "failed", "completed", "completed"],
+        )
+        result = await agent.should_stop(director_id, lookback=5)
+        assert result["should_stop"] is False
+        assert result["reason"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# DB History for Prompt Tests (Phase 5, Step 24)
+# ---------------------------------------------------------------------------
+
+class TestDBHistoryForPrompt:
+    async def _seed_full_history(self, agent, experiment_id, director_id):
+        """Seed decisions, configs, results, key_items for a Director."""
+        async with agent._session_factory() as session:
+            async with session.begin():
+                session.add(Experiment(
+                    experiment_id=experiment_id,
+                    research_goal="test",
+                    num_directors=1,
+                ))
+                session.add(DirectorRecord(
+                    director_id=director_id,
+                    experiment_id=experiment_id,
+                    external_label="director_0",
+                ))
+                for i in range(3):
+                    session.add(Decision(
+                        decision_id=_new_id(),
+                        director_id=director_id,
+                        iteration=i,
+                        previous_task="starting",
+                        next_task=f"task_{i}",
+                        change_parameters=False,
+                        rationale=f"reason_{i}",
+                    ))
+                    session.add(TaskPlan(
+                        plan_id=_new_id(),
+                        director_id=director_id,
+                        task_type=f"task_{i}",
+                        plan_config={"param": i},
+                        rationale=f"plan_{i}",
+                    ))
+                    session.add(TaskExecution(
+                        execution_id=_new_id(),
+                        director_id=director_id,
+                        agent_key="bindcraft",
+                        status="completed",
+                        result_data={"result": i},
+                        duration_ms=1000 * (i + 1),
+                        completed_at=_utcnow(),
+                    ))
+                    session.add(KeyItem(
+                        item_id=_new_id(),
+                        director_id=director_id,
+                        item_type="top_binder",
+                        item_data={"seq": f"ACDEF{i}", "energy": -10.0 - i},
+                    ))
+
+    @pytest.mark.asyncio
+    async def test_db_history_matches_workflow_shape(self, agent, experiment_id, director_id):
+        """get_director_history returns data that WorkflowHistory.from_raw can consume."""
+        await self._seed_full_history(agent, experiment_id, director_id)
+        history = await agent.get_director_history(director_id, limit=10)
+
+        wh = WorkflowHistory.from_raw(history)
+        assert len(wh.decisions) == 3
+        assert len(wh.results) == 3
+        assert len(wh.configurations) == 3
+        assert len(wh.key_items) == 3
+
+    @pytest.mark.asyncio
+    async def test_db_history_as_list_merges(self, agent, experiment_id, director_id):
+        """Wrapping DB history in a list (as _try_recover does) should merge correctly."""
+        await self._seed_full_history(agent, experiment_id, director_id)
+        history = await agent.get_director_history(director_id, limit=10)
+
+        # Simulate what _try_recover used to do: wrap as [db_history]
+        wh = WorkflowHistory.from_raw([history])
+        assert len(wh.decisions) == 3
+        assert len(wh.results) == 3

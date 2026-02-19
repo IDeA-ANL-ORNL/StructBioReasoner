@@ -1,0 +1,100 @@
+# BinderDesignReasoner Configuration
+# Extends Jnana configuration for binder design applications
+executive:
+  history_length: 3
+
+  allocation:
+    nodes: 2000
+    block_size: 100
+
+  # Validation thresholds
+  validation:
+    min_confidence_score: 0.6
+    min_binding_affinity: -8.0  # kcal/mol
+    max_rmsd_threshold: 3.0
+
+director:
+  reasoner:
+    research_goal: 'Design a better metal binding protein, using the merp protein from Shigella flexneri as inspiration.'
+    enabled_agents: ['reasoner', 'bindcraft', 'md', 'mmpbsa', 'folding']
+    llm_provider: 'alcf'
+    target_protein: 'TLAVPGMTCAACPITVKK'
+
+  bindcraft:
+    root_dir: '/flare/FRAME-IDP/msinclair/agent'
+    device: 'xpu'
+    fold_backend: "chai"  # Options: chai, alphafold
+    inv_fold_backend: "proteinmpnn"
+    nseq: 5
+    retries: 5
+    
+    # InverseFolding parameters
+    inverse_folding:
+      batch_size: 5
+      sampling_temp: "0.1"
+      model_name: "v_48_020"
+      model_weights: "soluble_model_weights"
+      proteinmpnn_path: "/flare/FoundEpidem/msinclair/pkgs/ProteinMPNN"
+    
+    # Quality control
+    quality_control:
+      enabled: false
+      max_repeat: 4
+      max_appearance_ratio: 0.33
+      max_charge: 9
+      max_charge_ratio: 0.5
+      max_hydrophobic_ratio: 0.8
+      min_diversity: 8
+      bad_motifs: [] #null
+      bad_n_termini: [] #null
+    
+  rag:
+    rag_configs:
+      generator_config:
+        _target_: OpenAIAPIGeneratorConfig
+        model: "gpt-4.1"
+        temperature: 0.1
+        max_tokens: 32768
+    
+      retriever_config:
+        faiss_config:
+          name: faiss_index_v2
+          dataset_dir: /flare/FoundEpidem/biostructreasoner/merged
+          faiss_index_path: /flare/FoundEpidem/biostructreasoner/faiss_indices/sfr_mistral_nmnat
+          dataset_chunk_paths: null
+          precision: float32
+          search_algorithm: exact
+          rescore_multiplier: 2
+          num_quantization_workers: 1
+    
+        encoder_config:
+          name: auto
+          pretrained_model_name_or_path: "Salesforce/SFR-Embedding-Mistral"
+    
+        pooler_config:
+          name: last_token
+    
+      verbose: false
+    
+    save_conversation_path: /flare/FRAME-IDP/msinclair/IDEAL/Agentics/StructBioReasoner/output/rag_logs
+
+  md:
+    solvent_model: "implicit"  # Options: "implicit" or "explicit"
+    equil_steps: 10_000
+    prod_steps: 1_000_000  # 2ns at 2fs timestep
+    amberhome: "/lus/flare/projects/FoundEpidem/msinclair/envs/ambertools" 
+    platform: "OpenCL"
+
+  parsl:
+    available_accelerators: 12
+    nodes: 1
+    worker_init: 'export TMPDIR=/tmp; export ZE_DEVICE_HIERARCHY=FLAT'
+
+  mmpbsa:
+    n_cpus: 10
+    amberhome: '/lus/flare/projects/FoundEpidem/msinclair/envs/ambertools'
+
+  folding: 
+    root_path: '/flare/FRAME-IDP/msinclair/agent/structure_prediction'
+    diffusion_steps: 100
+    device: 'xpu'

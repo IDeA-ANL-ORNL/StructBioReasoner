@@ -99,6 +99,7 @@ class ReasonerAgent(Agent):
         previous_run: str,
         history: dict,
         prompt_type: str = "",
+        executive_instruction: str | None = None,
     ) -> RecommendationResult:
         """Generate a recommended next task.
 
@@ -125,6 +126,14 @@ class ReasonerAgent(Agent):
             history=ctx.history,
             resource_summary=self.resource_summary,
         )
+
+        if executive_instruction:
+            recommender_prompt += (
+                f"\n\n## Executive Instruction\n"
+                f"The executive has provided the following guidance:\n"
+                f"{executive_instruction}\n"
+                f"Take this into account when making your recommendation."
+            )
 
         logger.debug(recommender_prompt)
 

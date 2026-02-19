@@ -286,6 +286,26 @@ class TestExecutive:
         while not self._should_stop():
             await asyncio.sleep(self.config.review_interval_seconds)
 
+            # Aggregate experiment-level stats from DataAgent
+            summary: dict = {}
+            insights: dict = {}
+            if self.data_agent_handle:
+                try:
+                    summary = await self.data_agent_handle.get_experiment_summary(
+                        self.experiment_id
+                    )
+                    insights = await self.data_agent_handle.get_cross_director_insights(
+                        self.experiment_id
+                    )
+                    logger.info(
+                        "Experiment summary: %d tasks completed, %d failed, avg %.0fms",
+                        summary.get("completed", 0),
+                        summary.get("failed", 0),
+                        summary.get("avg_duration_ms") or 0,
+                    )
+                except Exception:
+                    logger.debug("DataAgent summary query failed", exc_info=True)
+
             for director_label, handle in self.director_handles.items():
                 director_id = self._director_ids.get(director_label, director_label)
                 task = self.director_tasks.get(director_label)
@@ -314,21 +334,69 @@ class TestExecutive:
                     status = await handle.check_status()
                     logger.info("%s status: %s", director_label, status)
 
+                    action = await self._evaluate_director(
+                        director_label, handle, summary, insights,
+                    )
+
                     await self._emit({
                         "event_type": EventType.EXECUTIVE_ACTION.value,
                         "director_id": director_id,
                         "experiment_id": self.experiment_id,
                         "payload": {
-                            "action_type": "continue",
+                            "action_type": action,
                             "status_snapshot": str(status),
                         },
                     })
+
+                    if action == "advise":
+                        advice = (
+                            f"High failure rate detected ({summary.get('failed', 0)}"
+                            f"/{summary.get('total_tasks', 0)} tasks failed). "
+                            f"Consider changing strategy or parameters."
+                        )
+                        try:
+                            await handle.receive_instruction(advice)
+                        except Exception:
+                            logger.debug(
+                                "Failed to send instruction to %s",
+                                director_label,
+                                exc_info=True,
+                            )
                 except Exception as exc:
                     logger.warning(
                         "%s: check_status failed: %s", director_label, exc,
                     )
 
         logger.info("Review loop ended")
+
+    async def _evaluate_director(
+        self,
+        director_label: str,
+        handle: Any,
+        summary: dict,
+        insights: dict,
+    ) -> str:
+        """Decide KILL / ADVISE / CONTINUE for a director."""
+        director_id = self._director_ids.get(director_label, director_label)
+
+        # Get per-director recovery state as a proxy for recent progress
+        if self.data_agent_handle:
+            try:
+                state = await self.data_agent_handle.get_recovery_state(director_id)
+            except Exception:
+                state = {}
+        else:
+            state = {}
+
+        action = "continue"
+
+        # If the summary shows high failure rate, advise
+        total = summary.get("total_tasks", 0)
+        failed = summary.get("failed", 0)
+        if total > 5 and failed / max(total, 1) > 0.5:
+            action = "advise"
+
+        return action
 
     # ----- stop ------------------------------------------------------------
 
@@ -367,6 +435,18 @@ class TestExecutive:
                 "status": "completed",
             },
         })
+
+        # Export data to Parquet
+        if self.data_agent_handle:
+            try:
+                export_dir = str(self._output_dir / "exports")
+                paths = await self.data_agent_handle.export_to_parquet(
+                    output_dir=export_dir,
+                    experiment_id=self.experiment_id,
+                )
+                logger.info("Exported %d tables to %s", len(paths), export_dir)
+            except Exception:
+                logger.warning("Parquet export failed", exc_info=True)
 
         # Academy Manager cleanup
         if self.academy_manager:

@@ -2,7 +2,7 @@
 
 import json
 
-from struct_bio_reasoner.prompts._registry import TaskDef, PromptContext
+from struct_bio_reasoner.prompts._registry import TaskDef, PromptContext, serialize_history
 
 
 class AnalysisTask(TaskDef):
@@ -32,15 +32,24 @@ Currently all distance_cutoffs refer to distances between alpha carbons, and hav
 
     def conclusion(self, ctx: PromptContext) -> str:
         input_json_str = json.dumps(ctx.input_json, indent=2, default=str)
-        history_str = json.dumps(ctx.history.model_dump(), indent=2, default=str)
+        sh = serialize_history(ctx.history)
 
         return f"""You are an expert in evaluating md simulation analyses. Evaluate the analyses here and decide what step should be taken next.
 
 The following analyses have generated the following statistics:
 {input_json_str}
 
-Here is the history (which may include details from hiperrag about the interacting proteins):
-{history_str}
+HISTORY OF DECISIONS:
+{sh['decisions']}
+
+HISTORY OF RESULTS:
+{sh['results']}
+
+HISTORY OF CONFIGURATIONS:
+{sh['configurations']}
+
+KEY ITEMS:
+{sh['key_items']}
 
 Please provide your decision and reasoning and indicate which step should be taken next. For the purpose of testing this workflow, default this to free_energy.
 Rationale for each decision:
