@@ -1,4 +1,4 @@
-# StructBioReasoner: Data Flow, LLM/Decision History, and SQL Database Migration Report
+# StructBioReasoner: Data Flow, LLM/Decision History, and SQLAlchemy/PostgreSQL Database Migration Report
 
 > **Scope**: This report covers only `agents/` and `prompts/tasks/` (plus the
 > `_registry.py` / `_recommender.py` infrastructure they import). Nothing from
@@ -10,9 +10,9 @@
 2. [LLM & Decision History: Current State](#2-llm--decision-history-current-state)
 3. [Agent Data Flow](#3-agent-data-flow)
 4. [Gaps and Pain Points](#4-gaps-and-pain-points)
-5. [DB 1 — Decision/LLM History Schema](#5-db-1--decisionllm-history-schema)
-6. [DB 2 — Scientific Data Schema](#6-db-2--scientific-data-schema)
-7. [DuckDB Integration Strategy](#7-duckdb-integration-strategy)
+5. [Unified Database Schema (SQLAlchemy ORM)](#5-unified-database-schema-sqlalchemy-orm)
+6. [Scientific Data Tables](#6-scientific-data-tables)
+7. [SQLAlchemy Integration Strategy](#7-sqlalchemy-integration-strategy)
 8. [Parallel LLM/Decision History Treatment](#8-parallel-llmdecision-history-treatment)
 9. [DataAgent: A New Database-Managing Agent](#9-dataagent-a-new-database-managing-agent)
 10. [Migration Path & Implementation Steps](#10-migration-path--implementation-steps)
@@ -442,24 +442,28 @@ extract key metrics without parsing free-form dicts.
 
 ---
 
-## 5. DB 1 — Decision/LLM History Schema
+## 5. Unified Database Schema (SQLAlchemy ORM)
 
-### 5.1 Why SQL / DuckDB
+### 5.1 Why SQLAlchemy / PostgreSQL
 
-- **DuckDB** is an embedded analytical database — no server to manage, single-file storage, ideal for append-heavy analytical workloads
-- Excellent Python integration (`import duckdb`), supports Parquet export, rich SQL dialect with window functions
-- Columnar storage is well-suited for the analytical queries we need (aggregations, time-series over history)
-- Can coexist alongside the in-memory data flow without adding network hops
-- Each Director process can open a DuckDB connection to the same file for reads
+- **SQLAlchemy** provides a mature ORM layer with declarative models, automatic schema migration (via Alembic), and database-agnostic SQL generation
+- **PostgreSQL** is a production-grade relational database with native UUID support, JSONB columns, full-text search, and robust concurrent access from multiple Directors and Executives
+- SQLAlchemy's `async` session support integrates cleanly with the Academy agent lifecycle
+- The ORM enables type-safe query construction in Python rather than raw SQL strings
+- A single PostgreSQL database replaces the previous two-file DuckDB approach, with decision and scientific tables coexisting in one schema with proper foreign keys
 
-### 5.2 Core Tables
+### 5.2 Core Tables (SQLAlchemy ORM Models)
+
+These tables now live in a single PostgreSQL database, managed via SQLAlchemy
+ORM models. The DDL below shows the logical schema; the actual table creation
+is handled by `Base.metadata.create_all()` or Alembic migrations.
 
 ```sql
 -- Experiments: top-level container for a TestExecutive run
 CREATE TABLE experiments (
     experiment_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     research_goal       TEXT NOT NULL,
-    config_snapshot     JSON,           -- full YAML config at launch time
+    config_snapshot     JSONB,          -- full YAML config at launch time
     num_directors       INTEGER,
     started_at          TIMESTAMPTZ DEFAULT now(),
     ended_at            TIMESTAMPTZ,
@@ -473,7 +477,7 @@ CREATE TABLE directors (
     external_label      TEXT,           -- 'director_0', 'director_1', etc.
     accelerator_ids     TEXT[],         -- which GPUs this director got
     target_protein      TEXT,
-    config_snapshot     JSON,
+    config_snapshot     JSONB,
     launched_at         TIMESTAMPTZ DEFAULT now(),
     terminated_at       TIMESTAMPTZ,
     termination_reason  TEXT            -- completed | killed | timeout | error
@@ -487,7 +491,7 @@ CREATE TABLE llm_calls (
     model_name          TEXT,           -- e.g. 'openai/gpt-oss-120b'
     prompt_text         TEXT,           -- full prompt sent to LLM
     response_text       TEXT,           -- raw LLM response
-    parsed_output       JSON,           -- validated Pydantic model as JSON
+    parsed_output       JSONB,          -- validated Pydantic model as JSON
     temperature         FLOAT,
     max_tokens          INTEGER,
     prompt_tokens       INTEGER,
@@ -518,7 +522,7 @@ CREATE TABLE task_plans (
     director_id         UUID REFERENCES directors(director_id),
     task_type           TEXT NOT NULL,  -- TaskName value
     plan_model_name     TEXT,           -- e.g. 'ComputationalDesignPlan'
-    plan_config         JSON NOT NULL,  -- plan.new_config.model_dump()
+    plan_config         JSONB NOT NULL, -- plan.new_config.model_dump()
     rationale           TEXT,           -- plan.rationale
     created_at          TIMESTAMPTZ DEFAULT now()
 );
@@ -530,8 +534,8 @@ CREATE TABLE task_executions (
     director_id         UUID REFERENCES directors(director_id),
     agent_key           TEXT NOT NULL,  -- 'bindcraft' | 'md' | 'folding' | 'mmpbsa'
     status              TEXT DEFAULT 'running',  -- running | completed | failed
-    input_kwargs        JSON,           -- the **kwargs sent to agent.run()
-    result_data         JSON,           -- full results dict from worker
+    input_kwargs        JSONB,          -- the **kwargs sent to agent.run()
+    result_data         JSONB,          -- full results dict from worker
     error               TEXT,
     started_at          TIMESTAMPTZ DEFAULT now(),
     completed_at        TIMESTAMPTZ,
@@ -545,7 +549,7 @@ CREATE TABLE key_items (
     director_id         UUID REFERENCES directors(director_id),
     execution_id        UUID REFERENCES task_executions(execution_id),
     item_type           TEXT,           -- 'top_binder' | 'structure_path' | 'hotspot_residues' | ...
-    item_data           JSON NOT NULL,
+    item_data           JSONB NOT NULL,
     created_at          TIMESTAMPTZ DEFAULT now()
 );
 
@@ -560,27 +564,18 @@ CREATE TABLE executive_actions (
     status_snapshot     TEXT,           -- the check_status() result that triggered this
     created_at          TIMESTAMPTZ DEFAULT now()
 );
-
--- View: reconstruct WorkflowHistory shape for any Director
-CREATE VIEW workflow_history_by_director AS
-SELECT
-    d.director_id,
-    (SELECT list(json_object('next_task', dec.next_task,
-                              'rationale', dec.rationale,
-                              'change_parameters', dec.change_parameters)
-                ORDER BY dec.created_at)
-     FROM decisions dec WHERE dec.director_id = d.director_id) AS decisions,
-    (SELECT list(te.result_data ORDER BY te.completed_at)
-     FROM task_executions te
-     WHERE te.director_id = d.director_id AND te.status = 'completed') AS results,
-    (SELECT list(tp.plan_config ORDER BY tp.created_at)
-     FROM task_plans tp WHERE tp.director_id = d.director_id) AS configurations,
-    (SELECT list(ki.item_data ORDER BY ki.created_at)
-     FROM key_items ki WHERE ki.director_id = d.director_id) AS key_items
-FROM directors d;
 ```
 
+> **Note**: The `workflow_history_by_director` view previously defined using
+> DuckDB-specific `list()` aggregation is now implemented as a SQLAlchemy
+> query method on the DataAgent (see Section 9), using standard SQL
+> `json_agg()` / `array_agg()` functions supported by PostgreSQL.
+
 ### 5.3 Useful Analytical Queries
+
+These queries use standard PostgreSQL syntax. In practice, many of these are
+expressed via SQLAlchemy ORM query methods on the DataAgent, but the raw SQL
+is shown for clarity.
 
 ```sql
 -- Decision frequency by task type
@@ -619,16 +614,18 @@ ORDER BY te.completed_at DESC;
 
 ---
 
-## 6. DB 2 — Scientific Data Schema
+## 6. Scientific Data Tables
 
-### 6.1 Motivation: Two Databases, Two Concerns
+### 6.1 Motivation: Separate Concerns, Single Database
 
-DB 1 (Section 5) tracks **agent decisions**: what did the LLM say, what plan was
-generated, how long did each task take. DB 2 tracks the **scientific artifacts**
-those decisions produce: sequences, structures, simulation metrics, free energies,
-embeddings.
+The decision tables (Section 5) track **agent decisions**: what did the LLM say,
+what plan was generated, how long did each task take. The scientific tables track
+the **scientific artifacts** those decisions produce: sequences, structures,
+simulation metrics, free energies, embeddings.
 
-These are separate concerns because:
+With the migration to SQLAlchemy/PostgreSQL, both sets of tables live in a single
+database with proper foreign key relationships. They remain logically separate
+concerns:
 
 - **Different lifecycles**: Decision history is append-only and tied to a single
   experiment run. Scientific data accumulates across experiments — a binder
@@ -642,6 +639,10 @@ These are separate concerns because:
 - **Traceability**: A key goal is to trace a single binder sequence from its
   generation through folding, simulation, analysis, and free energy evaluation.
   This requires a sequence-centric schema, not a decision-centric one.
+
+Having both in the same PostgreSQL database enables proper foreign keys between
+`sequences.experiment_id` / `sequences.director_id` and the decision tables,
+and eliminates the need for cross-database `ATTACH` workarounds.
 
 ### 6.2 What Scientific Data Do the Agents Produce?
 
@@ -666,7 +667,7 @@ of that sequence observed at a particular stage of the workflow.
 
 ```sql
 -- ═══════════════════════════════════════════════════════════════════
--- DB 2: Scientific Data  (file: scientific.duckdb)
+-- Scientific Data Tables (same PostgreSQL database as decision tables)
 -- ═══════════════════════════════════════════════════════════════════
 
 -- Sequences: the central entity. One row per unique binder sequence.
@@ -719,7 +720,7 @@ CREATE TABLE folding_results (
     per_chain_pair_iptm FLOAT[],             -- pairwise chain ipTM values
     has_inter_chain_clashes BOOLEAN,
     diffusion_steps     INTEGER,
-    constraints_used    JSON,                -- constraint dict if any
+    constraints_used    JSONB,               -- constraint dict if any
     trial_label         TEXT,                -- 'trial_0', 'trial_1', etc.
     created_at          TIMESTAMPTZ DEFAULT now()
 );
@@ -773,7 +774,7 @@ CREATE TABLE trajectory_analyses (
 
     -- Advanced metrics (hotspot analysis)
     binding_site_residues TEXT[],            -- top contact residues
-    contact_frequencies JSON,                -- {residue_pair: frequency}
+    contact_frequencies JSONB,               -- {residue_pair: frequency}
 
     confidence_score    FLOAT,               -- calculated from RMSD stability
     created_at          TIMESTAMPTZ DEFAULT now()
@@ -953,12 +954,14 @@ WITH RECURSIVE lineage AS (
 SELECT * FROM lineage ORDER BY depth DESC;
 
 -- Embedding-space neighbors (for diversity analysis or clustering prep)
-SELECT a.sequence_id, b.sequence_id,
-       list_cosine_similarity(a.embedding_vector, b.embedding_vector) as similarity
+-- Note: cosine similarity computed via pgvector extension or application-level Python
+-- If using pgvector, embedding_vector would be a vector column and you would use:
+--   1 - (a.embedding_vector <=> b.embedding_vector) as similarity
+-- Otherwise, compute similarity in Python after fetching vectors.
+SELECT a.sequence_id, b.sequence_id
 FROM embeddings a, embeddings b
 WHERE a.sequence_id < b.sequence_id
   AND a.model_name = b.model_name
-ORDER BY similarity DESC
 LIMIT 100;
 
 -- Cross-director comparison: which director found the best binders?
@@ -971,49 +974,47 @@ LEFT JOIN free_energy_results fe ON fe.sequence_id = s.sequence_id AND fe.succes
 GROUP BY s.director_id;
 ```
 
-### 6.6 How DB 1 and DB 2 Relate
+### 6.6 How Decision and Scientific Tables Relate
 
-The two databases share referential context via `experiment_id` and `director_id`
-columns on the `sequences` table, but they are not formally foreign-keyed across
-files. This is intentional:
+With the migration to a single PostgreSQL database, decision tables and scientific
+tables coexist with proper foreign key relationships. The `sequences` table now
+has real foreign keys to `experiments` and `directors`:
 
 ```
-┌─────────────────────────────────┐       ┌─────────────────────────────────┐
-│  DB 1: decisions.duckdb         │       │  DB 2: scientific.duckdb        │
-│                                 │       │                                 │
-│  experiments ◄─── directors     │       │  sequences                      │
-│       │               │        │       │    │  (experiment_id, director_id│
-│       │               │        │       │    │   are informational only)   │
-│  executive_actions    │        │  ───► │    │                             │
-│                       │        │       │    ├──► qc_results               │
-│  decisions ◄── task_plans      │       │    ├──► folding_results          │
-│       │                        │       │    │       └──► energy_results   │
-│  llm_calls    task_executions  │       │    ├──► simulation_runs          │
-│                                 │       │    │       ├──► trajectory_an.  │
-│                                 │       │    │       └──► free_energy_r.  │
-│                                 │       │    └──► embeddings              │
-│                                 │       │                                 │
-│  Queried by: LLM prompt builder│       │  Queried by: analysis notebooks,│
-│  Executive, DataAgent           │       │  DataAgent, visualization tools │
-└─────────────────────────────────┘       └─────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│  Single PostgreSQL Database                                          │
+│                                                                      │
+│  ┌── Decision Tables ───────┐    ┌── Scientific Tables ───────────┐ │
+│  │                          │    │                                │ │
+│  │  experiments ◄── directors│◄──►│  sequences                    │ │
+│  │       │               │  │    │    │  (experiment_id FK,       │ │
+│  │       │               │  │    │    │   director_id FK)         │ │
+│  │  executive_actions    │  │    │    │                           │ │
+│  │                       │  │    │    ├──► qc_results             │ │
+│  │  decisions ◄── task_plans│    │    ├──► folding_results        │ │
+│  │       │               │  │    │    │       └──► energy_results │ │
+│  │  llm_calls  task_exec.│  │    │    ├──► simulation_runs       │ │
+│  │                       │  │    │    │       ├──► trajectory_an. │ │
+│  │                       │  │    │    │       └──► free_energy_r. │ │
+│  │                       │  │    │    └──► embeddings             │ │
+│  └───────────────────────┘  │    └────────────────────────────────┘ │
+│                                                                      │
+│  Cross-table joins are standard SQL — no ATTACH workarounds needed   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-To join across databases (e.g., "what decision led to the best binder?"), DuckDB's
-`ATTACH` command can open both files:
+Joining decision and scientific data is now a standard SQL join:
 
 ```sql
-ATTACH 'decisions.duckdb' AS db1;
-ATTACH 'scientific.duckdb' AS db2;
-
 -- Which LLM decisions led to the best free energy outcomes?
 SELECT d.next_task, d.rationale, s.sequence, fe.free_energy
-FROM db1.decisions d
-JOIN db1.task_executions te ON te.plan_id = (
-    SELECT plan_id FROM db1.task_plans WHERE decision_id = d.decision_id
+FROM decisions d
+JOIN task_executions te ON te.plan_id = (
+    SELECT plan_id FROM task_plans WHERE decision_id = d.decision_id
 )
-JOIN db2.sequences s ON s.director_id::TEXT = d.director_id::TEXT
+JOIN sequences s ON s.director_id = d.director_id
     AND s.design_round = d.iteration
-JOIN db2.free_energy_results fe ON fe.sequence_id = s.sequence_id
+JOIN free_energy_results fe ON fe.sequence_id = s.sequence_id
 WHERE fe.success = true
 ORDER BY fe.free_energy ASC
 LIMIT 10;
@@ -1021,44 +1022,40 @@ LIMIT 10;
 
 ---
 
-## 7. DuckDB Integration Strategy
+## 7. SQLAlchemy Integration Strategy
 
-### 6.1 Connection Management
+### 7.1 Connection Management
 
 ```python
-import duckdb
-from pathlib import Path
-from contextlib import contextmanager
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.orm import DeclarativeBase
+
+class Base(DeclarativeBase):
+    pass
 
 class WorkflowDB:
-    """Thin wrapper around DuckDB for StructBioReasoner."""
+    """SQLAlchemy async engine wrapper for StructBioReasoner."""
 
-    def __init__(self, db_path: str | Path = "workflow.duckdb"):
-        self.db_path = str(db_path)
-        self._conn = duckdb.connect(self.db_path)
-        self._init_schema()
+    def __init__(self, database_url: str = "postgresql+asyncpg://localhost/structbio"):
+        self.engine = create_async_engine(database_url, echo=False)
+        self.session_factory = async_sessionmaker(self.engine, expire_on_commit=False)
 
-    def _init_schema(self):
-        """Run CREATE TABLE IF NOT EXISTS for all tables."""
-        schema_path = Path(__file__).parent / "schema.sql"
-        self._conn.execute(schema_path.read_text())
+    async def init_schema(self):
+        """Create all tables from ORM models (or use Alembic for migrations)."""
+        async with self.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
-    @contextmanager
-    def cursor(self):
-        """Thread-safe read cursor (separate connection)."""
-        local_conn = duckdb.connect(self.db_path, read_only=True)
-        try:
-            yield local_conn
-        finally:
-            local_conn.close()
+    def session(self) -> AsyncSession:
+        """Create a new async session for queries."""
+        return self.session_factory()
 
-    def close(self):
-        self._conn.close()
+    async def close(self):
+        await self.engine.dispose()
 ```
 
-### 6.2 Integration Points
+### 7.2 Integration Points
 
-DuckDB writes should happen at well-defined boundaries in the `agents/` code:
+Database writes should happen at well-defined boundaries in the `agents/` code:
 
 | Event | Table(s) Written | Where in Code |
 |-------|-----------------|---------------|
@@ -1075,59 +1072,75 @@ DuckDB writes should happen at well-defined boundaries in the `agents/` code:
 | Director terminated | `directors` (UPDATE) | `TestExecutive.stop()` |
 | Experiment ends | `experiments` (UPDATE) | `TestExecutive.stop()` |
 
-### 6.3 Read Path: Replacing In-Memory History
+### 7.3 Read Path: Replacing In-Memory History
 
 Instead of passing the growing in-memory list, the prompt builder can query
-DuckDB for the last N entries:
+PostgreSQL via SQLAlchemy for the last N entries:
 
 ```python
-def get_history_for_prompt(
-    db: WorkflowDB, director_id: str, limit: int = 5
+from sqlalchemy import select, desc
+from sqlalchemy.ext.asyncio import AsyncSession
+
+async def get_history_for_prompt(
+    session: AsyncSession, director_id: str, limit: int = 5
 ) -> WorkflowHistory:
     """Fetch recent history from DB instead of in-memory list."""
-    with db.cursor() as conn:
-        decisions = conn.execute("""
-            SELECT json_object('next_task', next_task,
-                               'rationale', rationale,
-                               'change_parameters', change_parameters)
-            FROM decisions
-            WHERE director_id = ? ORDER BY created_at DESC LIMIT ?
-        """, [director_id, limit]).fetchall()
 
-        results = conn.execute("""
-            SELECT result_data FROM task_executions
-            WHERE director_id = ? AND status = 'completed'
-            ORDER BY completed_at DESC LIMIT ?
-        """, [director_id, limit]).fetchall()
+    decisions_q = await session.execute(
+        select(Decision.next_task, Decision.rationale, Decision.change_parameters)
+        .where(Decision.director_id == director_id)
+        .order_by(desc(Decision.created_at))
+        .limit(limit)
+    )
+    decisions = [
+        {'next_task': r.next_task, 'rationale': r.rationale,
+         'change_parameters': r.change_parameters}
+        for r in reversed(decisions_q.all())
+    ]
 
-        configs = conn.execute("""
-            SELECT plan_config FROM task_plans
-            WHERE director_id = ? ORDER BY created_at DESC LIMIT ?
-        """, [director_id, limit]).fetchall()
+    results_q = await session.execute(
+        select(TaskExecution.result_data)
+        .where(TaskExecution.director_id == director_id,
+               TaskExecution.status == 'completed')
+        .order_by(desc(TaskExecution.completed_at))
+        .limit(limit)
+    )
+    results = [r.result_data for r in reversed(results_q.all())]
 
-        items = conn.execute("""
-            SELECT item_data FROM key_items
-            WHERE director_id = ? ORDER BY created_at DESC LIMIT ?
-        """, [director_id, limit]).fetchall()
+    configs_q = await session.execute(
+        select(TaskPlan.plan_config)
+        .where(TaskPlan.director_id == director_id)
+        .order_by(desc(TaskPlan.created_at))
+        .limit(limit)
+    )
+    configs = [r.plan_config for r in reversed(configs_q.all())]
+
+    items_q = await session.execute(
+        select(KeyItem.item_data)
+        .where(KeyItem.director_id == director_id)
+        .order_by(desc(KeyItem.created_at))
+        .limit(limit)
+    )
+    items = [r.item_data for r in reversed(items_q.all())]
 
     return WorkflowHistory(
-        decisions=[r[0] for r in reversed(decisions)],
-        results=[r[0] for r in reversed(results)],
-        configurations=[r[0] for r in reversed(configs)],
-        key_items=[r[0] for r in reversed(items)],
+        decisions=decisions,
+        results=results,
+        configurations=configs,
+        key_items=items,
     )
 ```
 
 ---
 
-## 7. Parallel LLM/Decision History Treatment
+## 8. Parallel LLM/Decision History Treatment
 
 The current architecture has a tension: the in-memory history is needed for
 low-latency prompt construction within the Director loop, but a DB provides
 durability, queryability, and cross-Director visibility. Rather than forcing
 one to replace the other, they can operate in parallel.
 
-### 7.1 Dual-Write Architecture
+### 8.1 Dual-Write Architecture
 
 ```
                        ┌─────────────────────┐
@@ -1147,7 +1160,8 @@ one to replace the other, they can operate in parallel.
           │ WorkflowHistory │        │ DataAgent receives│
           │ updated inline  │        │ events via action │
           │ for next LLM    │        │ calls; writes to  │
-          │ prompt          │        │ DuckDB in batches │
+          │ prompt          │        │ PostgreSQL via    │
+          │                 │        │ SQLAlchemy        │
           └─────────────────┘        └──────────────────┘
                     │                           │
                     ▼                           ▼
@@ -1159,7 +1173,7 @@ one to replace the other, they can operate in parallel.
           └─────────────────┘        └──────────────────┘
 ```
 
-### 7.2 Event Types
+### 8.2 Event Types
 
 The Director emits structured events at each boundary. The DataAgent consumes
 them asynchronously:
@@ -1187,11 +1201,11 @@ class WorkflowEvent:
     timestamp: float = field(default_factory=time.time)
 ```
 
-### 7.3 Why Parallel?
+### 8.3 Why Parallel?
 
 1. **Latency**: The Director loop should not block on I/O. The DataAgent's
    `record_event()` Academy action is fire-and-forget from the Director's
-   perspective. Batch writes to DuckDB happen on a background timer.
+   perspective. Batch writes to PostgreSQL happen on a background timer.
 
 2. **Decoupling**: The in-memory `WorkflowHistory` remains the prompt builder's
    source for the current Director. The DB becomes the source for cross-Director
@@ -1208,7 +1222,7 @@ class WorkflowEvent:
    call, every decision, and every execution — enabling offline analysis of
    decision patterns and prompt effectiveness.
 
-### 7.4 When to Read from DB vs. Memory
+### 8.4 When to Read from DB vs. Memory
 
 | Use Case | Source |
 |----------|--------|
@@ -1217,28 +1231,29 @@ class WorkflowEvent:
 | Cross-Director insight sharing | DB query (compare decision patterns) |
 | Post-experiment analysis | DB query (full historical record) |
 | Crash recovery / resume | DB (reconstruct in-memory state from last N rows) |
-| Monitoring / dashboard | DB (live analytical queries via DuckDB CLI or Python) |
+| Monitoring / dashboard | DB (live analytical queries via SQLAlchemy or psql) |
 
 ---
 
-## 8. DataAgent: A New Database-Managing Agent
+## 9. DataAgent: A New Database-Managing Agent
 
-### 8.1 Responsibilities
+### 9.1 Responsibilities
 
 The `DataAgent` is a new Academy agent (`agents/data/data_agent.py`) that:
 
 1. **Consumes events** from the Director and Executive via `@action` calls
-2. **Writes to DuckDB** in batches for efficiency
+2. **Writes to PostgreSQL** via SQLAlchemy in batches for efficiency
 3. **Serves analytical queries** to the Executive and other agents
-4. **Manages schema migrations** (versioned DDL)
-5. **Exports data** to Parquet for offline analysis
+4. **Manages schema migrations** (via Alembic)
+5. **Exports data** to Parquet/CSV for offline analysis
 6. **Provides crash-recovery state** to Directors on restart
 
-### 8.2 Proposed Implementation
+### 9.2 Proposed Implementation
 
 ```python
 from academy.agent import Agent, action
-import duckdb
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy import select, desc, func, update
 import asyncio
 import logging
 import time
@@ -1248,38 +1263,40 @@ logger = logging.getLogger(__name__)
 
 
 class DataAgent(Agent):
-    """Academy agent managing all DuckDB operations for the workflow."""
+    """Academy agent managing all PostgreSQL operations for the workflow via SQLAlchemy."""
 
     def __init__(
         self,
-        db_path: str = "workflow.duckdb",
+        database_url: str = "postgresql+asyncpg://localhost/structbio",
         batch_size: int = 50,
         flush_interval: float = 2.0,  # seconds
     ):
-        self.db_path = db_path
+        self.database_url = database_url
         self.batch_size = batch_size
         self.flush_interval = flush_interval
         self._event_buffer: list[dict] = []
-        self._conn: duckdb.DuckDBPyConnection | None = None
+        self._engine = None
+        self._session_factory = None
         super().__init__()
 
     async def agent_on_startup(self) -> None:
-        self._conn = duckdb.connect(self.db_path)
-        self._init_schema()
+        self._engine = create_async_engine(self.database_url, echo=False)
+        self._session_factory = async_sessionmaker(self._engine, expire_on_commit=False)
+        await self._init_schema()
         self._flush_task = asyncio.create_task(self._periodic_flush())
-        logger.info("DataAgent started, db=%s", self.db_path)
+        logger.info("DataAgent started, db=%s", self.database_url)
 
     async def agent_on_shutdown(self) -> None:
         self._flush_task.cancel()
         await self._flush()  # final flush
-        if self._conn:
-            self._conn.close()
+        if self._engine:
+            await self._engine.dispose()
         logger.info("DataAgent shut down")
 
-    def _init_schema(self):
-        """Initialize all tables (CREATE IF NOT EXISTS)."""
-        # Execute the DDL from Section 5.2
-        ...
+    async def _init_schema(self):
+        """Initialize all tables from ORM models."""
+        async with self._engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
     # ── Write Path ──────────────────────────────────────────────
 
@@ -1302,31 +1319,33 @@ class DataAgent(Agent):
                 await self._flush()
 
     async def _flush(self):
-        """Write buffered events to DuckDB."""
+        """Write buffered events to PostgreSQL via SQLAlchemy."""
         if not self._event_buffer:
             return
         events = self._event_buffer.copy()
         self._event_buffer.clear()
 
-        for event in events:
-            try:
-                match event['event_type']:
-                    case 'llm_call':
-                        self._insert_llm_call(event)
-                    case 'decision':
-                        self._insert_decision(event)
-                    case 'plan':
-                        self._insert_plan(event)
-                    case 'execution_start':
-                        self._insert_execution_start(event)
-                    case 'execution_end':
-                        self._update_execution_end(event)
-                    case 'key_item':
-                        self._insert_key_item(event)
-                    case 'executive_action':
-                        self._insert_executive_action(event)
-            except Exception as e:
-                logger.error("Failed to write event %s: %s", event['event_type'], e)
+        async with self._session_factory() as session:
+            for event in events:
+                try:
+                    match event['event_type']:
+                        case 'llm_call':
+                            await self._insert_llm_call(session, event)
+                        case 'decision':
+                            await self._insert_decision(session, event)
+                        case 'plan':
+                            await self._insert_plan(session, event)
+                        case 'execution_start':
+                            await self._insert_execution_start(session, event)
+                        case 'execution_end':
+                            await self._update_execution_end(session, event)
+                        case 'key_item':
+                            await self._insert_key_item(session, event)
+                        case 'executive_action':
+                            await self._insert_executive_action(session, event)
+                except Exception as e:
+                    logger.error("Failed to write event %s: %s", event['event_type'], e)
+            await session.commit()
 
     # ── Read Path (Query Actions) ──────────────────────────────
 
@@ -1337,35 +1356,49 @@ class DataAgent(Agent):
         limit: int = 10,
     ) -> dict[str, Any]:
         """Reconstruct WorkflowHistory for a Director from DB."""
-        decisions = self._conn.execute("""
-            SELECT json_object('next_task', next_task,
-                               'rationale', rationale,
-                               'change_parameters', change_parameters)
-            FROM decisions WHERE director_id = ?
-            ORDER BY created_at DESC LIMIT ?
-        """, [director_id, limit]).fetchall()
+        async with self._session_factory() as session:
+            decisions_q = await session.execute(
+                select(Decision.next_task, Decision.rationale, Decision.change_parameters)
+                .where(Decision.director_id == director_id)
+                .order_by(desc(Decision.created_at))
+                .limit(limit)
+            )
+            decisions = [
+                {'next_task': r.next_task, 'rationale': r.rationale,
+                 'change_parameters': r.change_parameters}
+                for r in reversed(decisions_q.all())
+            ]
 
-        results = self._conn.execute("""
-            SELECT result_data FROM task_executions
-            WHERE director_id = ? AND status = 'completed'
-            ORDER BY completed_at DESC LIMIT ?
-        """, [director_id, limit]).fetchall()
+            results_q = await session.execute(
+                select(TaskExecution.result_data)
+                .where(TaskExecution.director_id == director_id,
+                       TaskExecution.status == 'completed')
+                .order_by(desc(TaskExecution.completed_at))
+                .limit(limit)
+            )
+            results = [r.result_data for r in reversed(results_q.all())]
 
-        configs = self._conn.execute("""
-            SELECT plan_config FROM task_plans
-            WHERE director_id = ? ORDER BY created_at DESC LIMIT ?
-        """, [director_id, limit]).fetchall()
+            configs_q = await session.execute(
+                select(TaskPlan.plan_config)
+                .where(TaskPlan.director_id == director_id)
+                .order_by(desc(TaskPlan.created_at))
+                .limit(limit)
+            )
+            configs = [r.plan_config for r in reversed(configs_q.all())]
 
-        items = self._conn.execute("""
-            SELECT item_data FROM key_items
-            WHERE director_id = ? ORDER BY created_at DESC LIMIT ?
-        """, [director_id, limit]).fetchall()
+            items_q = await session.execute(
+                select(KeyItem.item_data)
+                .where(KeyItem.director_id == director_id)
+                .order_by(desc(KeyItem.created_at))
+                .limit(limit)
+            )
+            items = [r.item_data for r in reversed(items_q.all())]
 
         return {
-            'decisions':      [r[0] for r in reversed(decisions)],
-            'results':        [r[0] for r in reversed(results)],
-            'configurations': [r[0] for r in reversed(configs)],
-            'key_items':      [r[0] for r in reversed(items)],
+            'decisions':      decisions,
+            'results':        results,
+            'configurations': configs,
+            'key_items':      items,
         }
 
     @action
@@ -1374,20 +1407,27 @@ class DataAgent(Agent):
         experiment_id: str,
     ) -> dict[str, Any]:
         """Aggregate statistics across all Directors in an experiment."""
-        return self._conn.execute("""
-            SELECT
-                COUNT(DISTINCT d.director_id) as num_directors,
-                COUNT(te.execution_id) as total_tasks,
-                COUNT(te.execution_id) FILTER (WHERE te.status = 'completed') as completed,
-                COUNT(te.execution_id) FILTER (WHERE te.status = 'failed') as failed,
-                AVG(te.duration_ms) FILTER (WHERE te.status = 'completed') as avg_ms,
-                SUM(lc.prompt_tokens) as prompt_tokens,
-                SUM(lc.completion_tokens) as completion_tokens
-            FROM directors d
-            LEFT JOIN task_executions te ON te.director_id = d.director_id
-            LEFT JOIN llm_calls lc ON lc.director_id = d.director_id
-            WHERE d.experiment_id = ?
-        """, [experiment_id]).fetchdf().to_dict('records')[0]
+        async with self._session_factory() as session:
+            result = await session.execute(
+                select(
+                    func.count(func.distinct(Director.director_id)).label('num_directors'),
+                    func.count(TaskExecution.execution_id).label('total_tasks'),
+                    func.count(TaskExecution.execution_id)
+                        .filter(TaskExecution.status == 'completed').label('completed'),
+                    func.count(TaskExecution.execution_id)
+                        .filter(TaskExecution.status == 'failed').label('failed'),
+                    func.avg(TaskExecution.duration_ms)
+                        .filter(TaskExecution.status == 'completed').label('avg_ms'),
+                    func.sum(LLMCall.prompt_tokens).label('prompt_tokens'),
+                    func.sum(LLMCall.completion_tokens).label('completion_tokens'),
+                )
+                .select_from(Director)
+                .outerjoin(TaskExecution, TaskExecution.director_id == Director.director_id)
+                .outerjoin(LLMCall, LLMCall.director_id == Director.director_id)
+                .where(Director.experiment_id == experiment_id)
+            )
+            row = result.one()
+            return row._asdict()
 
     @action
     async def get_cross_director_insights(
@@ -1395,15 +1435,21 @@ class DataAgent(Agent):
         experiment_id: str,
     ) -> dict[str, Any]:
         """Provide the Executive with cross-Director comparative data."""
-        transitions = self._conn.execute("""
-            SELECT d.external_label, dec.previous_task, dec.next_task,
-                   COUNT(*) as count
-            FROM decisions dec
-            JOIN directors d ON d.director_id = dec.director_id
-            WHERE d.experiment_id = ?
-            GROUP BY d.external_label, dec.previous_task, dec.next_task
-            ORDER BY count DESC
-        """, [experiment_id]).fetchdf().to_dict('records')
+        async with self._session_factory() as session:
+            result = await session.execute(
+                select(
+                    Director.external_label,
+                    Decision.previous_task,
+                    Decision.next_task,
+                    func.count().label('count'),
+                )
+                .select_from(Decision)
+                .join(Director, Director.director_id == Decision.director_id)
+                .where(Director.experiment_id == experiment_id)
+                .group_by(Director.external_label, Decision.previous_task, Decision.next_task)
+                .order_by(desc('count'))
+            )
+            transitions = [row._asdict() for row in result.all()]
 
         return {'task_transitions': transitions}
 
@@ -1413,45 +1459,64 @@ class DataAgent(Agent):
         director_id: str,
     ) -> dict[str, Any]:
         """Provide state needed to resume a Director after crash."""
-        last_decision = self._conn.execute("""
-            SELECT next_task, rationale FROM decisions
-            WHERE director_id = ? ORDER BY created_at DESC LIMIT 1
-        """, [director_id]).fetchone()
+        async with self._session_factory() as session:
+            last_decision = await session.execute(
+                select(Decision.next_task, Decision.rationale)
+                .where(Decision.director_id == director_id)
+                .order_by(desc(Decision.created_at))
+                .limit(1)
+            )
 
-        last_execution = self._conn.execute("""
-            SELECT agent_key, status, result_data FROM task_executions
-            WHERE director_id = ? ORDER BY started_at DESC LIMIT 1
-        """, [director_id]).fetchone()
+            last_execution = await session.execute(
+                select(TaskExecution.agent_key, TaskExecution.status, TaskExecution.result_data)
+                .where(TaskExecution.director_id == director_id)
+                .order_by(desc(TaskExecution.started_at))
+                .limit(1)
+            )
 
         return {
-            'last_decision': last_decision,
-            'last_execution': last_execution,
+            'last_decision': last_decision.first(),
+            'last_execution': last_execution.first(),
         }
 
     @action
-    async def export_to_parquet(
+    async def export_to_csv(
         self,
         experiment_id: str,
         output_dir: str,
     ) -> list[str]:
-        """Export all tables for an experiment to Parquet files."""
-        tables = ['llm_calls', 'decisions', 'task_plans',
-                  'task_executions', 'key_items', 'executive_actions']
+        """Export all tables for an experiment to CSV files.
+
+        For Parquet export, use pandas with SQLAlchemy:
+            df = pd.read_sql(query, engine)
+            df.to_parquet(path)
+        """
+        import pandas as pd
+        tables = [
+            ('llm_calls', LLMCall),
+            ('decisions', Decision),
+            ('task_plans', TaskPlan),
+            ('task_executions', TaskExecution),
+            ('key_items', KeyItem),
+            ('executive_actions', ExecutiveAction),
+        ]
         paths = []
-        for table in tables:
-            path = f"{output_dir}/{table}.parquet"
-            self._conn.execute(f"""
-                COPY (
-                    SELECT t.* FROM {table} t
-                    JOIN directors d ON t.director_id = d.director_id
-                    WHERE d.experiment_id = ?
-                ) TO '{path}' (FORMAT PARQUET)
-            """, [experiment_id])
-            paths.append(path)
+        async with self._session_factory() as session:
+            for name, model in tables:
+                result = await session.execute(
+                    select(model)
+                    .join(Director, model.director_id == Director.director_id)
+                    .where(Director.experiment_id == experiment_id)
+                )
+                rows = result.scalars().all()
+                path = f"{output_dir}/{name}.csv"
+                df = pd.DataFrame([r.__dict__ for r in rows])
+                df.to_csv(path, index=False)
+                paths.append(path)
         return paths
 ```
 
-### 8.3 Integration with Existing Agents
+### 9.3 Integration with Existing Agents
 
 The DataAgent is launched alongside worker agents by the Director:
 
@@ -1461,7 +1526,9 @@ from struct_bio_reasoner.agents.data.data_agent import DataAgent
 
 self.data_agent = await self.agent_launch_alongside(
     DataAgent,
-    kwargs={'db_path': f'{self.runtime_config.get("output_dir", ".")}/workflow.duckdb'},
+    kwargs={'database_url': self.runtime_config.get(
+        'database_url', 'postgresql+asyncpg://localhost/structbio'
+    )},
 )
 ```
 
@@ -1504,7 +1571,7 @@ insights = await self.data_agent.get_cross_director_insights(self.experiment_id)
 summary = await self.data_agent.get_experiment_summary(self.experiment_id)
 ```
 
-### 8.4 AgentRegistry Update
+### 9.4 AgentRegistry Update
 
 ```python
 class AgentRegistry(BaseModel):
@@ -1520,22 +1587,24 @@ class AgentRegistry(BaseModel):
 
 ---
 
-## 9. Migration Path & Implementation Steps
+## 10. Migration Path & Implementation Steps
 
-### Phase 1: Foundation (Non-Breaking)
+### Phase 1: Foundation (COMPLETED)
 
-1. **Add DuckDB dependency** to `pyproject.toml`
-2. **Create `agents/data/` package**:
+> Phases 1-2 were completed using DuckDB as the initial storage backend.
+
+1. **Added DuckDB dependency** to `pyproject.toml`
+2. **Created `agents/data/` package**:
    - `__init__.py`
-   - `data_agent.py` — the DataAgent class (Section 8.2)
-   - `schema.sql` — DDL from Section 5.2
-   - `events.py` — `WorkflowEvent`, `EventType` definitions
-3. **Add `data` entry to `AgentRegistry`** (not in `TASK_TO_AGENT`)
-4. **Write tests** for schema creation, event insertion, query functions
+   - `data_agent.py` -- the DataAgent class
+   - `decisions_schema.sql`, `scientific_schema.sql` -- DDL
+   - `events.py` -- `WorkflowEvent`, `EventType` definitions
+3. **Added `data` entry to `AgentRegistry`** (not in `TASK_TO_AGENT`)
+4. **Wrote tests** for schema creation, event insertion, query functions
 
-### Phase 2: Instrumentation (Additive, No Behavioral Changes)
+### Phase 2: Instrumentation (COMPLETED)
 
-5. **Add DataAgent launch** to `Director.load_agents()`
+5. **Added DataAgent launch** to `Director.load_agents()`
 6. **Emit events in `Director.query_reasoner()`**:
    - `LLM_CALL` event wrapping `ReasonerAgent.generate_recommendation()`
    - `DECISION` event with the parsed `Recommendation`
@@ -1545,76 +1614,106 @@ class AgentRegistry(BaseModel):
    - `EXECUTION_START` at entry
    - `EXECUTION_END` at return (or on error)
 8. **Emit `EXECUTIVE_ACTION` in `TestExecutive.run()`** review loop
-9. **Add experiment/director registration** in `TestExecutive.start()`
+9. **Added experiment/director registration** in `TestExecutive.start()`
 
-### Phase 3: Read Integration (Executive Upgrade)
+### Phase 3: SQLAlchemy/PostgreSQL Migration (CURRENT)
 
-10. **TestExecutive queries DataAgent** for `get_cross_director_insights()` and
+> Migrating from DuckDB (embedded, file-based) to SQLAlchemy ORM with
+> PostgreSQL backend. This addresses concurrency limitations of DuckDB
+> (single-writer) and enables multi-node deployments where Directors on
+> separate machines write to a shared database.
+
+10. **Add SQLAlchemy + asyncpg dependencies** to `pyproject.toml`
+11. **Define ORM models** (`Base` subclasses) for all tables in Sections 5-6
+12. **Replace DuckDB connection management** in DataAgent with SQLAlchemy
+    async engine and session factory (see Section 9.2)
+13. **Merge two database files** (`decisions.duckdb` + `scientific.duckdb`)
+    into a single PostgreSQL database with proper cross-table foreign keys
+14. **Update DataAgent constructor** from `db_path`/`decisions_db_path`/
+    `scientific_db_path` to a single `database_url` parameter
+15. **Replace raw SQL strings** in DataAgent query methods with SQLAlchemy
+    ORM queries (see Section 9.2 read path examples)
+16. **Set up Alembic** for schema migrations, replacing the raw `.sql` files
+17. **Update Director/Executive** `runtime_config` to pass `database_url`
+    instead of file paths
+18. **Migrate existing test data** from DuckDB files if needed
+
+### Phase 4: Read Integration (Executive Upgrade)
+
+19. **TestExecutive queries DataAgent** for `get_cross_director_insights()` and
     `get_experiment_summary()` during the review loop
-11. **Replace passive logging** with structured decision-making:
+20. **Replace passive logging** with structured decision-making:
     the Executive can now compare Directors and take action (advise, kill, etc.)
-12. **Add `get_recovery_state()` support**: on Director restart, query DB for
+21. **Add `get_recovery_state()` support**: on Director restart, query DB for
     last known state to reconstruct `self.previous_run` and seed `self.history`
-13. **Add Parquet export** in `TestExecutive.stop()`
+22. **Add CSV/Parquet export** in `TestExecutive.stop()`
 
-### Phase 4: History Optimization
+### Phase 5: History Optimization
 
-14. **Cap `Director.history` list** at a fixed window (e.g., last 10 entries)
+23. **Cap `Director.history` list** at a fixed window (e.g., last 10 entries)
     and rely on DB for anything older
-15. **Implement `get_history_for_prompt()`** (Section 6.3) as an alternative to
-    the current `self.history` list — fetch windowed history from DataAgent
-16. **Standardize prompt serialization**: migrate `structure_prediction.py` and
+24. **Implement `get_history_for_prompt()`** (Section 7.3) as an alternative to
+    the current `self.history` list -- fetch windowed history from DataAgent
+25. **Standardize prompt serialization**: migrate `structure_prediction.py` and
     `analysis.py` from `json.dumps(ctx.history.model_dump())` to
     `serialize_history(ctx.history)` for consistency
-17. **Add DB-based stopping criteria**: e.g., stop Director if no affinity
+26. **Add DB-based stopping criteria**: e.g., stop Director if no affinity
     improvement in last K decisions (queryable via DataAgent)
 
 ---
 
-## 10. Risks and Considerations
+## 11. Risks and Considerations
 
-### 10.1 DuckDB Concurrency
+### 11.1 PostgreSQL Availability
 
-DuckDB supports multiple reader connections but only one writer at a time per
-file. Since the DataAgent is the sole writer, this is safe. For multi-node
-deployments where Directors run on separate machines:
-- Each Director can write to a **local DuckDB file**, and the DataAgent merges
-  them periodically
-- Or use DuckDB's `ATTACH` to query across multiple database files
+PostgreSQL requires a running database server, unlike the previous embedded
+DuckDB approach. For HPC environments:
+- A PostgreSQL instance can be run on a login/service node accessible from
+  compute nodes
+- For local development and testing, SQLAlchemy can target SQLite via
+  `sqlite+aiosqlite:///path/to/test.db` as a lightweight alternative
+- Connection pooling via SQLAlchemy's built-in pool handles concurrent access
+  from multiple Directors and Executives without single-writer limitations
 
-### 10.2 Academy Serialization
+### 11.2 Academy Serialization
 
 Academy serializes data crossing agent boundaries (action calls). All
 `record_event()` payloads must be JSON-serializable — use `.model_dump()` on
 Pydantic models before emitting. The `WorkflowEvent` dataclass should be
 passed as a plain `dict` to the action, not as a dataclass instance.
 
-### 10.3 Parsl Interaction
+### 11.3 Parsl Interaction
 
-DuckDB connections are not picklable. The DataAgent must never be submitted as
-a Parsl task. It should run in the same process as the Director (via
-`agent_launch_alongside`), not on a Parsl worker node.
+SQLAlchemy engine and session objects are not picklable. The DataAgent must
+never be submitted as a Parsl task. It should run in the same process as the
+Director (via `agent_launch_alongside`), not on a Parsl worker node.
 
-### 10.4 Schema Evolution
+### 11.4 Schema Evolution
 
-Include a `schema_version` table and migration scripts. DuckDB supports
-`ALTER TABLE ADD COLUMN` for additive changes. For breaking changes, export to
-Parquet (via `export_to_parquet()`) and re-import.
+Schema migrations are managed via **Alembic**, SQLAlchemy's migration tool.
+Alembic auto-generates migration scripts by diffing ORM model definitions
+against the current database state. This replaces the manual `schema_version`
+table approach used with DuckDB. For breaking changes, export data first via
+the DataAgent's export method, run the Alembic migration, and re-import if
+needed.
 
-### 10.5 Disk Space
+### 11.5 Disk Space
 
-For a typical campaign with ~1000 LLM calls and ~500 task executions, the DB
-file will be well under 100MB. DuckDB's columnar compression keeps this small.
-Parquet export compresses further (~10x).
+For a typical campaign with ~1000 LLM calls and ~500 task executions, the
+database will be well under 100MB. PostgreSQL's TOAST compression handles
+large JSONB columns efficiently. CSV/Parquet export is available for archival.
 
-### 10.6 Performance Impact
+### 11.6 Performance Impact
 
-DuckDB in-process writes are ~0.1ms per row. The batched flush in DataAgent
-(every 2s or 50 events, whichever comes first) means the Director loop sees
-effectively zero write latency. Read queries for prompt construction (last 5-10
-rows with simple WHERE + ORDER BY + LIMIT) take <1ms.
+PostgreSQL writes over a local network add ~1-5ms per row compared to the
+previous in-process DuckDB writes (~0.1ms). The batched flush in DataAgent
+(every 2s or 50 events, whichever comes first) amortizes this cost, and the
+Director loop sees effectively zero write latency since events are
+fire-and-forget. Read queries for prompt construction (last 5-10 rows with
+simple WHERE + ORDER BY + LIMIT) take <5ms over a local connection. SQLAlchemy
+connection pooling avoids per-query connection overhead.
 
-### 10.7 WorkflowHistory.from_raw() Bug
+### 11.7 WorkflowHistory.from_raw() Bug
 
 As noted in Section 4.2, `from_raw()` discards non-empty lists. This should be
 fixed regardless of the DB migration — either by teaching `from_raw()` to

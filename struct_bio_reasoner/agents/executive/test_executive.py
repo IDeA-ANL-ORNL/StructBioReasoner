@@ -20,6 +20,7 @@ import argparse
 import asyncio
 import logging
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -31,6 +32,8 @@ from academy.exchange import LocalExchangeFactory
 from academy.logging import init_logging
 from academy.manager import Manager
 
+from struct_bio_reasoner.agents.data.data_agent import DataAgent
+from struct_bio_reasoner.agents.data.events import EventType
 from struct_bio_reasoner.agents.director.director_agent import Director
 from struct_bio_reasoner.utils.parsl_settings import (
     LocalSettings,
@@ -136,8 +139,16 @@ class TestExecutive:
         self._shutdown_requested = False
         self._start_time: Optional[float] = None
 
+        # Persistence identifiers
+        self.experiment_id = str(uuid.uuid4())
+        self.data_agent_handle: Optional[Any] = None
+
+        # Map director labels → assigned UUIDs for DB consistency
+        self._director_ids: Dict[str, str] = {}
+
         # Output directory
-        Path(config.output_dir).mkdir(parents=True, exist_ok=True)
+        self._output_dir = Path(config.output_dir)
+        self._output_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info(
             "TestExecutive initialised: %d directors, accelerators split %s",
@@ -147,12 +158,21 @@ class TestExecutive:
 
     # ----- start -----------------------------------------------------------
 
+    async def _emit(self, event: dict[str, Any]) -> None:
+        """Fire-and-forget an event to the executive-level DataAgent."""
+        if self.data_agent_handle is None:
+            return
+        try:
+            await self.data_agent_handle.record_event(event)
+        except Exception:
+            logger.debug("Executive DataAgent event emission failed", exc_info=True)
+
     async def start(self) -> None:
         """Load Parsl, create Academy Manager, launch LocalDirectors."""
         init_logging(logging.INFO)
 
         # --- 1. Load Parsl once at the executive level ---
-        run_dir = Path(self.config.output_dir)
+        run_dir = self._output_dir
         parsl_section = self.yaml_config.get('parsl', {})
         all_accels = parsl_section.get(
             'available_accelerators',
@@ -175,10 +195,44 @@ class TestExecutive:
         await self.academy_manager.__aenter__()
         logger.info("Academy Manager ready")
 
-        # --- 3. Launch LocalDirectors ---
+        # --- 3. Launch executive-level DataAgent ---
+        database_url = self.yaml_config.get(
+            "database_url",
+            f"sqlite+aiosqlite:///{run_dir / 'data.db'}",
+        )
+        self.data_agent_handle = await self.academy_manager.launch(
+            DataAgent,
+            kwargs={"database_url": database_url},
+        )
+        logger.info("Executive DataAgent launched")
+
+        # --- 4. Emit EXPERIMENT_START ---
+        await self._emit({
+            "event_type": EventType.EXPERIMENT_START.value,
+            "director_id": "",
+            "experiment_id": self.experiment_id,
+            "payload": {
+                "experiment_id": self.experiment_id,
+                "research_goal": self.yaml_config.get(
+                    "reasoner", {}
+                ).get("research_goal", ""),
+                "config_snapshot": self.yaml_config,
+                "num_directors": self.config.num_directors,
+            },
+        })
+
+        # --- 5. Launch LocalDirectors ---
         for i, chunk in enumerate(self.accel_chunks):
-            director_id = f"director_{i}"
+            director_label = f"director_{i}"
+            director_id = str(uuid.uuid4())
+            self._director_ids[director_label] = director_id
+
             runtime = build_director_runtime(self.yaml_config, chunk)
+            # Inject director_id and shared database_url so the Director's
+            # DataAgent writes to the same database.
+            runtime['director_id'] = director_id
+            runtime['database_url'] = database_url
+
             director_settings = LocalSettings(
                 available_accelerators=chunk,
                 nodes=1,
@@ -188,12 +242,28 @@ class TestExecutive:
                 LocalDirector,
                 args=(runtime, director_settings),
             )
-            self.director_handles[director_id] = handle
+            self.director_handles[director_label] = handle
             logger.info(
-                "Launched %s with accelerators %s",
+                "Launched %s (id=%s) with accelerators %s",
+                director_label,
                 director_id,
                 chunk,
             )
+
+            # Emit DIRECTOR_START
+            await self._emit({
+                "event_type": EventType.DIRECTOR_START.value,
+                "director_id": director_id,
+                "experiment_id": self.experiment_id,
+                "payload": {
+                    "external_label": director_label,
+                    "accelerator_ids": chunk,
+                    "target_protein": self.yaml_config.get(
+                        "reasoner", {}
+                    ).get("target_protein", ""),
+                    "config_snapshot": runtime,
+                },
+            })
 
         self._start_time = time.monotonic()
         logger.info("All %d directors launched", len(self.director_handles))
@@ -203,12 +273,12 @@ class TestExecutive:
     async def run(self) -> None:
         """Kick off each director's agentic loop and enter the review loop."""
         # Start agentic_run for each director as a background task
-        for director_id, handle in self.director_handles.items():
+        for director_label, handle in self.director_handles.items():
             task = asyncio.create_task(
                 handle.agentic_run(),
-                name=f"run_{director_id}",
+                name=f"run_{director_label}",
             )
-            self.director_tasks[director_id] = task
+            self.director_tasks[director_label] = task
 
         logger.info("Director agentic loops started — entering review loop")
 
@@ -216,22 +286,46 @@ class TestExecutive:
         while not self._should_stop():
             await asyncio.sleep(self.config.review_interval_seconds)
 
-            for director_id, handle in self.director_handles.items():
-                task = self.director_tasks.get(director_id)
+            for director_label, handle in self.director_handles.items():
+                director_id = self._director_ids.get(director_label, director_label)
+                task = self.director_tasks.get(director_label)
+
                 if task and task.done():
-                    logger.info("%s: agentic_run finished", director_id)
+                    logger.info("%s: agentic_run finished", director_label)
+                    snapshot = "completed"
                     try:
                         await task
                     except Exception as exc:
-                        logger.error("%s: agentic_run error: %s", director_id, exc)
+                        logger.error("%s: agentic_run error: %s", director_label, exc)
+                        snapshot = str(exc)
+
+                    await self._emit({
+                        "event_type": EventType.EXECUTIVE_ACTION.value,
+                        "director_id": director_id,
+                        "experiment_id": self.experiment_id,
+                        "payload": {
+                            "action_type": "observed_finished",
+                            "status_snapshot": snapshot,
+                        },
+                    })
                     continue
 
                 try:
                     status = await handle.check_status()
-                    logger.info("%s status: %s", director_id, status)
+                    logger.info("%s status: %s", director_label, status)
+
+                    await self._emit({
+                        "event_type": EventType.EXECUTIVE_ACTION.value,
+                        "director_id": director_id,
+                        "experiment_id": self.experiment_id,
+                        "payload": {
+                            "action_type": "continue",
+                            "status_snapshot": str(status),
+                        },
+                    })
                 except Exception as exc:
                     logger.warning(
-                        "%s: check_status failed: %s", director_id, exc,
+                        "%s: check_status failed: %s", director_label, exc,
                     )
 
         logger.info("Review loop ended")
@@ -243,15 +337,36 @@ class TestExecutive:
         self._shutdown_requested = True
 
         # Cancel running director tasks
-        for director_id, task in self.director_tasks.items():
+        for director_label, task in self.director_tasks.items():
             if not task.done():
                 task.cancel()
-                logger.info("Cancelled %s", director_id)
+                logger.info("Cancelled %s", director_label)
 
         if self.director_tasks:
             await asyncio.gather(
                 *self.director_tasks.values(), return_exceptions=True,
             )
+
+        # Emit DIRECTOR_END for each director
+        for director_label in self.director_handles:
+            director_id = self._director_ids.get(director_label, director_label)
+            task = self.director_tasks.get(director_label)
+            reason = "completed" if (task and task.done()) else "shutdown"
+            await self._emit({
+                "event_type": EventType.DIRECTOR_END.value,
+                "director_id": director_id,
+                "payload": {"reason": reason},
+            })
+
+        # Emit EXPERIMENT_END
+        await self._emit({
+            "event_type": EventType.EXPERIMENT_END.value,
+            "director_id": "",
+            "payload": {
+                "experiment_id": self.experiment_id,
+                "status": "completed",
+            },
+        })
 
         # Academy Manager cleanup
         if self.academy_manager:

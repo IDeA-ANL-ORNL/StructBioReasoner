@@ -1,238 +1,348 @@
-# 🧬 StructBioReasoner
+# StructBioReasoner
 
-**AI-Powered Protein Engineering with Multi-Agent Reasoning and PyMOL Visualization**
+**An agentic framework for autonomous computational protein design using LLM-driven decision-making, distributed HPC execution, and structured scientific workflows.**
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PyMOL Integration](https://img.shields.io/badge/PyMOL-Integrated-green.svg)](https://pymol.org/)
-[![AI Powered](https://img.shields.io/badge/AI-Multi--Agent-purple.svg)](https://openai.com/)
 
-> **A comprehensive AI system for protein engineering that combines structural biology insights, multi-agent reasoning, and advanced visualization capabilities.**
+## Overview
 
-## 🎯 Overview
+StructBioReasoner is a hierarchical multi-agent system that autonomously coordinates computational protein engineering workflows. An LLM-based reasoner decides **what** to do next and **how** to configure each step, while specialized agents execute folding, molecular dynamics, free energy calculations, and binder design on HPC resources via Parsl and Globus Compute.
 
-StructBioReasoner is a cutting-edge AI-powered system for protein engineering that integrates:
+The system follows a three-tier architecture:
 
-- **🤖 Multi-Agent AI System**: ProtoGnosis tournament-based hypothesis generation
-- **🧬 PyMOL Integration**: Publication-quality protein structure visualization  
-- **📊 Predictive Modeling**: Quantitative thermodynamic and structural predictions
-- **🔬 Literature Integration**: Knowledge-driven mutation design
-- **⚡ Real-time Analysis**: Interactive and batch processing modes
+- **Executive** -- manages the experiment, launches and monitors multiple Director agents
+- **Director** -- runs an autonomous decide-then-execute loop, using an LLM to select and parameterize each task
+- **Worker Agents** -- execute scientific computations (folding, MD, design, analysis, free energy)
 
-## ✨ Key Features
+All decisions, plans, and scientific results are persisted to a database through a dedicated Data Agent, enabling full audit trails and cross-director analytics.
 
-### 🧠 **AI-Powered Hypothesis Generation**
-- Multi-agent tournament system with 5 generation agents
-- Protein-specific strategies (structural, evolutionary, energetic, design)
-- Automatic hypothesis ranking and evaluation
-- Session management with persistent storage
+## Architecture
 
-### 🎨 **Advanced Visualization**
-- **PyMOL Integration**: Homebrew, Python module, and command-line interfaces
-- **Multiple Styles**: Cartoon, surface, sticks, spheres representations
-- **Mutation Highlighting**: Automatic identification and coloring of mutation sites
-- **Publication Quality**: High-resolution images (1600x1200) suitable for research
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#1a1a2e', 'primaryTextColor': '#eee', 'primaryBorderColor': '#6c63ff', 'lineColor': '#6c63ff', 'secondaryColor': '#16213e', 'tertiaryColor': '#0f3460', 'edgeLabelBackground': '#1a1a2e'}}}%%
 
-### 📈 **Predictive Capabilities**
-- **Thermostability Predictions**: ΔΔG and ΔTm calculations
-- **Structural Analysis**: Core stability, surface interactions, loop rigidification
-- **Biophysical Modeling**: Hydrophobic packing, electrostatic optimization
-- **Literature Validation**: Evidence-based mutation recommendations
+graph TD
+    subgraph Executive["Executive Agent (simple_executive.py)"]
+        EX_INIT["initialize()<br/>Create Manager + Globus Compute"]
+        EX_LOOP["perform_experiment()<br/>Main management loop"]
+        EX_MANAGE["manage_directors()<br/>Monitor & control directors"]
+        EX_EVAL["evaluate_director()<br/>Check status via ReasonerAgent"]
+        EX_DECIDE{{"KILL | ADVISE | CONTINUE"}}
+        EX_SUMMARY["summarize_experiment()<br/>Collect final results"]
 
-### 🔄 **Multiple Operation Modes**
-- **Interactive Mode**: Real-time hypothesis refinement
-- **Batch Mode**: High-throughput hypothesis generation
-- **Hybrid Mode**: Combined batch generation with interactive refinement
-- **Status Mode**: System health and capability checking
+        EX_INIT --> EX_LOOP --> EX_MANAGE --> EX_EVAL --> EX_DECIDE
+        EX_DECIDE -->|loop| EX_MANAGE
+        EX_LOOP --> EX_SUMMARY
+    end
 
-## 🚀 Quick Start
+    subgraph Director1["Director Agent 1 (director_agent.py)"]
+        D1_LOOP["agentic_run()<br/>Main decision-execution loop"]
 
-### Installation
+        subgraph Reasoning["Step 1: query_reasoner()"]
+            REC["ReasonerAgent.generate_recommendation()<br/>LLM Call &rarr; WHAT to do next"]
+            PLAN["ReasonerAgent.plan_run()<br/>LLM Call &rarr; HOW to do it"]
+            REC --> PLAN
+        end
 
-```bash
-# Clone the repository
-git clone <repository-url>
-cd StructBioReasoner
+        subgraph ToolCall["Step 2: tool_call(task, plan)"]
+            RESOLVE["Resolve TaskName &rarr; Agent Key"]
+            DISPATCH["agent.run(**config)"]
+            RESOLVE --> DISPATCH
+        end
 
-# Install dependencies
-pip install -r requirements.txt
+        D1_LOOP --> Reasoning --> ToolCall
+        ToolCall -->|loop| D1_LOOP
+    end
 
-# Set up environment
-cp .env.example .env
-# Edit .env with your OpenAI API key
+    subgraph Director2["Director Agent N (parallel instances)"]
+        D2_LOOP["agentic_run()<br/>Independent experiment branch"]
+    end
+
+    subgraph Agents["Specialized Worker Agents"]
+        subgraph Design["Computational Design"]
+            BC["BindCraftCoordinator<br/>(bindcraft_coordinator.py)"]
+            BC_FOLD["prepare_run() &rarr; Chai folding"]
+            BC_INV["inverse_fold_sequences() &rarr; ProteinMPNN"]
+            BC_QC["run_qc() &rarr; SequenceQualityControl"]
+            BC_EN["compute_energy() &rarr; SimpleEnergy"]
+            BC --> BC_FOLD & BC_INV & BC_QC & BC_EN
+        end
+
+        subgraph Folding["Structure Prediction"]
+            CHAI["ChaiAgent<br/>(chai_agent.py)"]
+            CHAI_RUN["run() &rarr; fold_sequence_task()<br/>Chai-1 folding"]
+            CHAI --> CHAI_RUN
+        end
+
+        subgraph MD["Molecular Dynamics"]
+            MDA["MDAgent<br/>(MD.py)"]
+            MD_BUILD["build_system() &rarr; Amber prep"]
+            MD_SIM["run_simulation() &rarr; Production MD"]
+            MDA --> MD_BUILD --> MD_SIM
+        end
+
+        subgraph FE["Free Energy"]
+            FEA["FEAgent<br/>(mmpbsa_agent.py)"]
+            FE_RUN["run() &rarr; MM-PBSA calculation"]
+            FEA --> FE_RUN
+        end
+
+        subgraph Analysis["Trajectory Analysis"]
+            TA["TrajectoryAnalysisAgent<br/>(trajectory_analysis.py)"]
+            TA_RUN["RMSD / RMSF / Contacts / Hotspots"]
+            TA --> TA_RUN
+        end
+
+        subgraph LM["Language Model"]
+            RA["ReasonerAgent<br/>(pydantic_ai_agent.py)"]
+            RA_REC["generate_recommendation()"]
+            RA_PLAN["plan_run()"]
+            RA_QUERY["query() / evaluate_history()"]
+            RA --> RA_REC & RA_PLAN & RA_QUERY
+        end
+
+        subgraph RAG_Agent["Literature Retrieval"]
+            RAG["RAGAgent<br/>(rag_agent.py)"]
+            RAG_RUN["HiPerRAG pipeline"]
+            RAG --> RAG_RUN
+        end
+    end
+
+    subgraph Data["Data Layer"]
+        DA["DataAgent<br/>(data_agent.py)"]
+        DA_WRITE["record_event() / record_scientific_event()<br/>Batched writes (50 events / 2s)"]
+        DA_READ["get_director_history()<br/>get_experiment_summary()<br/>get_top_binders()<br/>get_sequence_lifecycle()"]
+        DA --> DA_WRITE & DA_READ
+        DB[("Database<br/>PostgreSQL / SQLite")]
+        DA_WRITE --> DB
+        DA_READ --> DB
+    end
+
+    subgraph Compute["HPC / Distributed Compute"]
+        PARSL["Parsl Task Execution"]
+        GC["Globus Compute Endpoint"]
+    end
+
+    %% Executive to Directors
+    EX_INIT -->|"launch via Academy Manager"| D1_LOOP
+    EX_INIT -->|"launch via Academy Manager"| D2_LOOP
+    EX_DECIDE -->|"KILL"| D1_LOOP
+    EX_DECIDE -->|"ADVISE (send instructions)"| D1_LOOP
+    EX_EVAL -->|"query history"| DA_READ
+
+    %% Director to Agents (tool calls)
+    DISPATCH -->|"computational_design"| BC
+    DISPATCH -->|"structure_prediction"| CHAI
+    DISPATCH -->|"molecular_dynamics"| MDA
+    DISPATCH -->|"free_energy"| FEA
+    DISPATCH -->|"analysis"| TA
+    DISPATCH -->|"rag"| RAG
+
+    %% Director to Reasoner
+    REC -->|"LLM call"| RA_REC
+    PLAN -->|"LLM call"| RA_PLAN
+    EX_EVAL -->|"evaluate_history()"| RA_QUERY
+
+    %% All agents emit events to DataAgent
+    D1_LOOP -.->|"DECISION / PLAN / EXECUTION events"| DA_WRITE
+    D2_LOOP -.->|"events"| DA_WRITE
+    BC -.->|"SEQUENCE_GENERATED / QC_RESULT"| DA_WRITE
+    CHAI -.->|"FOLDING_RESULT"| DA_WRITE
+    MDA -.->|"SIMULATION_RUN"| DA_WRITE
+    FEA -.->|"FREE_ENERGY_RESULT"| DA_WRITE
+    TA -.->|"TRAJECTORY_ANALYSIS"| DA_WRITE
+
+    %% Agents to Parsl
+    BC_FOLD & BC_INV & BC_QC & BC_EN -->|"Parsl apps"| PARSL
+    CHAI_RUN -->|"Parsl apps"| PARSL
+    MD_BUILD & MD_SIM -->|"Parsl apps"| PARSL
+    FE_RUN -->|"Parsl apps"| PARSL
+    TA_RUN -->|"Parsl apps"| PARSL
+    PARSL --- GC
+
+    %% Styling
+    classDef executive fill:#6c63ff,stroke:#6c63ff,color:#fff
+    classDef director fill:#e94560,stroke:#e94560,color:#fff
+    classDef agent fill:#0f3460,stroke:#6c63ff,color:#eee
+    classDef data fill:#16213e,stroke:#00b4d8,color:#eee
+    classDef compute fill:#1b4332,stroke:#52b788,color:#eee
+    classDef decision fill:#ff6b6b,stroke:#ff6b6b,color:#fff
+
+    class EX_INIT,EX_LOOP,EX_MANAGE,EX_EVAL,EX_SUMMARY executive
+    class D1_LOOP,D2_LOOP director
+    class EX_DECIDE decision
+    class BC,CHAI,MDA,FEA,TA,RA,RAG agent
+    class DA,DB data
+    class PARSL,GC compute
 ```
 
-Also need to install Jnana code here: `../Jnana`:
+## How It Works
+
+### 1. Executive Agent (`agents/executive/simple_executive.py`)
+
+The top-level orchestrator. It initializes an Academy Manager with a Globus Compute endpoint, launches one or more Director agents, and runs a management loop that periodically evaluates each director's progress. Based on the evaluation it can:
+
+- **CONTINUE** -- let the director keep running
+- **ADVISE** -- send new instructions or constraints to the director
+- **KILL** -- terminate an underperforming director and optionally launch a replacement
+
+At the end of the experiment it collects and summarizes results across all directors.
+
+### 2. Director Agent (`agents/director/director_agent.py`)
+
+Each Director runs an autonomous `agentic_run()` loop with two phases per iteration:
+
+1. **query_reasoner()** -- Two-stage LLM call via the ReasonerAgent:
+   - `generate_recommendation()` -- decides the next task (returns a `Recommendation` with `next_task`, `change_parameters`, `rationale`)
+   - `plan_run()` -- produces a task-specific configuration (e.g., `ComputationalDesignConfig`, `MolecularDynamicsConfig`)
+
+2. **tool_call(task, plan)** -- resolves the task name to an agent key and calls `agent.run(**config)`:
+
+   | Task Name | Agent Key | Agent Class |
+   |-----------|-----------|-------------|
+   | `COMPUTATIONAL_DESIGN` | `bindcraft` | BindCraftCoordinator |
+   | `STRUCTURE_PREDICTION` | `folding` | ChaiAgent |
+   | `MOLECULAR_DYNAMICS` | `md` | MDAgent |
+   | `FREE_ENERGY` | `mmpbsa` | FEAgent |
+   | `ANALYSIS` | `reasoner` | TrajectoryAnalysisAgent |
+   | `RAG` | `reasoner` | RAGAgent |
+
+The loop repeats until the LLM returns a `STOP` signal or the executive terminates the director.
+
+### 3. Worker Agents
+
+Each worker agent inherits from `academy.Agent` and submits compute-heavy work as Parsl apps:
+
+- **BindCraftCoordinator** (`agents/computational_design/`) -- Orchestrates the binder design pipeline: initial folding via Chai, inverse folding via ProteinMPNN, sequence quality control (diversity, charge, hydrophobic ratio), and binding energy calculation.
+
+- **ChaiAgent** (`agents/structure_prediction/`) -- Runs Chai-1 structure prediction on input sequences with optional constraints.
+
+- **MDAgent** (`agents/molecular_dynamics/`) -- Builds Amber systems (`parsl_build`) and runs production molecular dynamics simulations (`parsl_simulate`).
+
+- **FEAgent** (`agents/molecular_dynamics/mmpbsa_agent.py`) -- Computes binding free energies using MM-PBSA on simulation trajectories.
+
+- **TrajectoryAnalysisAgent** (`agents/analysis/`) -- Analyzes MD trajectories: RMSD, RMSF, radius of gyration, contact frequency, and hotspot identification.
+
+- **RAGAgent** (`agents/hiper_rag/`) -- Literature retrieval and knowledge mining via the HiPerRAG pipeline.
+
+### 4. ReasonerAgent (`agents/language_model/pydantic_ai_agent.py`)
+
+The LLM interface used by both the Director (for task decisions) and the Executive (for director evaluation). Built on pydantic-ai, it returns structured Pydantic models and supports OpenAI-compatible endpoints with ALCF Globus token authentication.
+
+### 5. DataAgent (`agents/data/data_agent.py`)
+
+Handles all persistence. Buffers workflow events (`LLM_CALL`, `DECISION`, `PLAN`, `EXECUTION_START/END`) and scientific events (`SEQUENCE_GENERATED`, `FOLDING_RESULT`, `SIMULATION_RUN`, `FREE_ENERGY_RESULT`, etc.) with automatic batch flushing (every 50 events or 2 seconds). Provides read queries for the Executive: director history, experiment summaries, top binders, sequence lifecycles, and cross-director analytics. Backed by SQLAlchemy with PostgreSQL (asyncpg) or SQLite (aiosqlite).
+
+## Project Structure
+
+```
+StructBioReasoner/
+├── struct_bio_reasoner/
+│   ├── models.py                    # TaskName enum, config models, Recommendation schema
+│   ├── agents/
+│   │   ├── executive/               # Executive agent (simple_executive.py)
+│   │   ├── director/                # Director agent (director_agent.py)
+│   │   ├── language_model/          # ReasonerAgent (pydantic_ai_agent.py)
+│   │   ├── computational_design/    # BindCraftCoordinator
+│   │   ├── structure_prediction/    # ChaiAgent
+│   │   ├── molecular_dynamics/      # MDAgent, FEAgent
+│   │   ├── analysis/                # TrajectoryAnalysisAgent
+│   │   ├── hiper_rag/               # RAGAgent
+│   │   ├── data/                    # DataAgent, event models, DB schema
+│   │   └── embedding/               # ESM/GenSLM embedding and diversity sampling
+│   ├── prompts/
+│   │   ├── _registry.py             # Auto-discovery prompt registry
+│   │   ├── _recommender.py          # Recommendation prompt builder
+│   │   └── tasks/                   # Per-task prompt templates
+│   │       ├── computational_design.py
+│   │       ├── molecular_dynamics.py
+│   │       ├── structure_prediction.py
+│   │       ├── analysis.py
+│   │       ├── free_energy.py
+│   │       └── rag.py
+│   └── utils/
+├── config/                          # YAML configuration files
+├── examples/                        # Example scripts and demos
+├── tests/                           # Test suite
+├── scripts/                         # Utility and HPC submission scripts
+├── docs/                            # Additional documentation
+├── pyproject.toml
+└── requirements.txt
+```
+
+## Installation
+
 ```bash
-# Clone Jnana repo
-cd ..
-https://github.com/acadev/Jnana.git
-cd Jnana
+git clone <repository-url>
+cd StructBioReasoner
 pip install -e .
 ```
 
-### Basic Usage
+For development dependencies:
 
 ```bash
-# Check system status
-python struct_bio_reasoner.py --mode status
-
-# Generate protein engineering hypotheses
-python struct_bio_reasoner.py --mode batch \
-  --goal "Design thermostable mutations for enzyme optimization" \
-  --count 3
-
-# Interactive hypothesis refinement
-python struct_bio_reasoner.py --mode interactive \
-  --goal "Improve protein stability"
+pip install -e ".[dev]"
 ```
 
-### 🧬 **Ubiquitin Thermostability Demo**
-
-Run our comprehensive demonstration:
+### Environment Setup
 
 ```bash
-python examples/ubiquitin_thermostability_design.py
+cp .env.example .env
 ```
 
-**Results:**
-- ✅ 4 beneficial mutations identified (T11I, Q27E, Q48E, D36E)
-- ✅ Average predicted stabilization: 0.93 kcal/mol  
-- ✅ Estimated melting temperature increase: 2.3°C
-- ✅ Publication-quality visualizations generated
+Configure the following in `.env`:
 
-## 📊 **Demonstrated Capabilities**
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | Yes | LLM API key (OpenAI-compatible endpoint) |
+| `ANTHROPIC_API_KEY` | No | Alternative LLM provider |
+| `LOG_LEVEL` | No | Logging verbosity (default: INFO) |
 
-### **🎯 Successful Ubiquitin Engineering**
-Our system successfully designed thermostability-enhancing mutations for ubiquitin:
+### Requirements
 
-| Mutation | ΔΔG (kcal/mol) | Rationale |
-|----------|----------------|-----------|
-| **T11I** | 1.3 | Hydrophobic core stabilization |
-| **Q27E** | 0.7 | Salt bridge formation |
-| **Q48E** | 0.9 | Surface electrostatics |
-| **D36E** | 0.9 | Hydrogen bonding optimization |
+- Python >= 3.10
+- Core: `pydantic`, `pydantic-ai`, `httpx`, `sqlalchemy[asyncio]`, `asyncpg`
+- HPC: Parsl, Globus Compute, Academy framework
+- Science: Amber/AmberTools (MD), Chai-1 (folding), ProteinMPNN (inverse folding)
 
-### **📈 Performance Metrics**
-- **Hypothesis Generation**: 10 hypotheses in ~3 minutes
-- **Tournament Evaluation**: 15 matches completed successfully  
-- **Visualization**: 4 high-quality images (1.4MB total)
-- **Prediction Accuracy**: Literature-validated mutation strategies
+## Configuration
 
-## 🛠️ **System Architecture**
+Experiments are configured via YAML. The config has two main sections:
 
-### **Core Components**
-- **`struct_bio_reasoner/`**: Main system modules
-  - `core/`: Protein engineering system and knowledge foundation
-  - `agents/`: Specialized analysis agents (structural, evolutionary, energetic)
-  - `tools/`: PyMOL wrapper, BioPython utilities
-- **`examples/`**: Demonstration scripts and tutorials
-- **`docs/`**: Comprehensive documentation and guides
-- **`config/`**: System configuration files
+- **`executive`** -- model, temperature, check interval, max directors
+- **`director`** -- enabled agents, research goal, target protein, resource allocation
 
-### **AI Integration**
-- **ProtoGnosis**: Multi-agent hypothesis generation system
-- **Jnana Framework**: Knowledge management and reasoning
-- **OpenAI GPT-4**: Natural language processing and analysis
-- **Tournament System**: Competitive hypothesis evaluation
+See `config/hierarchical_workflow_config.yaml` for a full example.
 
-## 📚 **Documentation**
+## Task Types
 
-- **[PyMOL Integration Guide](docs/PYMOL_INTEGRATION_GUIDE.md)**: Complete PyMOL setup and usage
-- **[Usage Guide](docs/USAGE_GUIDE.md)**: Comprehensive system usage instructions  
-- **[Ubiquitin Results](docs/UBIQUITIN_THERMOSTABILITY_RESULTS.md)**: Detailed analysis of thermostability design
-- **[No-Biomni Setup](docs/NO_BIOMNI_SETUP.md)**: Standalone system configuration
+The `TaskName` enum defines the available workflow steps:
 
-## 🔧 **Requirements**
+| Task | Description |
+|------|-------------|
+| `COMPUTATIONAL_DESIGN` | Binder design: folding, inverse folding, QC, energy |
+| `STRUCTURE_PREDICTION` | Protein structure prediction via Chai-1 |
+| `MOLECULAR_DYNAMICS` | System building and production MD simulation |
+| `FREE_ENERGY` | MM-PBSA binding free energy calculation |
+| `ANALYSIS` | Trajectory analysis (RMSD, RMSF, contacts, hotspots) |
+| `RAG` | Literature retrieval via HiPerRAG |
+| `STARTING` | Bootstrap task (workflow initialization) |
+| `STOP` | Terminal signal (end the director loop) |
 
-### **Core Dependencies**
-- **Python 3.8+**
-- **OpenAI API key** (for AI-powered analysis)
-- **PyMOL** (for structure visualization)
-- **BioPython** (for structural analysis)
-- **Matplotlib** (for plotting and analysis)
+## Event System
 
-### **System Status**
-```bash
-python struct_bio_reasoner.py --mode status
-```
-Expected output:
-```
-✓ pymol          # PyMOL visualization available
-✓ biopython      # Structural analysis available  
-✓ esm            # Protein language models available
-```
+All workflow activity is captured as structured events for observability and reproducibility:
 
-## 🎨 **Example Outputs**
+**Workflow events:** `LLM_CALL`, `DECISION`, `PLAN`, `EXECUTION_START`, `EXECUTION_END`, `KEY_ITEM`, `EXECUTIVE_ACTION`, `EXPERIMENT_START/END`, `DIRECTOR_START/END`
 
-### **Generated Visualizations**
-- **Protein Structures**: Wild-type and mutated protein visualizations
-- **Mutation Highlights**: Color-coded mutation site identification
-- **Predictive Plots**: 4-panel thermostability analysis charts
-- **Surface Representations**: Molecular surface with mutation accessibility
+**Scientific events:** `SEQUENCE_GENERATED`, `QC_RESULT`, `FOLDING_RESULT`, `ENERGY_RESULT`, `SIMULATION_RUN`, `TRAJECTORY_ANALYSIS`, `FREE_ENERGY_RESULT`, `EMBEDDING`
 
-### **Quantitative Predictions**
-- **ΔΔG Values**: Thermodynamic stability predictions
-- **ΔTm Estimates**: Melting temperature changes
-- **Success Rates**: Percentage of beneficial mutations identified
-- **Regional Analysis**: Structural region-specific effects
+## Authors
 
-## 🤝 **Contributing**
+- Matt Sinclair (msinclair@anl.gov)
+- Archit Vasan
 
-We welcome contributions! Please see our contributing guidelines:
+## License
 
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Commit changes**: `git commit -m 'Add amazing feature'`
-4. **Push to branch**: `git push origin feature/amazing-feature`
-5. **Open a Pull Request**
-
-## 📄 **License**
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 **Acknowledgments**
-
-- **Jnana Framework**: Multi-agent reasoning system
-- **ProtoGnosis**: Hypothesis generation and tournament evaluation
-- **PyMOL**: Molecular visualization and analysis
-- **OpenAI**: GPT-4 language model integration
-- **BioPython**: Structural biology tools and utilities
-
-## 📞 **Support**
-
-- **Issues**: [GitHub Issues](../../issues)
-- **Documentation**: [docs/](docs/)
-- **Examples**: [examples/](examples/)
-
----
-
-**🧬 Ready to revolutionize protein engineering with AI? Get started with StructBioReasoner today!** 🚀
-
-Ideas
-- Hierarchical reasoner workflow
-- Sub agents going off at the same time:
-e.g. the reasoner can spawn off a 'naive design' task while it also begins hiper-rag to introduce the interactome
-and then we need to compare the interactome stuff to the naive design to see if we need to add constraints to bias towards certain binding sites
-    - constraints not tested yet
-
-- Run an initial interactome screen with 1 reasoner
-    - Folding -> simulations -> clustering -> hotspots
-- Main reasoner spins out sub-reasoner for each hotspot
-so like this:
-Executor -> Hotspot determination -> List of sub reasoners based on # of hotspots -> Decide biner design workflow step by step, give number of nodes per task needed with the reasoner 
-- Test academy integration for the reasoner
-- Executor -> academy -> parsl -> sub-reasoners -> any task -> -> 
-    - sub-reasoner -> message -> executor -> executive decision
-- CEO -> managerr -> worker
-- message passing: worker -> manager -> CEO
-- CEO and manager are the same api but have different prompts to direct what to do
-- one new directory:
-reasoner/...
-- reasoner file
-prompts/
-- prompts
-    executive
-    manager
-
-while 
+MIT -- see [LICENSE](LICENSE) for details.
