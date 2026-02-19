@@ -37,21 +37,14 @@ logger = logging.getLogger(__name__)
 
 @parsl.python_app(executors=['gpu', 'htex'])
 def embedding_task(
+    embed_alg: object,
     sequences: list[str],
-    model: object,
-    tokenizer: object,
-    inf_params: dict,
-    device: str = 'xpu'
+    metadata: list[str],
 ) -> dict:
     """Parsl task for folding a single sequence."""
-        
-    import struct_bio_reasoner.utils.embedding_utils as embedding_utils
-    pbar = embedding_utils.create_dataloader(sequences,
-                    tokenizer,
-                    inf_params)
+    
+    results = embed_alg(sequences, metadata)
 
-    all_embeddings = embedding_utils.embed_seqs(pbar, model, device)
-    results = [(seq, emb) for seq, emb in zip(sequences, all_embeddings)]
     return results
 
 
