@@ -60,10 +60,16 @@ class Chai(Folding):
         if constraints is None:
             return constraints
 
+        required_keys = {'chainA', 'resA', 'chainB', 'resB', 'const_type', 'distance'}
         constraints_text = [header]
         for i, constraint_params in constraints.items():
+            if not isinstance(constraint_params, dict) or not required_keys.issubset(constraint_params):
+                continue
             constraint_params['i'] = i
             constraints_text.append(template.substitute(**constraint_params))
+
+        if len(constraints_text) == 1:
+            return None
 
         constraint_file = out / 'constraints.txt'
         constraint_file.write_text('\n'.join(constraints_text))
@@ -158,10 +164,16 @@ class ChaiBinder(Chai):
         if constraints is None:
             return constraints
 
+        required_keys = {'chainA', 'resA', 'chainB', 'resB', 'const_type', 'distance'}
         constraints_text = [header]
         for i, constraint_params in constraints.items():
+            if not isinstance(constraint_params, dict) or not required_keys.issubset(constraint_params):
+                continue
             constraint_params['i'] = i
             constraints_text.append(template.substitute(**constraint_params))
+
+        if len(constraints_text) == 1:
+            return None
 
         constraint_file = out / 'constraints.txt'
         constraint_file.write_text('\n'.join(constraints_text))

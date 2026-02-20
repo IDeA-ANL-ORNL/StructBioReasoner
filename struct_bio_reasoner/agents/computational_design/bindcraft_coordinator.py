@@ -67,7 +67,8 @@ class BindCraftCoordinator(Agent):
 
         self.inv_fold_handle = self.inv_fold_alg(**self.inverse_folding)
 
-        self.qc_handle = SequenceQualityControl(**self.quality_control)
+        qc_kwargs = {k: v for k, v in self.quality_control.items() if k != 'enabled'}
+        self.qc_handle = SequenceQualityControl(**qc_kwargs)
 
         self.energy_handle = SimpleEnergy()
         
