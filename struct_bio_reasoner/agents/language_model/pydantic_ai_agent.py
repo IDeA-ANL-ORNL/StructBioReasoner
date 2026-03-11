@@ -26,6 +26,7 @@ from struct_bio_reasoner.utils.inference_auth_token import get_access_token
 
 logger = logging.getLogger(__name__)
 
+
 # ---------------------------------------------------------------------------
 # Section 2: ALCF Auth Utility
 # ---------------------------------------------------------------------------
@@ -55,19 +56,20 @@ class ReasonerAgent(Agent):
     """
 
     def __init__(
-        self,
-        research_goal: str,
-        enabled_agents: list[str],
-        llm_provider: str,
-        target_protein: str,
-        *,
-        resource_summary: str = "",
-        base_url: str = "https://inference-api.alcf.anl.gov/resource_server/sophia/vllm/v1",
-        model_name: str = "openai/gpt-oss-120b",
-        api_key: str = "placeholder",
-        auth: httpx.Auth | None = None,
-        timeout: httpx.Timeout = httpx.Timeout(120.0, connect=30.0),
+            self,
+            research_goal: str,
+            enabled_agents: list[str],
+            llm_provider: str,
+            target_protein: str,
+            *,
+            resource_summary: str = "",
+            base_url: str = "https://inference-api.alcf.anl.gov/resource_server/sophia/vllm/v1",
+            model_name: str = "openai/gpt-oss-120b",
+            api_key: str = "placeholder",
+            auth: httpx.Auth | None = None,
+            timeout: httpx.Timeout = httpx.Timeout(120.0, connect=30.0),
     ):
+        super().__init__()
         self.research_goal = research_goal
         self.enabled_agents = enabled_agents
         self.llm_provider = llm_provider
@@ -94,12 +96,12 @@ class ReasonerAgent(Agent):
 
     @action
     async def generate_recommendation(
-        self,
-        results: Any,
-        previous_run: str,
-        history: dict,
-        prompt_type: str = "",
-        executive_instruction: str | None = None,
+            self,
+            results: Any,
+            previous_run: str,
+            history: dict,
+            prompt_type: str = "",
+            executive_instruction: str | None = None,
     ) -> RecommendationResult:
         """Generate a recommended next task.
 
@@ -137,26 +139,51 @@ class ReasonerAgent(Agent):
 
         logger.debug(recommender_prompt)
 
-        result = await self._agent.run(
-            user_prompt=recommender_prompt,
-            output_type=PromptedOutput(Recommendation),
-            model_settings=ModelSettings(temperature=0.3, max_tokens=32768),
+        recommendation = await self._invoke_agent(
+            recommender_prompt,
+            output_type=Recommendation,
+            temperature=0.3,
+            max_tokens=32768
         )
-
-        recommendation = result.output
         logger.debug(recommendation)
+        print(recommendation)
 
         return RecommendationResult(
             previous_run=previous_run,
             recommendation=recommendation,
         )
 
+    async def _invoke_agent(
+            self,
+            prompt: str,
+            output_type: type[BaseModel] | None = None,
+            temperature: float = 0.3,
+            max_tokens: int = 32768,
+    ) -> BaseModel | str:
+        """Invoke an agent with the given prompt.
+
+        Args:
+            prompt: The prompt to send to the agent
+            output_type: Optional Pydantic model class to parse the output into. If None, returns raw string.
+            temperature: LLM temperature setting
+            max_tokens: LLM max tokens setting
+        Returns:
+            The agent's response, either as a Pydantic model instance or raw string.
+        """
+
+        result = await self._agent.run(
+            user_prompt=prompt,
+            output_type=str if output_type is None else PromptedOutput(output_type),
+            model_settings=ModelSettings(temperature=temperature, max_tokens=max_tokens),
+        )
+        return result.output
+
     @action
     async def plan_run(
-        self,
-        recommendation: RecommendationResult,
-        history: dict,
-        prompt_type: str = "",
+            self,
+            recommendation: RecommendationResult,
+            history: dict,
+            prompt_type: str = "",
     ) -> BaseModel | dict[str, Any]:
         """Generate a config for the recommended next task.
 
@@ -183,29 +210,29 @@ class ReasonerAgent(Agent):
             logger.warning(
                 f"No Pydantic plan model for task '{next_task}', falling back to str output"
             )
-            result = await self._agent.run(
-                user_prompt=running_text,
-                model_settings=ModelSettings(temperature=0.3, max_tokens=32768),
+            output = await self._invoke_agent(
+                running_text,
+                temperature=0.3,
+                max_tokens=32768,
             )
-            return {"raw": result.output}
+            return {"raw": output}
 
-        result = await self._agent.run(
-            user_prompt=running_text,
-            output_type=PromptedOutput(plan_model),
-            model_settings=ModelSettings(temperature=0.3, max_tokens=32768),
+        plan = await self._invoke_agent(
+            running_text,
+            plan_model,
+            temperature=0.3,
+            max_tokens=32768,
         )
-
-        return result.output
+        return plan
 
     @action
     async def query(self, prompt: str) -> str:
         """Send a free-form prompt to the LLM and return the response."""
-        result = await self._agent.run(
-            user_prompt=prompt,
-            output_type=str,
-            model_settings=ModelSettings(temperature=0.7, max_tokens=32768),
+        return await self._invoke_agent(
+            prompt,
+            temperature=0.7,
+            max_tokens=32768,
         )
-        return result.output
 
     @action
     async def evaluate_history(self, history: str) -> tuple[str]:
@@ -215,12 +242,12 @@ class ReasonerAgent(Agent):
             f"continue, stop, or change strategy. History:\n{history}\n\n"
             f"Return a brief decision and explanation."
         )
-        result = await self._agent.run(
-            user_prompt=prompt,
-            output_type=str,
-            model_settings=ModelSettings(temperature=0.3, max_tokens=4096),
+        result = await self._invoke_agent(
+            prompt,
+            temperature=0.3,
+            max_tokens=4096
         )
-        return (result.output,)
+        return (result,)
 
 
 # Backward-compat alias

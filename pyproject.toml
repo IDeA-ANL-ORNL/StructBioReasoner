@@ -42,6 +42,9 @@ md = [
 all = [
     "struct_bio_reasoner[dev,md]",
 ]
+nvidia = [
+    "langchain-nvidia-ai-endpoints",
+]
 
 [project.urls]
 Homepage = 'https://github.com/IDeA-ANL-ORNL/StructBioReasoner'
