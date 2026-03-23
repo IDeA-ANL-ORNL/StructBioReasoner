@@ -35,8 +35,16 @@ md = [
     "openmm>=8.0",
     "mdtraj>=1.9.7",
 ]
+jnana = [
+    "jnana @ git+https://github.com/acadev/Jnana.git",
+]
+academy = [
+    "jnana @ git+https://github.com/acadev/Jnana.git",
+    "parsl>=2024.1.1",
+    "redis>=5.0",
+]
 all = [
-    "struct_bio_reasoner[dev,md]",
+    "struct_bio_reasoner[dev,md,jnana]",
 ]
 
 [project.urls]

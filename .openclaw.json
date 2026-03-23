@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "structbioreasoner": {
+      "command": "python",
+      "args": ["-m", "struct_bio_reasoner.mcp.server"],
+      "env": {
+        "PYTHONPATH": "."
+      }
+    }
+  },
+  "skills": {
+    "load": {
+      "extraDirs": []
+    }
+  }
+}
