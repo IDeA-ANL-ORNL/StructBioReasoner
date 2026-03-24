@@ -587,3 +587,582 @@ class TestConvergenceDetection:
         result = await loop.run("Test goal", max_iterations=10)
         assert result["converged"] is True
         assert result["iterations"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Campaign mode (multi-phase workflow)
+# ---------------------------------------------------------------------------
+
+
+class TestCampaignMode:
+    """Test multi-phase campaign orchestration."""
+
+    @pytest.fixture
+    def mock_dispatch(self):
+        dispatch = MagicMock()
+        dispatch._started = True
+        dispatch.list_available_skills.return_value = [
+            "bindcraft", "folding", "md", "rag",
+        ]
+        dispatch.list_active_workers.return_value = []
+        dispatch.start = AsyncMock()
+        dispatch.stop = AsyncMock()
+        dispatch.dispatch = AsyncMock(return_value={
+            "result": "mock_output",
+            "affinity": -12.5,
+            "status": "success",
+        })
+        return dispatch
+
+    @pytest.mark.asyncio
+    async def test_two_phase_campaign(self, tmp_path, mock_dispatch):
+        """Run a 2-phase campaign: exploration → design."""
+        from struct_bio_reasoner.workflows.hybrid_loop import (
+            HybridLoop, CampaignPhase,
+        )
+
+        loop = HybridLoop(artifact_store_root=str(tmp_path / "artifacts"))
+        loop._academy_dispatch = mock_dispatch
+        loop._started = True
+
+        phases = [
+            CampaignPhase(
+                name="exploration",
+                goal="Identify hotspots",
+                step_sequence=["rag", "structure_prediction"],
+                max_iterations=5,
+            ),
+            CampaignPhase(
+                name="design",
+                goal="Design binders",
+                step_sequence=["computational_design"],
+                max_iterations=5,
+            ),
+        ]
+
+        # Phase 1 LLM responses: rag step + stop
+        # Phase 2 LLM responses: design step + stop
+        llm_responses = [
+            # Phase 1 - set_goal hypothesis
+            # Phase 1 step 1: recommend rag
+            {"next_task": "rag", "rationale": "Start with literature", "confidence": 0.8},
+            {"prompt": "find hotspots"},  # bound params
+            {"evaluation": "Found targets", "decision": "continue", "updated_hypothesis": "Hotspots found", "scores": {"coverage": 0.9}},
+            # Phase 1 step 2: recommend stop (sequence ends)
+            {"next_task": "structure_prediction", "rationale": "Fold complexes", "confidence": 0.7},
+            {"sequences": [["AAAA"]], "names": ["test"]},  # bound params
+            {"evaluation": "Structures predicted", "decision": "continue", "updated_hypothesis": "OK", "scores": {"confidence": 0.8}},
+            # Phase 2 - set_goal hypothesis
+            # Phase 2 step 1: recommend design
+            {"next_task": "computational_design", "rationale": "Design binders", "confidence": 0.9},
+            {"binder_sequence": "MKTEST", "num_rounds": 3},  # bound params
+            {"evaluation": "Good binder", "decision": "continue", "updated_hypothesis": "Binder works", "scores": {"affinity": -12.5}},
+        ]
+        _mock_llm_json_call(loop.reasoning_bridge, llm_responses)
+
+        result = await loop.run_campaign("Design binder for NMNAT-2", phases)
+
+        assert result["phases_completed"] == 2
+        assert result["total_phases"] == 2
+        assert len(result["phase_results"]) == 2
+        assert result["phase_results"][0]["phase_name"] == "exploration"
+        assert result["phase_results"][1]["phase_name"] == "design"
+
+    @pytest.mark.asyncio
+    async def test_campaign_memory_persists(self, tmp_path, mock_dispatch):
+        """Memory should persist across phases."""
+        from struct_bio_reasoner.workflows.hybrid_loop import (
+            HybridLoop, CampaignPhase, CampaignMemory,
+        )
+
+        loop = HybridLoop(artifact_store_root=str(tmp_path / "artifacts"))
+        loop._academy_dispatch = mock_dispatch
+        loop._started = True
+
+        phases = [
+            CampaignPhase(
+                name="phase1", goal="Goal 1",
+                step_sequence=["rag"], max_iterations=3,
+            ),
+            CampaignPhase(
+                name="phase2", goal="Goal 2",
+                step_sequence=["computational_design"], max_iterations=3,
+            ),
+        ]
+
+        llm_responses = [
+            # Phase 1
+            {"next_task": "rag", "rationale": "Search", "confidence": 0.7},
+            {"prompt": "search"},
+            {"evaluation": "Found", "decision": "continue", "updated_hypothesis": "OK", "scores": {"relevance": 0.8}},
+            # Phase 2
+            {"next_task": "computational_design", "rationale": "Design", "confidence": 0.8},
+            {"binder_sequence": "AAA", "num_rounds": 1},
+            {"evaluation": "Designed", "decision": "continue", "updated_hypothesis": "OK", "scores": {"affinity": -10.0}},
+        ]
+        _mock_llm_json_call(loop.reasoning_bridge, llm_responses)
+
+        result = await loop.run_campaign("Test goal", phases)
+
+        # Memory should contain experimental data from both phases
+        mem = result["memory"]
+        assert len(mem["long_term"]["experimental_data"]) >= 2
+        phases_in_memory = {e["phase"] for e in mem["long_term"]["experimental_data"]}
+        assert "phase1" in phases_in_memory
+        assert "phase2" in phases_in_memory
+
+    @pytest.mark.asyncio
+    async def test_campaign_produces_tournament_rounds(self, tmp_path, mock_dispatch):
+        """Each phase should produce a tournament round."""
+        from struct_bio_reasoner.workflows.hybrid_loop import (
+            HybridLoop, CampaignPhase,
+        )
+
+        loop = HybridLoop(artifact_store_root=str(tmp_path / "artifacts"))
+        loop._academy_dispatch = mock_dispatch
+        loop._started = True
+
+        phases = [
+            CampaignPhase(
+                name="phase1", goal="Goal 1",
+                step_sequence=["rag"], max_iterations=3,
+            ),
+        ]
+
+        llm_responses = [
+            {"next_task": "rag", "rationale": "Search", "confidence": 0.7},
+            {"prompt": "search"},
+            {"evaluation": "Found", "decision": "continue", "updated_hypothesis": "OK", "scores": {"relevance": 0.8}},
+        ]
+        _mock_llm_json_call(loop.reasoning_bridge, llm_responses)
+
+        result = await loop.run_campaign("Test goal", phases)
+
+        assert len(result["tournament_rounds"]) >= 1
+        tr = result["tournament_rounds"][0]
+        assert tr["phase_name"] == "phase1"
+        assert tr["round_number"] == 1
+        assert len(tr["artifact_ids"]) >= 1
+
+    @pytest.mark.asyncio
+    async def test_campaign_stores_artifacts_in_dag(self, tmp_path, mock_dispatch):
+        """Campaign should store campaign config + tournament artifacts."""
+        from struct_bio_reasoner.workflows.hybrid_loop import (
+            HybridLoop, CampaignPhase,
+        )
+
+        loop = HybridLoop(artifact_store_root=str(tmp_path / "artifacts"))
+        loop._academy_dispatch = mock_dispatch
+        loop._started = True
+
+        phases = [
+            CampaignPhase(
+                name="phase1", goal="Goal 1",
+                step_sequence=["rag"], max_iterations=3,
+            ),
+        ]
+
+        llm_responses = [
+            {"next_task": "rag", "rationale": "Search", "confidence": 0.7},
+            {"prompt": "search"},
+            {"evaluation": "Found", "decision": "continue", "updated_hypothesis": "OK", "scores": {}},
+        ]
+        _mock_llm_json_call(loop.reasoning_bridge, llm_responses)
+
+        await loop.run_campaign("Test goal", phases)
+
+        # Should have: campaign config + phase artifacts + tournament round
+        all_ids = loop.artifact_dag.artifact_store.list_all()
+        assert len(all_ids) >= 3
+
+
+# ---------------------------------------------------------------------------
+# Tournament framework
+# ---------------------------------------------------------------------------
+
+
+class TestTournamentRound:
+    """Test tournament scoring and promote/cull decisions."""
+
+    def test_tournament_round_dataclass(self):
+        from struct_bio_reasoner.workflows.hybrid_loop import TournamentRound
+
+        tr = TournamentRound(
+            round_number=1,
+            phase_name="design",
+            scores={"affinity": -12.5, "stability": 0.6},
+            promoted=["affinity"],
+            culled=["stability"],
+        )
+        d = tr.to_dict()
+        assert d["round_number"] == 1
+        assert d["phase_name"] == "design"
+        assert "affinity" in d["promoted"]
+        assert "stability" in d["culled"]
+
+    @pytest.mark.asyncio
+    async def test_tournament_promotes_above_average(self, tmp_path):
+        """Scores above average are promoted, below are culled."""
+        from struct_bio_reasoner.workflows.hybrid_loop import HybridLoop, LoopStep
+
+        loop = HybridLoop(artifact_store_root=str(tmp_path / "artifacts"))
+
+        # Create fake steps with varying scores
+        steps = [
+            LoopStep(
+                iteration=1, task_type="computational_design",
+                skill_name="bindcraft", artifact_id="art1",
+                evaluation={"scores": {"affinity": -15.0}},
+            ),
+            LoopStep(
+                iteration=2, task_type="molecular_dynamics",
+                skill_name="md", artifact_id="art2",
+                evaluation={"scores": {"rmsd": 1.5}},
+            ),
+            LoopStep(
+                iteration=3, task_type="computational_design",
+                skill_name="bindcraft", artifact_id="art3",
+                evaluation={"scores": {"affinity": -5.0}},
+            ),
+        ]
+
+        tournament = loop._score_tournament_round(steps, "design")
+
+        assert tournament is not None
+        assert tournament.round_number == 1
+        assert len(tournament.scores) >= 2
+        # With scores -15, 1.5, -5 → avg ≈ -6.17
+        # -5 > avg → promoted; -15 < avg → culled; 1.5 > avg → promoted
+        assert len(tournament.promoted) + len(tournament.culled) == len(tournament.scores)
+
+    def test_tournament_round_empty_steps(self, tmp_path):
+        from struct_bio_reasoner.workflows.hybrid_loop import HybridLoop
+
+        loop = HybridLoop(artifact_store_root=str(tmp_path / "artifacts"))
+        result = loop._score_tournament_round([], "empty")
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# CampaignMemory
+# ---------------------------------------------------------------------------
+
+
+class TestCampaignMemory:
+    """Test the long-term/short-term memory system."""
+
+    def test_memory_init(self):
+        from struct_bio_reasoner.workflows.hybrid_loop import CampaignMemory
+
+        mem = CampaignMemory()
+        assert "hotspots" in mem.long_term
+        assert "top_binders" in mem.long_term
+        assert "design_constraints" in mem.long_term
+        assert len(mem.short_term) == 0
+
+    def test_add_long_term(self):
+        from struct_bio_reasoner.workflows.hybrid_loop import CampaignMemory
+
+        mem = CampaignMemory()
+        mem.add_long_term("hotspots", {"residue": "R45", "score": 0.9})
+        assert len(mem.long_term["hotspots"]) == 1
+        assert mem.long_term["hotspots"][0]["residue"] == "R45"
+
+    def test_add_long_term_new_category(self):
+        from struct_bio_reasoner.workflows.hybrid_loop import CampaignMemory
+
+        mem = CampaignMemory()
+        mem.add_long_term("custom_category", "value1")
+        assert "custom_category" in mem.long_term
+        assert mem.long_term["custom_category"] == ["value1"]
+
+    def test_short_term_auto_trim(self):
+        from struct_bio_reasoner.workflows.hybrid_loop import CampaignMemory
+
+        mem = CampaignMemory(max_short_term=5)
+        for i in range(10):
+            mem.add_short_term({"iteration": i})
+
+        assert len(mem.short_term) == 5
+        # Should keep the most recent entries
+        assert mem.short_term[0]["iteration"] == 5
+        assert mem.short_term[-1]["iteration"] == 9
+
+    def test_manual_trim(self):
+        from struct_bio_reasoner.workflows.hybrid_loop import CampaignMemory
+
+        mem = CampaignMemory(max_short_term=100)
+        for i in range(20):
+            mem.add_short_term({"iteration": i})
+
+        mem.trim_short_term(keep=3)
+        assert len(mem.short_term) == 3
+        assert mem.short_term[0]["iteration"] == 17
+
+    def test_get_context(self):
+        from struct_bio_reasoner.workflows.hybrid_loop import CampaignMemory
+
+        mem = CampaignMemory()
+        mem.add_long_term("hotspots", {"residue": "R45"})
+        for i in range(15):
+            mem.add_short_term({"iteration": i})
+
+        ctx = mem.get_context()
+        assert "long_term" in ctx
+        assert "short_term" in ctx
+        # get_context returns at most 10 short-term entries
+        assert len(ctx["short_term"]) == 10
+
+    def test_to_dict(self):
+        from struct_bio_reasoner.workflows.hybrid_loop import CampaignMemory
+
+        mem = CampaignMemory(max_short_term=15)
+        mem.add_long_term("hotspots", "R45")
+        mem.add_short_term({"x": 1})
+
+        d = mem.to_dict()
+        assert d["max_short_term"] == 15
+        assert len(d["long_term"]["hotspots"]) == 1
+        assert len(d["short_term"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# Checkpoint callbacks
+# ---------------------------------------------------------------------------
+
+
+class TestCheckpointCallbacks:
+    """Test human-in-the-loop checkpoint firing."""
+
+    @pytest.fixture
+    def mock_dispatch(self):
+        dispatch = MagicMock()
+        dispatch._started = True
+        dispatch.list_available_skills.return_value = ["bindcraft"]
+        dispatch.list_active_workers.return_value = []
+        dispatch.start = AsyncMock()
+        dispatch.stop = AsyncMock()
+        dispatch.dispatch = AsyncMock(return_value={
+            "result": "mock_output", "affinity": -12.5,
+        })
+        return dispatch
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_fires_at_interval(self, tmp_path, mock_dispatch):
+        """Checkpoint fires every N steps."""
+        from struct_bio_reasoner.workflows.hybrid_loop import (
+            HybridLoop, CampaignPhase,
+        )
+
+        checkpoint_calls = []
+
+        def my_callback(hypotheses, evidence, uncertainties):
+            checkpoint_calls.append({
+                "hypotheses": hypotheses,
+                "evidence": evidence,
+            })
+            return None  # no override
+
+        loop = HybridLoop(
+            artifact_store_root=str(tmp_path / "artifacts"),
+            checkpoint_callback=my_callback,
+            checkpoint_interval=2,
+        )
+        loop._academy_dispatch = mock_dispatch
+        loop._started = True
+
+        phases = [
+            CampaignPhase(
+                name="test", goal="Test",
+                step_sequence=["rag", "computational_design", "molecular_dynamics"],
+                max_iterations=5,
+            ),
+        ]
+
+        llm_responses = [
+            # Step 1
+            {"next_task": "rag", "rationale": "Search", "confidence": 0.7},
+            {"prompt": "search"},
+            {"evaluation": "Found", "decision": "continue", "updated_hypothesis": "OK", "scores": {}},
+            # Step 2
+            {"next_task": "computational_design", "rationale": "Design", "confidence": 0.8},
+            {"binder_sequence": "AAA", "num_rounds": 1},
+            {"evaluation": "Designed", "decision": "continue", "updated_hypothesis": "OK", "scores": {"affinity": -10.0}},
+            # Step 3
+            {"next_task": "molecular_dynamics", "rationale": "Simulate", "confidence": 0.7},
+            {"simulation_paths": ["/sim1"], "steps": 1000},
+            {"evaluation": "Simulated", "decision": "continue", "updated_hypothesis": "OK", "scores": {"rmsd": 2.0}},
+        ]
+        _mock_llm_json_call(loop.reasoning_bridge, llm_responses)
+
+        await loop.run_campaign("Test goal", phases)
+
+        # Checkpoint should have fired at step 2 (interval=2)
+        assert len(checkpoint_calls) >= 1
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_override_applied(self, tmp_path, mock_dispatch):
+        """Checkpoint override injects into reasoning history."""
+        from struct_bio_reasoner.workflows.hybrid_loop import (
+            HybridLoop, CampaignPhase,
+        )
+
+        def override_callback(hypotheses, evidence, uncertainties):
+            return {
+                "key_items": "Focus on hotspot R45",
+                "configuration": {"focus_residue": "R45"},
+            }
+
+        loop = HybridLoop(
+            artifact_store_root=str(tmp_path / "artifacts"),
+            checkpoint_callback=override_callback,
+            checkpoint_interval=1,  # fire every step
+        )
+        loop._academy_dispatch = mock_dispatch
+        loop._started = True
+
+        phases = [
+            CampaignPhase(
+                name="test", goal="Test",
+                step_sequence=["rag", "computational_design"],
+                max_iterations=5,
+            ),
+        ]
+
+        llm_responses = [
+            {"next_task": "rag", "rationale": "Search", "confidence": 0.7},
+            {"prompt": "search"},
+            {"evaluation": "Found", "decision": "continue", "updated_hypothesis": "OK", "scores": {}},
+            {"next_task": "computational_design", "rationale": "Design", "confidence": 0.8},
+            {"binder_sequence": "AAA", "num_rounds": 1},
+            {"evaluation": "Designed", "decision": "continue", "updated_hypothesis": "OK", "scores": {}},
+        ]
+        _mock_llm_json_call(loop.reasoning_bridge, llm_responses)
+
+        await loop.run_campaign("Test goal", phases)
+
+        # History should contain override
+        key_items = loop.reasoning_bridge.history["key_items"]
+        assert any("R45" in str(ki) for ki in key_items)
+
+    def test_checkpoint_callback_in_constructor(self, tmp_path):
+        """Verify checkpoint params are stored correctly."""
+        from struct_bio_reasoner.workflows.hybrid_loop import HybridLoop
+
+        def dummy(h, e, u):
+            return None
+
+        loop = HybridLoop(
+            artifact_store_root=str(tmp_path / "artifacts"),
+            checkpoint_callback=dummy,
+            checkpoint_interval=3,
+        )
+        assert loop._checkpoint_callback is dummy
+        assert loop._checkpoint_interval == 3
+
+
+# ---------------------------------------------------------------------------
+# Cross-hypothesis learning
+# ---------------------------------------------------------------------------
+
+
+class TestCrossHypothesisLearning:
+    """Test pattern identification across hypotheses."""
+
+    def test_patterns_identified_from_memory(self, tmp_path):
+        from struct_bio_reasoner.workflows.hybrid_loop import (
+            HybridLoop, CampaignMemory,
+        )
+
+        loop = HybridLoop(artifact_store_root=str(tmp_path / "artifacts"))
+        loop._campaign_memory = CampaignMemory()
+
+        # Add multiple evaluations for the same task type
+        loop._campaign_memory.add_short_term({
+            "task_type": "computational_design",
+            "evaluation": {"scores": {"affinity": -12.0}},
+        })
+        loop._campaign_memory.add_short_term({
+            "task_type": "computational_design",
+            "evaluation": {"scores": {"affinity": -11.5}},
+        })
+        loop._campaign_memory.add_short_term({
+            "task_type": "computational_design",
+            "evaluation": {"scores": {"affinity": -12.2}},
+        })
+
+        loop._update_cross_hypothesis_patterns()
+
+        assert len(loop._cross_hypothesis_patterns) >= 1
+        pattern = loop._cross_hypothesis_patterns[0]
+        assert pattern["task_type"] == "computational_design"
+        assert pattern["metric"] == "affinity"
+        assert pattern["count"] == 3
+
+    def test_design_constraints_stored_in_memory(self, tmp_path):
+        from struct_bio_reasoner.workflows.hybrid_loop import (
+            HybridLoop, CampaignMemory,
+        )
+
+        loop = HybridLoop(artifact_store_root=str(tmp_path / "artifacts"))
+        loop._campaign_memory = CampaignMemory()
+
+        # Add consistent scores → should create design constraint
+        for i in range(3):
+            loop._campaign_memory.add_short_term({
+                "task_type": "molecular_dynamics",
+                "evaluation": {"scores": {"rmsd": 2.0 + i * 0.05}},
+            })
+
+        loop._update_cross_hypothesis_patterns()
+
+        constraints = loop._campaign_memory.long_term["design_constraints"]
+        assert len(constraints) >= 1
+        assert constraints[0]["source"] == "cross_hypothesis"
+        assert constraints[0]["task_type"] == "molecular_dynamics"
+
+    def test_no_patterns_without_memory(self, tmp_path):
+        from struct_bio_reasoner.workflows.hybrid_loop import HybridLoop
+
+        loop = HybridLoop(artifact_store_root=str(tmp_path / "artifacts"))
+        loop._campaign_memory = None
+        loop._update_cross_hypothesis_patterns()
+        assert len(loop._cross_hypothesis_patterns) == 0
+
+    def test_no_patterns_with_single_entry(self, tmp_path):
+        from struct_bio_reasoner.workflows.hybrid_loop import (
+            HybridLoop, CampaignMemory,
+        )
+
+        loop = HybridLoop(artifact_store_root=str(tmp_path / "artifacts"))
+        loop._campaign_memory = CampaignMemory()
+        loop._campaign_memory.add_short_term({
+            "task_type": "rag",
+            "evaluation": {"scores": {"relevance": 0.9}},
+        })
+
+        loop._update_cross_hypothesis_patterns()
+        # Need at least 2 entries to find patterns
+        assert len(loop._cross_hypothesis_patterns) == 0
+
+
+# ---------------------------------------------------------------------------
+# CampaignPhase dataclass
+# ---------------------------------------------------------------------------
+
+
+class TestCampaignPhase:
+    def test_to_dict(self):
+        from struct_bio_reasoner.workflows.hybrid_loop import CampaignPhase
+
+        phase = CampaignPhase(
+            name="exploration",
+            goal="Find targets",
+            step_sequence=["rag", "folding"],
+            max_iterations=5,
+        )
+        d = phase.to_dict()
+        assert d["name"] == "exploration"
+        assert d["goal"] == "Find targets"
+        assert d["step_sequence"] == ["rag", "folding"]
+        assert d["max_iterations"] == 5
