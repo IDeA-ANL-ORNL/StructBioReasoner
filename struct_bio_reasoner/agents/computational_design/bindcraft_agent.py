@@ -13,7 +13,7 @@ from datetime import datetime
 
 from jnana.core.model_manager import UnifiedModelManager
 
-from ...data.protein_hypothesis import BinderAnalysis, ProteinHypothesis
+from ...data.protein_hypothesis import BinderAnalysis, ProteinHypothesis, GlycanChain
 from ...core.base_agent import BaseAgent
 
 class BindCraftAgent:
@@ -235,7 +235,7 @@ class BindCraftAgent:
         folds_dir = cwd / "folds"
         fasta_dir.mkdir(exist_ok=True)
         folds_dir.mkdir(exist_ok=True)
-            
+
         target_sequence = data['target_sequence']
         print(f"\n{'='*80}")
         print(f"BindCraft _generate_binder_hypothesis - SEQUENCES BEING USED:")
@@ -244,7 +244,65 @@ class BindCraftAgent:
         constraints = data.get('constraints', None)
         num_rounds = data.get('num_rounds', 3)
 
-        # Run the workflow
+        # --- glycan support ------------------------------------------------
+        # In the binder-design context chain assignment is:
+        #   A = target protein,  B = designed binder,  C,D,... = glycan chains
+        # Glycan chains extracted from the research goal start at 'B' by
+        # default, so we shift them by 2 positions here (past A and B).
+        raw_glycan_chains: list[GlycanChain] = data.get('glycan_chains', [])
+        glycan_chains: list[GlycanChain] = []
+        glycan_restraint_path: Optional[Path] = None
+
+        if raw_glycan_chains:
+            chain_letters = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+            # Target=A (offset 0), Binder=B (offset 1), glycans start at C (offset 2)
+            glycan_offset = 2
+            for i, gc in enumerate(raw_glycan_chains):
+                slot = glycan_offset + i
+                if slot >= len(chain_letters):
+                    self.logger.warning(
+                        f'Cannot assign chain letter for glycan {i + 1}; '
+                        'too many chains — skipping.'
+                    )
+                    break
+                glycan_chains.append(GlycanChain(
+                    chain_id=chain_letters[slot],
+                    sequence=gc.sequence,
+                    attachment_residue=gc.attachment_residue,
+                    protein_chain=gc.protein_chain,
+                    protein_atom=gc.protein_atom,
+                    glycan_atom=gc.glycan_atom,
+                ))
+
+            glycan_restraint_path = fasta_dir / 'glycan_restraints.csv'
+            GlycanChain.write_restraints_csv(glycan_chains, glycan_restraint_path)
+            self.logger.info(
+                f'Wrote glycan restraint CSV → {glycan_restraint_path} '
+                f'({len(glycan_chains)} bond(s)). '
+                'ProteinMPNN will receive protein-only structure; '
+                'glycans re-added for Chai forward folding.'
+            )
+
+            # Append any existing constraint rows so nothing is lost.
+            if constraints is not None:
+                existing_lines = Path(constraints).read_text().splitlines()
+                data_rows = [l for l in existing_lines[1:] if l.strip()]  # skip header
+                if data_rows:
+                    with glycan_restraint_path.open('a') as f:
+                        f.write('\n'.join(data_rows) + '\n')
+                    self.logger.info(
+                        f'Appended {len(data_rows)} existing constraint row(s) '
+                        f'from {constraints} into {glycan_restraint_path}'
+                    )
+            # Use the merged file as the single constraint source.
+            constraints = glycan_restraint_path
+        # -------------------------------------------------------------------
+
+        # Run the workflow.
+        # glycan_chains and glycan_restraint_path are forwarded so that the
+        # internal BindCraft coordinator can:
+        #   1. strip glycans before ProteinMPNN inverse folding, and
+        #   2. re-inject them before ChaiBinder forward folding.
         results = await self.coordinator.run_full_workflow(
             target_sequence=target_sequence,
             binder_sequence=binder_sequence,
@@ -252,7 +310,9 @@ class BindCraftAgent:
             pdb_base_path=folds_dir,
             constraints=constraints,
             remodel_indices=None,  # Interface indices to redesign, else measure
-            num_rounds=num_rounds
+            num_rounds=num_rounds,
+            glycan_chains=[gc.to_dict() for gc in glycan_chains] if glycan_chains else None,
+            glycan_restraint_path=glycan_restraint_path,
         )
 
         await self.cleanup()

@@ -22,6 +22,85 @@ from .mutation_model import Mutation, MutationSet, MutationEffect
 
 
 @dataclass
+class GlycanChain:
+    """
+    One glycan chain attached to a protein, expressed in the Chai-1
+    FASTA / restraint-file format.
+
+    chain_id           – Chai-1 chain letter (e.g. 'B').  In a pure folding
+                         run the protein occupies chain A and glycans start at
+                         B.  In binder-design (target=A, binder=B) glycans
+                         should start at C; the calling agent is responsible
+                         for adjusting the letters before passing to Chai /
+                         BindCraft.
+    sequence           – glycan tree string, e.g. 'NAG(6-1 FUC)(4-1 NAG(...))'
+    attachment_residue – protein residue the glycan is bonded to, e.g. 'N131'
+    protein_chain      – protein chain letter the glycan is bonded to
+    protein_atom       – atom in the protein residue ('N' for N-glycan,
+                         'O' for O-glycan)
+    glycan_atom        – anomeric atom of the reducing-end sugar (usually 'C1')
+    """
+    chain_id: str
+    sequence: str
+    attachment_residue: str
+    protein_chain: str = 'A'
+    protein_atom: str = 'N'   # 'N' for N-linked, 'O' for O-linked glycans
+    glycan_atom: str = 'C1'   # anomeric carbon of the reducing-end sugar
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'chain_id': self.chain_id,
+            'sequence': self.sequence,
+            'attachment_residue': self.attachment_residue,
+            'protein_chain': self.protein_chain,
+            'protein_atom': self.protein_atom,
+            'glycan_atom': self.glycan_atom,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'GlycanChain':
+        return cls(
+            chain_id=data['chain_id'],
+            sequence=data['sequence'],
+            attachment_residue=data['attachment_residue'],
+            protein_chain=data.get('protein_chain', 'A'),
+            protein_atom=data.get('protein_atom', 'N'),
+            glycan_atom=data.get('glycan_atom', 'C1'),
+        )
+
+    def to_fasta_entry(self) -> str:
+        """Return a Chai-1 FASTA glycan block."""
+        return f'>glycan|{self.chain_id}\n{self.sequence}'
+
+    def to_restraint_row(self, bond_id: str) -> str:
+        """Return one data row for a Chai-1 restraint CSV."""
+        return (
+            f'{self.protein_chain},{self.attachment_residue}@{self.protein_atom},'
+            f'{self.chain_id},@{self.glycan_atom},'
+            f'covalent,1.0,0.0,0.0,protein-glycan,{bond_id}'
+        )
+
+    @classmethod
+    def write_restraints_csv(
+        cls,
+        glycan_chains: List['GlycanChain'],
+        output_path: Path,
+    ) -> None:
+        """Write a Chai-1 restraint CSV covering all protein-glycan bonds."""
+        header = (
+            'chainA,res_idxA,chainB,res_idxB,'
+            'connection_type,confidence,'
+            'min_distance_angstrom,max_distance_angstrom,'
+            'comment,restraint_id'
+        )
+        rows = [header] + [
+            gc.to_restraint_row(f'bond{i + 1}')
+            for i, gc in enumerate(glycan_chains)
+        ]
+        output_path.write_text('\n'.join(rows) + '\n')
+
+
+@dataclass
 class BinderHypothesisData:
     """Data structure for binder design hypotheses
     """
@@ -32,6 +111,8 @@ class BinderHypothesisData:
     literature_references: List[str]
     binding_affinity_goal: Optional[str] = None
     clinical_context: Optional[str] = None
+    # Glycan chains attached to the target (N- or O-linked)
+    glycan_chains: List[GlycanChain] = field(default_factory=list)
     # Binder type information
     binder_type: str = "peptide"  # "peptide", "antibody", "nanobody", etc.
     # Metadata
@@ -48,6 +129,7 @@ class BinderHypothesisData:
             'literature_references': self.literature_references,
             'binding_affinity_goal': self.binding_affinity_goal,
             'clinical_context': self.clinical_context,
+            'glycan_chains': [g.to_dict() for g in self.glycan_chains],
             'binder_type': self.binder_type,
             'generated_by': self.generated_by,
             'generation_timestamp': self.generation_timestamp
@@ -64,6 +146,9 @@ class BinderHypothesisData:
             literature_references=data.get('literature_references', []),
             binding_affinity_goal=data.get('binding_affinity_goal'),
             clinical_context=data.get('clinical_context'),
+            glycan_chains=[
+                GlycanChain.from_dict(g) for g in data.get('glycan_chains', [])
+            ],
             binder_type=data.get('binder_type', 'peptide'),
             generated_by=data.get('generated_by', 'coscientist'),
             generation_timestamp=data.get('generation_timestamp', datetime.now().isoformat())

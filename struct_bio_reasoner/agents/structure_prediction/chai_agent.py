@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
-from ...data.protein_hypothesis import ProteinHypothesis, FoldAnalysis
+from ...data.protein_hypothesis import ProteinHypothesis, FoldAnalysis, GlycanChain
 from ...core.base_agent import BaseAgent
 
 class ChaiAgent:
@@ -147,15 +147,130 @@ class ChaiAgent:
 
         return await self._generate_binder_hypothesis(data)
 
+    @staticmethod
+    def _append_extra_constraints(base_path: Path, extra_path: Path) -> None:
+        """
+        Append data rows from *extra_path* into *base_path*, skipping the
+        header line of *extra_path* so the combined file stays valid CSV.
+        """
+        extra_lines = Path(extra_path).read_text().splitlines()
+        data_rows = [l for l in extra_lines[1:] if l.strip()]  # skip header
+        if data_rows:
+            with base_path.open('a') as f:
+                f.write('\n'.join(data_rows) + '\n')
+
+    def _inject_glycans(
+        self,
+        sequences: list,
+        glycan_chains: list,
+        existing_constraints: list,
+        cwd: Optional[str] = None,
+    ) -> tuple:
+        """
+        Extend every fold's sequence list with glycan entries and produce a
+        merged Chai-1 restraint CSV per fold.
+
+        Chain assignment logic
+        ----------------------
+        Chai-1 assigns chain letters in FASTA order: the first sequence block
+        becomes chain A, the second chain B, etc.  We discover how many
+        protein/binder chains are already in the first fold and let glycans
+        occupy the next consecutive letters.
+
+        Constraint merging
+        ------------------
+        The glycan covalent bonds are written to a base restraint CSV first.
+        If a fold already has its own constraint file, the glycan rows are
+        appended to a per-fold copy so neither set of constraints is lost.
+
+        Args:
+            sequences:            list-of-lists of amino-acid / glycan strings.
+            glycan_chains:        list of GlycanChain objects.
+            existing_constraints: one entry per fold — a path string or None.
+            cwd:                  working directory for output files.
+
+        Returns:
+            (new_sequences, new_constraints)
+        """
+        # How many non-glycan chains come before the glycans?
+        n_protein_chains = len(sequences[0]) if sequences else 1
+        chain_letters = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+
+        # Re-letter glycan chains to sit immediately after protein chains.
+        adjusted: list[GlycanChain] = []
+        for i, gc in enumerate(glycan_chains):
+            slot = n_protein_chains + i
+            if slot >= len(chain_letters):
+                self.logger.warning(
+                    f'Cannot assign chain letter for glycan {i + 1}; '
+                    'too many chains — skipping.'
+                )
+                break
+            adjusted.append(GlycanChain(
+                chain_id=chain_letters[slot],
+                sequence=gc.sequence,
+                attachment_residue=gc.attachment_residue,
+                protein_chain=gc.protein_chain,
+                protein_atom=gc.protein_atom,
+                glycan_atom=gc.glycan_atom,
+            ))
+
+        glycan_seqs = [gc.sequence for gc in adjusted]
+        new_sequences = [list(seq_group) + glycan_seqs for seq_group in sequences]
+
+        # Write the base glycan restraint CSV (glycan bonds only).
+        restraint_dir = Path(cwd) if cwd else Path('.')
+        restraint_dir.mkdir(exist_ok=True, parents=True)
+        base_restraint_path = restraint_dir / 'glycan_restraints.csv'
+        GlycanChain.write_restraints_csv(adjusted, base_restraint_path)
+        self.logger.info(
+            f'Wrote glycan restraint CSV → {base_restraint_path} '
+            f'({len(adjusted)} bond(s))'
+        )
+
+        # Per-fold: merge with any existing constraint file.
+        new_constraints: list[str] = []
+        for i, existing in enumerate(existing_constraints):
+            if existing is None:
+                # No extra constraints — use the shared glycan file directly.
+                new_constraints.append(str(base_restraint_path))
+            else:
+                # Copy the base glycan file, then append the fold's constraints.
+                merged_path = restraint_dir / f'merged_restraints_fold{i}.csv'
+                merged_path.write_text(base_restraint_path.read_text())
+                self._append_extra_constraints(merged_path, Path(existing))
+                self.logger.info(
+                    f'Fold {i}: merged glycan restraints + {existing} → {merged_path}'
+                )
+                new_constraints.append(str(merged_path))
+
+        return new_sequences, new_constraints
+
     async def _generate_binder_hypothesis(self,
                                           data: dict[str, Any]) -> Optional[ProteinHypothesis]:
         """"""
-        constraints = data.get('constraints', [None] * len(data['sequences']))
+        sequences = data['sequences']
+        names = data['names']
+        constraints = data.get('constraints', [None] * len(sequences))
+
+        # --- glycan support ------------------------------------------------
+        glycan_chains = data.get('glycan_chains', [])
+        if glycan_chains:
+            self.logger.info(
+                f'Injecting {len(glycan_chains)} glycan chain(s) into Chai fold inputs.'
+            )
+            sequences, constraints = self._inject_glycans(
+                sequences,
+                glycan_chains,
+                existing_constraints=constraints,
+                cwd=data.get('cwd'),
+            )
+        # -------------------------------------------------------------------
 
         # Run the workflow
         results = await self.coordinator.fold_sequences(
-            sequences=data['sequences'],
-            names=data['names'],
+            sequences=sequences,
+            names=names,
             constraints=constraints,
         )
 

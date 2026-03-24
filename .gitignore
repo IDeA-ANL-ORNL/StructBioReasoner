@@ -247,6 +247,7 @@ data/jnana.db
 data/fastas/trial_0/fixed_design.jsonl
 data/fastas/trial_0/parsed_design.jsonl
 bindcraft_output/
+bindcraft
 fastas/
 logs/test.err
 logs/two_steptoolcall.err

@@ -20,7 +20,7 @@ from jnana.core.jnana_system import JnanaSystem
 from jnana.protognosis.core.agent_core import ContextMemory 
 from jnana.protognosis.core.llm_interface import alcfLLM
 # Import protein-specific components
-from ..data.protein_hypothesis import ProteinHypothesis
+from ..data.protein_hypothesis import ProteinHypothesis, GlycanChain
 from ..agents.analysis.trajectory_analysis import TrajectoryAnalysisAgent
 from ..agents.computational_design.bindcraft_agent import BindCraftAgent
 from ..agents.molecular_dynamics.mdagent_adapter import MDAgentAdapter
@@ -517,6 +517,79 @@ class BinderDesignSystem(JnanaSystem):
 
         # No binder sequence found (this is optional)
         return ""
+
+    def _extract_glycan_chains(self, research_goal: str) -> List[GlycanChain]:
+        """
+        Extract glycan chain definitions from the research goal text.
+
+        Parses entries of the form::
+
+            <ResName><ResID>:<GlycanTree>
+
+        where <ResName> is the one-letter amino-acid code of the attachment
+        residue, <ResID> is its sequence number, and <GlycanTree> is a
+        Chai-1-style branched glycan string beginning with a 3-letter sugar
+        code (e.g. NAG, FUC, MAN, GAL, SIA).
+
+        Example research-goal snippet::
+
+            N131:NAG(6-1 FUC)(4-1 NAG(4-1 MAN(6-1 MAN(2-1 NAG))(3-1 MAN(2-1 NAG))))
+            N203:NAG(6-1 FUC)(4-1 NAG(4-1 MAN(6-1 MAN(2-1 NAG(4-1 GAL)))(3-1 MAN(2-1 NAG))))
+
+        Chain letters are assigned sequentially starting at 'B' (chain 'A'
+        is reserved for the target protein).  In binder-design runs where
+        the binder also occupies a chain letter the calling agent is
+        responsible for re-lettering the glycan chains before passing them
+        to Chai / BindCraft.
+
+        Args:
+            research_goal: The full research-goal text.
+
+        Returns:
+            List of GlycanChain objects (empty if none found).
+        """
+        import re
+
+        # Match: single AA letter + residue number + colon +
+        # glycan tree starting with a known 3-letter sugar code, to EOL.
+        known_sugars = 'NAG|FUC|MAN|GAL|SIA|GLC|GLA'
+        pattern = rf'([A-Z])(\d+):((?:{known_sugars})[^\n]+)'
+
+        matches = re.findall(pattern, research_goal)
+
+        # Chain letters for glycan chains; protein is always A.
+        chain_letters = [c for c in 'BCDEFGHIJKLMNOPQRSTUVWXYZ']
+
+        glycan_chains: List[GlycanChain] = []
+        for idx, (resname, resid, glycan_seq) in enumerate(matches):
+            if idx >= len(chain_letters):
+                self.logger.warning(
+                    f'Too many glycan chains (>{len(chain_letters)}); '
+                    'skipping the rest.'
+                )
+                break
+            glycan_chains.append(GlycanChain(
+                chain_id=chain_letters[idx],
+                sequence=glycan_seq.strip(),
+                attachment_residue=f'{resname}{resid}',
+                protein_chain='A',
+                # Asparagine → N-glycan (atom N); anything else → O-glycan (atom O)
+                protein_atom='N' if resname == 'N' else 'O',
+                glycan_atom='C1',
+            ))
+
+        if glycan_chains:
+            self.logger.info(
+                f'Extracted {len(glycan_chains)} glycan chain(s): '
+                + ', '.join(
+                    f"{gc.attachment_residue}→chain{gc.chain_id}"
+                    for gc in glycan_chains
+                )
+            )
+        else:
+            self.logger.debug('No glycan chains found in research goal.')
+
+        return glycan_chains
 
     async def generate_protein_hypothesis(self,
                                         research_goal: str,

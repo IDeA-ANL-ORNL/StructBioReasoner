@@ -89,6 +89,7 @@ class AgenticBinderPipeline:
         self.best_binders = []
         self.iteration_count = 0
         self.comp_design_it = 0
+        self.glycan_chains: list = []  # populated in initialize()
     
     async def initialize(self, research_goal: str) -> None:
         """
@@ -117,7 +118,19 @@ class AgenticBinderPipeline:
         self.research_goal = research_goal
         self.session_id = await self.system.set_research_goal(research_goal)
         self.target_sequence = self.system._extract_target_sequence(research_goal)
-        
+        self.glycan_chains = self.system._extract_glycan_chains(research_goal)
+
+        if self.glycan_chains:
+            logger.info(
+                f"✓ {len(self.glycan_chains)} glycan chain(s) extracted: "
+                + ", ".join(
+                    f"{gc.attachment_residue}→chain{gc.chain_id}"
+                    for gc in self.glycan_chains
+                )
+            )
+        else:
+            logger.info("✓ No glycan chains in research goal (apo / protein-only run)")
+
         # Get global working directory
         self.global_cwd = self.system.binder_config.get("agents", {}).get(
             "computational_design", {}
@@ -602,6 +615,10 @@ class AgenticBinderPipeline:
                     config['constraints'] = {}
             self.system.design_agents[task_name].config['cwd'] = config['cwd']
             await self.system.design_agents[task_name].initialize()
+
+        # Propagate glycan chains to every agent that receives a config dict
+        if self.glycan_chains:
+            config['glycan_chains'] = self.glycan_chains
 
         # Execute the task
         logger.info(f'Before running {task_name}, {config=}')
