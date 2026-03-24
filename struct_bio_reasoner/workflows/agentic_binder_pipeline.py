@@ -28,7 +28,13 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from types import SimpleNamespace
 
-from jnana.protognosis.core.llm_interface import alcfLLM
+try:
+    from jnana.protognosis.core.llm_interface import alcfLLM
+except ImportError:
+    raise ImportError(
+        "The 'jnana' package is required for agentic_binder_pipeline. "
+        "Install Jnana with: pip install git+https://github.com/acadev/Jnana.git --no-deps"
+    )
 from ..core.binder_design_system import BinderDesignSystem
 from ..data.protein_hypothesis import ProteinHypothesis
 from ..prompts.prompts import get_prompt_manager, config_master

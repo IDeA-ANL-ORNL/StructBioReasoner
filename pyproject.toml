@@ -35,6 +35,11 @@ md = [
     "openmm>=8.0",
     "mdtraj>=1.9.7",
 ]
+# NOTE: Jnana requires biomni>=1.0.0 which is not yet on PyPI (latest: 0.0.8).
+# Until biomni 1.0 is released, install Jnana separately with:
+#   pip install git+https://github.com/acadev/Jnana.git --no-deps
+# The extras below are kept for documentation but will fail with pip's
+# dependency resolver until the biomni issue is resolved.
 jnana = [
     "jnana @ git+https://github.com/acadev/Jnana.git",
 ]

@@ -8,33 +8,42 @@ to Academy worker agents.
 """
 
 from .config import AcademyConfig, create_exchange_factory, create_parsl_executor
-from .dispatch import AcademyDispatch
-from .executive import ExecutiveAgent
-from .manager_agent import ManagerAgent
-from .worker_agents import (
-    BindCraftWorker,
-    FoldingWorker,
-    MDWorker,
-    RAGWorker,
-    ConservationWorker,
-    ProteinLMWorker,
-    TrajectoryAnalysisWorker,
-    WORKER_REGISTRY,
-)
+
+try:
+    from .dispatch import AcademyDispatch
+    from .executive import ExecutiveAgent
+    from .manager_agent import ManagerAgent
+    from .worker_agents import (
+        BindCraftWorker,
+        FoldingWorker,
+        MDWorker,
+        RAGWorker,
+        ConservationWorker,
+        ProteinLMWorker,
+        TrajectoryAnalysisWorker,
+        WORKER_REGISTRY,
+    )
+    _ACADEMY_AVAILABLE = True
+except ImportError:
+    _ACADEMY_AVAILABLE = False
 
 __all__ = [
     "AcademyConfig",
-    "AcademyDispatch",
-    "ExecutiveAgent",
-    "ManagerAgent",
-    "BindCraftWorker",
-    "FoldingWorker",
-    "MDWorker",
-    "RAGWorker",
-    "ConservationWorker",
-    "ProteinLMWorker",
-    "TrajectoryAnalysisWorker",
-    "WORKER_REGISTRY",
     "create_exchange_factory",
     "create_parsl_executor",
 ]
+
+if _ACADEMY_AVAILABLE:
+    __all__ += [
+        "AcademyDispatch",
+        "ExecutiveAgent",
+        "ManagerAgent",
+        "BindCraftWorker",
+        "FoldingWorker",
+        "MDWorker",
+        "RAGWorker",
+        "ConservationWorker",
+        "ProteinLMWorker",
+        "TrajectoryAnalysisWorker",
+        "WORKER_REGISTRY",
+    ]

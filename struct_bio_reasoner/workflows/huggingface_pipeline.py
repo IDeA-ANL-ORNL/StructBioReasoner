@@ -35,7 +35,13 @@ from types import SimpleNamespace
 from typing import Dict, Any, List, Optional, Tuple
 #import wandb
 
-from jnana.protognosis.core.llm_interface import create_llm, huggingfaceLLM
+try:
+    from jnana.protognosis.core.llm_interface import create_llm, huggingfaceLLM
+except ImportError:
+    raise ImportError(
+        "The 'jnana' package is required for huggingface_pipeline. "
+        "Install Jnana with: pip install git+https://github.com/acadev/Jnana.git --no-deps"
+    )
 from ..core.binder_design_system import BinderDesignSystem
 from ..data.protein_hypothesis import ProteinHypothesis
 from ..prompts.prompts import get_prompt_manager, config_master

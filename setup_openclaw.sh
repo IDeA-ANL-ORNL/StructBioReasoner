@@ -5,7 +5,6 @@
 set -euo pipefail
 
 DRY_RUN=false
-JNANA_DIR="${JNANA_DIR:-./Jnana}"
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -13,9 +12,6 @@ usage() {
     echo "Options:"
     echo "  --dry-run    Show commands without executing"
     echo "  --help       Show this help message"
-    echo ""
-    echo "Environment variables:"
-    echo "  JNANA_DIR    Directory for Jnana clone (default: ./Jnana)"
 }
 
 run_cmd() {
@@ -70,19 +66,16 @@ echo "--- Step 2: Install OpenClaw ---"
 run_cmd npm install -g openclaw@latest
 echo ""
 
-# 3. Clone and install Jnana
-echo "--- Step 3: Install Jnana ---"
-if [ ! -d "$JNANA_DIR" ]; then
-    run_cmd git clone https://github.com/acadev/Jnana.git "$JNANA_DIR"
-else
-    echo "Jnana directory already exists at $JNANA_DIR"
-fi
-run_cmd pip install -e "$JNANA_DIR"
+# 3. Install Jnana
+# NOTE: Jnana requires biomni>=1.0.0 which is not yet on PyPI (latest: 0.0.8).
+# We install with --no-deps to avoid the unresolvable biomni dependency.
+echo "--- Step 3: Install Jnana (--no-deps to work around biomni version) ---"
+run_cmd pip install git+https://github.com/acadev/Jnana.git --no-deps
 echo ""
 
-# 4. Install StructBioReasoner with optional deps
+# 4. Install StructBioReasoner with dev deps
 echo "--- Step 4: Install StructBioReasoner ---"
-run_cmd pip install -e ".[jnana,dev]"
+run_cmd pip install -e ".[dev]"
 echo ""
 
 # 5. Verify installation

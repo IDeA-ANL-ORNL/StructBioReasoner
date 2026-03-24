@@ -33,9 +33,15 @@ from parsl import Config, HighThroughputExecutor
 from parsl.concurrent import ParslPoolExecutor
 from parsl.providers import LocalProvider
 
-from academy.exchange import LocalExchangeFactory, RedisExchangeFactory
-from academy.logging import init_logging
-from academy.manager import Manager
+try:
+    from academy.exchange import LocalExchangeFactory, RedisExchangeFactory
+    from academy.logging import init_logging
+    from academy.manager import Manager
+except ImportError:
+    raise ImportError(
+        "The 'academy' package is required for parsl_hierarchical_workflow. "
+        "Install Jnana with: pip install git+https://github.com/acadev/Jnana.git --no-deps"
+    )
 
 from ..agents.executive.executive_agent import ExecutiveAgent
 from ..agents.manager.manager_agent import ManagerAgent

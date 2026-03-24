@@ -18,8 +18,14 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from academy.agent import Agent, action
-from academy.handle import Handle
+try:
+    from academy.agent import Agent, action
+    from academy.handle import Handle
+except ImportError:
+    raise ImportError(
+        "The 'academy' package is required for the ExecutiveAgent. "
+        "Install Jnana with: pip install git+https://github.com/acadev/Jnana.git --no-deps"
+    )
 
 logger = logging.getLogger(__name__)
 

@@ -15,10 +15,16 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 from pathlib import Path
 
-from academy.agent import Agent, action
-from academy.handle import Handle
-from academy.exchange import LocalExchangeFactory
-from academy.manager import Manager
+try:
+    from academy.agent import Agent, action
+    from academy.handle import Handle
+    from academy.exchange import LocalExchangeFactory
+    from academy.manager import Manager
+except ImportError:
+    raise ImportError(
+        "The 'academy' package is required for ExecutiveAgent. "
+        "Install Jnana with: pip install git+https://github.com/acadev/Jnana.git --no-deps"
+    )
 from concurrent.futures import ThreadPoolExecutor
 from struct_bio_reasoner.prompts.prompts import get_prompt_manager, config_master
 from struct_bio_reasoner.utils.uniprot_api import fetch_uniprot_sequence

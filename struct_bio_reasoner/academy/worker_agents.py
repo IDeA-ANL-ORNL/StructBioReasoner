@@ -13,7 +13,13 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from academy.agent import Agent, action
+try:
+    from academy.agent import Agent, action
+except ImportError:
+    raise ImportError(
+        "The 'academy' package is required for worker agents. "
+        "Install Jnana with: pip install git+https://github.com/acadev/Jnana.git --no-deps"
+    )
 
 logger = logging.getLogger(__name__)
 

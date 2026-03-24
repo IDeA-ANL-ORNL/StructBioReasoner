@@ -1,5 +1,11 @@
-from academy.exchange import LocalExchangeFactory
-from academy.manager import Manager
+try:
+    from academy.exchange import LocalExchangeFactory
+    from academy.manager import Manager
+except ImportError:
+    raise ImportError(
+        "The 'academy' package is required for ChaiAgent. "
+        "Install Jnana with: pip install git+https://github.com/acadev/Jnana.git --no-deps"
+    )
 from concurrent.futures import ThreadPoolExecutor
 import dill as pickle
 import asyncio
