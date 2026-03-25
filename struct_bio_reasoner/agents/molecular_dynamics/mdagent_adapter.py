@@ -35,6 +35,7 @@ except ImportError:
 
 from ...core.base_agent import BaseAgent
 from ...data.protein_hypothesis import SimAnalysis, ProteinHypothesis
+from .glycam_mapper import GlycanConverter
 
 
 class MDAgentAdapter:
@@ -214,15 +215,25 @@ class MDAgentAdapter:
         for pdb in pdb_path:
             self.logger.info(f'Running simulations at: {pdb}')
 
-        # Prepare build kwargs
-        build_kwargs = custom_build_kwargs or {
-            'solvent': self.solvent_model,
-            'protein': True,
-            'out': 'system.pdb',
-        }
-        
-        if 'amberhome' not in build_kwargs:
-            build_kwargs['amberhome'] = self.amberhome
+        sim_paths = [Path(root_path) / f'mdagent_{i}' for i in range(len(pdb_path))]
+        for sim_path in sim_paths:
+            sim_path.mkdir(parents=True, exist_ok=True)
+
+        # Prepare build kwargs — accept a pre-built per-simulation list or a
+        # single shared dict that gets broadcast to every simulation.
+        if isinstance(custom_build_kwargs, list):
+            build_kwargs = custom_build_kwargs
+        else:
+            build_kwargs = custom_build_kwargs or {
+                'solvent': self.solvent_model,
+                'protein': True,
+                'out': 'system.pdb',
+            }
+            build_kwargs = [build_kwargs.copy() for _ in range(len(sim_paths))]
+
+        for bk in build_kwargs:
+            if 'amberhome' not in bk:
+                bk['amberhome'] = self.amberhome
 
         # Prepare simulation kwargs
         sim_kwargs = custom_sim_kwargs or {
@@ -230,12 +241,6 @@ class MDAgentAdapter:
             'equil_steps': self.equil_steps,
             'prod_steps': self.prod_steps,
         }
-
-        sim_paths = [Path(root_path) / f'mdagent_{i}' for i in range(len(pdb_path))]
-        for sim_path in sim_paths:
-            sim_path.mkdir(parents=True, exist_ok=True)
-        
-        build_kwargs = [build_kwargs.copy() for _ in range(len(sim_paths))]
         sim_kwargs = [sim_kwargs.copy() for _ in range(len(sim_paths))]
         
         # Run MDAgent workflow
@@ -349,23 +354,69 @@ class MDAgentAdapter:
         structures = [Path(p) for p in task_params['simulation_paths']]
         out = Path(task_params['root_output_path'])
         prod_steps = task_params.get('steps', self.prod_steps)
-        
+
         solvent = task_params.get('solvent', 'explicit')
 
+        # -------------------------------------------------------------------
+        # Glycan support: if the hypothesis carries glycan chains, convert
+        # each input PDB from Chai residue names to GLYCAM/AMBER convention
+        # before handing off to MDAgent.
+        # -------------------------------------------------------------------
+        glycan_chains = getattr(hypothesis, 'glycan_chains', None)
+        if not glycan_chains:
+            # Also accept glycan_chains embedded in task_params
+            glycan_chains = task_params.get('glycan_chains', [])
+
+        # per-simulation build kwargs list (populated below for glycan systems)
+        per_sim_build_kwargs: Optional[List[Dict[str, Any]]] = None
+
+        if glycan_chains:
+            self.logger.info(
+                "Detected %d glycan chain(s) — converting PDBs to GLYCAM format.",
+                len(glycan_chains),
+            )
+            ff = self.mdagent_config.get('force_field', 'ff14SB')
+            glycam_ff = self.mdagent_config.get('glycam_ff', 'GLYCAM_06j-1')
+            # mol_name must match the tleap variable in molecular-simulations:
+            #   ImplicitSolvent → "prot",  ExplicitSolvent → "PROT"
+            mol_name = "PROT" if solvent == "explicit" else "prot"
+            converter = GlycanConverter(ff=ff, glycam_ff=glycam_ff)
+            converted = []
+            per_sim_build_kwargs = []
+            for pdb in structures:
+                glycam_dir = out / 'glycam_prep'
+                result = converter.convert_pdb(
+                    pdb, output_dir=glycam_dir, mol_name=mol_name
+                )
+                self.logger.info(
+                    "  %s → %s (%d bonds, %d bond commands)",
+                    pdb.name, result['glycam_pdb'].name,
+                    len(result['bonds']), len(result['bond_commands']),
+                )
+                converted.append(result['glycam_pdb'])
+                per_sim_build_kwargs.append({
+                    'protein': True,
+                    'glycans': True,
+                    'solvent': solvent,
+                    'bond_commands': result['bond_commands'],
+                })
+            structures = converted
+        # -------------------------------------------------------------------
+
         # TODO: get kwargs for build/sim from task_params
-        sim_results = await self.run_md_simulation( 
+        sim_results = await self.run_md_simulation(
             root_path=out,
             pdb_path=structures,
-            protein_name = "unknown",
-            custom_build_kwargs = {'protein': True,
-                                   'solvent': solvent},
-            custom_sim_kwargs = {'equil_steps': self.equil_steps,
-                                 'prod_steps': prod_steps,
-                                 'n_equil_cycles': 2,
-                                 'platform': 'OpenCL',
-                                 'solvent': solvent},
+            protein_name="unknown",
+            custom_build_kwargs=per_sim_build_kwargs or {'protein': True,
+                                                         'solvent': solvent},
+            custom_sim_kwargs={'equil_steps': self.equil_steps,
+                               'prod_steps': prod_steps,
+                               'n_equil_cycles': 2,
+                               'platform': 'OpenCL',
+                               'solvent': solvent},
         )
-        
+
         return {'paths': sim_results}
 
     async def is_ready(self) -> bool:
