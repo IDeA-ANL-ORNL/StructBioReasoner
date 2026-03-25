@@ -1,0 +1,109 @@
+# Der f 21 Binder Design Configuration (OpenClaw HybridLoop)
+# Based on PASC'26 paper Section 4.1 — House Dust Mite Allergen Case Study
+
+# Target protein
+target:
+  name: "Der f 21"
+  description: "House dust mite allergen (Dermatophagoides farinae group 21)"
+  pdb_id: "4WKY"
+  uniprot_id: "B2ZSY7"
+  # Der f 21 sequence from PDB 4WKY
+  sequence: >-
+    MKFFVFALILALMATQAIPEEVKKVEAEHGKLVPDDIPFNISTGKTLYYTISETKEALK
+    KEYGATTDKQTFEINPEHIFLTQNSYTVKADIPEDNFKPETTKEYLKHTEGKSDPRDKY
+    KEFIDEALKHSGFKY
+
+# Known epitopes from mutagenesis studies [45]
+epitopes:
+  known_residues: [K10, K26, K42, E43, K46, K48]
+  key_residue: "E7"
+  key_residue_note: "E7A mutation abrogates symptoms — salt bridge with IgE"
+
+# Reference baseline (BindCraft binder 10 from paper)
+reference:
+  binder_name: "BindCraft binder 10"
+  binding_affinity_nM: 793
+  free_energy_kcal_mol: -135.00
+  free_energy_std: 10.25
+
+# Paper statistics (Section 4.1)
+paper_stats:
+  total_binders_designed: 842
+  binders_passed_qc: 787
+  qc_success_rate: 0.9347
+  fraction_outperforming_reference: 0.5098
+
+# Campaign phases
+campaign:
+  research_goal: >-
+    Design biologic binders for Der f 21 allergen (PDB: 4WKY) that target
+    IgE-binding epitopes. Prioritize the E7 salt-bridge interface and known
+    epitopes (K10, K26, K42, E43, K46, K48) identified by mutagenesis.
+    Aim to exceed the reference BindCraft binder 10 baseline
+    (free energy: -135.00 +/- 10.25 kcal/mol, affinity: 793 nM).
+
+  phases:
+    exploration:
+      name: "exploration"
+      goal: "Literature mining, structure prediction, and MD hotspot analysis"
+      step_sequence:
+        - rag
+        - structure_prediction
+        - molecular_dynamics
+      max_iterations: 10
+
+    design:
+      name: "design"
+      goal: "Binder design tournament with iterative optimization"
+      step_sequence:
+        - computational_design
+        - molecular_dynamics
+        - free_energy
+      max_iterations: 10
+
+# Binder scaffolds
+scaffolds:
+  affibody:
+    sequence: "VDNKFNKEQQNAFYEILHLPNLNEEQRNAFIQSLKDDPSQSANLLAEAKKLNDAQAPK"
+    type: "affibody"
+  affitin:
+    sequence: "MGSWAEFKQRLAAIKTRLQALGGSEAELAAFEKEIAAFESELQAYKGKGNPEVEALRKEAAAIRDELQAYRHN"
+    type: "affitin"
+  nanobody:
+    sequence: "QVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAA"
+    type: "nanobody"
+
+# MD simulation parameters
+molecular_dynamics:
+  engine: "OpenMM"
+  force_field: "AMBER19"
+  temperature_K: 310
+  integrator: "Langevin"
+  timestep_fs: 4
+  hydrogen_mass_repartitioning: true
+  production_ns: 50
+  equilibration_ns: 5
+
+# Free energy calculation
+free_energy:
+  method: "MM-PBSA"
+  reference_energy_kcal_mol: -135.00
+  reference_energy_std: 10.25
+
+# Quality control thresholds
+quality_control:
+  max_repeat: 4
+  max_appearance_ratio: 0.33
+  max_charge: 9
+  max_charge_ratio: 0.5
+  max_hydrophobic_ratio: 0.8
+  min_diversity: 8
+
+# Artifact storage
+artifact_store:
+  root: "artifact_store/derf21"
+
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
