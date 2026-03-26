@@ -1,11 +1,16 @@
 """MCP Server for StructBioReasoner.
 
-Exposes computational skills, Jnana reasoning endpoints, and Academy
-agent status as callable MCP tools. This is the bridge between
-OpenClaw (Node.js) and the Python computation layers.
+Exposes computational skills, Jnana reasoning endpoints, Academy agent
+status, and human-in-the-loop directives as callable MCP tools.  This is
+the bridge between any MCP client (OpenClaw, Claude Code, a web UI) and
+the Python computation layers.
 
-Usage:
+The server uses the official ``mcp`` Python SDK with stdio transport so
+that it can be launched as a subprocess by any MCP-compatible host:
+
     python -m struct_bio_reasoner.mcp.server
+
+Configuration for OpenClaw lives in ``.openclaw.json`` at the repo root.
 """
 
 import asyncio
@@ -13,21 +18,39 @@ import importlib.util
 import json
 import logging
 import sys
+import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
 
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+from mcp.types import TextContent, Tool
+
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Jnana bridge import helper (handles hyphenated skill directory)
+# ---------------------------------------------------------------------------
 
 
 def _import_jnana_bridge():
-    """Import JnanaReasoningBridge from the hyphenated skills/jnana-reasoning dir."""
+    """Import JnanaReasoningBridge from skills/jnana-reasoning/scripts/reason.py."""
     mod_name = "_jnana_reason"
     if mod_name in sys.modules:
         return sys.modules[mod_name].JnanaReasoningBridge
     reason_path = (
         Path(__file__).resolve().parent.parent.parent
-        / "skills" / "jnana-reasoning" / "scripts" / "reason.py"
+        / "skills"
+        / "jnana-reasoning"
+        / "scripts"
+        / "reason.py"
     )
+    if not reason_path.exists():
+        raise FileNotFoundError(
+            f"Jnana reasoning script not found at {reason_path}. "
+            "Ensure the skills/jnana-reasoning directory is present."
+        )
     spec = importlib.util.spec_from_file_location(mod_name, str(reason_path))
     mod = importlib.util.module_from_spec(spec)
     sys.modules[mod_name] = mod
@@ -35,36 +58,38 @@ def _import_jnana_bridge():
     return mod.JnanaReasoningBridge
 
 
-class StructBioReasonerMCPServer:
-    """MCP server for StructBioReasoner.
+# ---------------------------------------------------------------------------
+# Shared application state (lazy-initialised, lives for the server lifetime)
+# ---------------------------------------------------------------------------
 
-    Hosts three categories of endpoints:
-    1. Skill tools — invoke computational skills (bindcraft, MD, folding, etc.)
-    2. Jnana reasoning — hypothesis generation, parameter bounding, evaluation
-    3. Academy status — agent lifecycle, Handle RPC status, exchange health
 
-    On first use, lazily initialises JnanaReasoningBridge (Layer 2) and
-    AcademyDispatch (Layer 4).
-    """
+class _AppState:
+    """Holds lazily-initialised singletons shared across tool handlers."""
 
     def __init__(
         self,
         artifact_store_root: str = "artifact_store",
         academy_config: Optional[Any] = None,
     ) -> None:
-        self._tools: dict[str, dict[str, Any]] = {}
         self._artifact_store_root = artifact_store_root
-
-        # Lazy — initialised on first call_tool
-        self._reasoning_bridge = None
-        self._academy_dispatch = None
         self._academy_config = academy_config
 
-        self._register_tools()
+        self._reasoning_bridge = None
+        self._academy_dispatch = None
 
-    # ------------------------------------------------------------------
-    # Layer 2: Jnana Reasoning Bridge (lazy)
-    # ------------------------------------------------------------------
+        # Human-in-the-loop directive inbox
+        self._directives: list[dict[str, Any]] = []
+
+        # Lightweight campaign status tracking
+        self._campaign_started_at: Optional[float] = None
+        self._tasks_submitted: int = 0
+        self._tasks_completed: int = 0
+        self._research_goal: Optional[str] = None
+
+        # Priority frontier (lazy — created when orchestration is available)
+        self._frontier = None
+
+    # -- Layer 2: Jnana Reasoning Bridge (lazy) ----------------------------
 
     @property
     def reasoning_bridge(self):
@@ -75,285 +100,490 @@ class StructBioReasonerMCPServer:
             )
         return self._reasoning_bridge
 
-    # ------------------------------------------------------------------
-    # Layer 4: Academy Dispatch (lazy)
-    # ------------------------------------------------------------------
+    # -- Layer 4: Academy Dispatch (lazy) ----------------------------------
 
     @property
     def academy_dispatch(self):
         if self._academy_dispatch is None:
-            from struct_bio_reasoner.academy.dispatch import AcademyDispatch
             from struct_bio_reasoner.academy.config import AcademyConfig
+            from struct_bio_reasoner.academy.dispatch import AcademyDispatch
 
             config = self._academy_config or AcademyConfig()
             self._academy_dispatch = AcademyDispatch(config)
         return self._academy_dispatch
 
-    # ------------------------------------------------------------------
-    # Tool registration
-    # ------------------------------------------------------------------
+    # -- Directive inbox ---------------------------------------------------
 
-    def _register_tools(self) -> None:
-        """Register all MCP tool endpoints."""
-        # Layer 1: Skill invocation tools
-        self._tools["run_skill"] = {
-            "name": "run_skill",
-            "description": "Invoke a StructBioReasoner computational skill",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "skill_name": {
-                        "type": "string",
-                        "description": "Name of the skill to invoke",
-                    },
-                    "parameters": {
-                        "type": "object",
-                        "description": "Skill-specific parameters",
-                    },
+    def add_directive(self, directive: dict[str, Any]) -> None:
+        directive.setdefault("timestamp", time.time())
+        self._directives.append(directive)
+
+    def pop_directives(self) -> list[dict[str, Any]]:
+        """Return and clear all pending directives."""
+        out = list(self._directives)
+        self._directives.clear()
+        return out
+
+    def peek_directives(self) -> list[dict[str, Any]]:
+        return list(self._directives)
+
+
+# ---------------------------------------------------------------------------
+# Tool definitions (schemas)
+# ---------------------------------------------------------------------------
+
+TOOLS: list[Tool] = [
+    # -- Layer 1: Skill invocation -----------------------------------------
+    Tool(
+        name="run_skill",
+        description=(
+            "Invoke a StructBioReasoner computational skill (bindcraft, "
+            "molecular-dynamics, structure-prediction, etc.).  The skill "
+            "runs on HPC via Academy dispatch and returns results as an "
+            "artifact."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "skill_name": {
+                    "type": "string",
+                    "description": "Name of the skill to invoke",
                 },
-                "required": ["skill_name"],
-            },
-        }
-
-        self._tools["list_skills"] = {
-            "name": "list_skills",
-            "description": "List all available computational skills",
-            "inputSchema": {
-                "type": "object",
-                "properties": {},
-            },
-        }
-
-        # Layer 2: Jnana reasoning tools
-        self._tools["jnana_set_goal"] = {
-            "name": "jnana_set_goal",
-            "description": "Set a research goal for Jnana CoScientist reasoning",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "research_goal": {
-                        "type": "string",
-                        "description": "The scientific research goal",
-                    },
-                },
-                "required": ["research_goal"],
-            },
-        }
-
-        self._tools["jnana_generate_hypothesis"] = {
-            "name": "jnana_generate_hypothesis",
-            "description": "Generate scientific hypotheses via Jnana",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "count": {
-                        "type": "integer",
-                        "description": "Number of hypotheses to generate",
-                        "default": 1,
-                    },
-                    "strategies": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Hypothesis generation strategies",
-                    },
+                "parameters": {
+                    "type": "object",
+                    "description": "Skill-specific parameters",
                 },
             },
-        }
-
-        self._tools["jnana_recommend_action"] = {
-            "name": "jnana_recommend_action",
-            "description": "Recommend next action via Jnana reasoning (Tier 1)",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "previous_run_type": {
-                        "type": "string",
-                        "description": "Type of the previous run",
-                        "default": "starting",
-                    },
-                    "previous_conclusion": {
-                        "type": "string",
-                        "description": "Conclusion from the previous run",
-                        "default": "",
-                    },
+            "required": ["skill_name"],
+        },
+    ),
+    Tool(
+        name="list_skills",
+        description="List all available computational skills and their descriptions.",
+        inputSchema={"type": "object", "properties": {}},
+    ),
+    # -- Layer 2: Jnana reasoning ------------------------------------------
+    Tool(
+        name="jnana_set_goal",
+        description=(
+            "Set the research goal that drives all subsequent reasoning. "
+            "Must be called before recommend_action or bound_parameters."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "research_goal": {
+                    "type": "string",
+                    "description": "The scientific research goal",
                 },
             },
-        }
-
-        self._tools["jnana_bound_parameters"] = {
-            "name": "jnana_bound_parameters",
-            "description": "Get Jnana bounded parameter config for a skill (Tier 2)",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "skill_name": {
-                        "type": "string",
-                        "description": "Target skill name",
-                    },
-                    "task_type": {
-                        "type": "string",
-                        "description": "Task type for parameter bounding",
-                    },
+            "required": ["research_goal"],
+        },
+    ),
+    Tool(
+        name="jnana_generate_hypothesis",
+        description="Generate scientific hypotheses for the current research goal.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "description": "Number of hypotheses to generate",
+                    "default": 1,
                 },
-                "required": ["skill_name", "task_type"],
-            },
-        }
-
-        self._tools["jnana_evaluate_results"] = {
-            "name": "jnana_evaluate_results",
-            "description": "Evaluate experimental results via Jnana",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "artifact_ids": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Artifact IDs to evaluate",
-                    },
-                },
-                "required": ["artifact_ids"],
-            },
-        }
-
-        self._tools["jnana_check_convergence"] = {
-            "name": "jnana_check_convergence",
-            "description": "Check if the research goal has been satisfied",
-            "inputSchema": {
-                "type": "object",
-                "properties": {},
-            },
-        }
-
-        # Layer 4: Academy agent status tools
-        self._tools["academy_agent_status"] = {
-            "name": "academy_agent_status",
-            "description": "Get status of Academy agents (Executive/Manager/Worker)",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "agent_id": {
-                        "type": "string",
-                        "description": "Specific agent ID (optional — returns all if omitted)",
-                    },
+                "strategies": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Hypothesis generation strategies",
                 },
             },
-        }
+        },
+    ),
+    Tool(
+        name="jnana_recommend_action",
+        description=(
+            "Tier-1 reasoning: recommend the next task type to run "
+            "(e.g. computational_design, molecular_dynamics, analysis, stop)."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "previous_run_type": {
+                    "type": "string",
+                    "description": "Type of the previous run",
+                    "default": "starting",
+                },
+                "previous_conclusion": {
+                    "type": "string",
+                    "description": "Conclusion from the previous run",
+                    "default": "",
+                },
+            },
+        },
+    ),
+    Tool(
+        name="jnana_bound_parameters",
+        description=(
+            "Tier-2 reasoning: generate a bounded parameter configuration "
+            "for a specific skill and task type."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "skill_name": {
+                    "type": "string",
+                    "description": "Target skill name",
+                },
+                "task_type": {
+                    "type": "string",
+                    "description": "Task type for parameter bounding",
+                },
+            },
+            "required": ["skill_name", "task_type"],
+        },
+    ),
+    Tool(
+        name="jnana_evaluate_results",
+        description="Evaluate experimental results stored as artifacts against the current hypotheses.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "artifact_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Artifact IDs to evaluate",
+                },
+            },
+            "required": ["artifact_ids"],
+        },
+    ),
+    Tool(
+        name="jnana_check_convergence",
+        description="Check whether the research goal has been satisfied and the campaign can stop.",
+        inputSchema={"type": "object", "properties": {}},
+    ),
+    # -- Layer 4: Academy status -------------------------------------------
+    Tool(
+        name="academy_agent_status",
+        description="Get the status of Academy agents (Executive/Manager/Worker).",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "agent_id": {
+                    "type": "string",
+                    "description": "Specific agent ID (optional — returns all if omitted)",
+                },
+            },
+        },
+    ),
+    # -- Human-in-the-loop -------------------------------------------------
+    Tool(
+        name="send_directive",
+        description=(
+            "Send a human directive to steer the running campaign. "
+            "Directives are injected into the reasoner's context on "
+            "its next decision cycle.  Use this to change focus "
+            "(e.g. 'focus on hydrophobic hotspots'), adjust parameters "
+            "(e.g. 'increase MD simulation length to 100ns'), reprioritize "
+            "tasks, or request early stopping."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "directive": {
+                    "type": "string",
+                    "description": "Free-text instruction to the reasoner",
+                },
+                "priority": {
+                    "type": "string",
+                    "enum": ["low", "normal", "high", "urgent"],
+                    "description": "How urgently this should affect the campaign",
+                    "default": "normal",
+                },
+                "category": {
+                    "type": "string",
+                    "enum": [
+                        "focus_change",
+                        "parameter_override",
+                        "add_constraint",
+                        "remove_constraint",
+                        "reprioritize",
+                        "stop",
+                        "other",
+                    ],
+                    "description": "Category of the directive",
+                    "default": "other",
+                },
+            },
+            "required": ["directive"],
+        },
+    ),
+    Tool(
+        name="get_campaign_status",
+        description=(
+            "Get the current status of the running campaign: research goal, "
+            "tasks submitted/completed, pending human directives, and "
+            "elapsed time."
+        ),
+        inputSchema={"type": "object", "properties": {}},
+    ),
+    Tool(
+        name="get_pending_directives",
+        description=(
+            "View all pending human directives that have not yet been "
+            "consumed by the reasoner."
+        ),
+        inputSchema={"type": "object", "properties": {}},
+    ),
+    # -- Orchestration: queue status and control ---------------------------
+    Tool(
+        name="get_queue_status",
+        description=(
+            "Get the status of the HPC task queue: pending/running counts, "
+            "per-executor breakdown, and currently running tools."
+        ),
+        inputSchema={"type": "object", "properties": {}},
+    ),
+    Tool(
+        name="reprioritize_task",
+        description=(
+            "Change the priority of a pending task in the queue.  Lower "
+            "numbers = higher priority (0=critical, 1=high, 2=default, 3=low)."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "task_id": {
+                    "type": "string",
+                    "description": "ID of the pending task to reprioritize",
+                },
+                "new_priority": {
+                    "type": "integer",
+                    "description": "New priority (0=critical, 1=high, 2=default, 3=low)",
+                },
+            },
+            "required": ["task_id", "new_priority"],
+        },
+    ),
+    Tool(
+        name="cancel_task",
+        description="Cancel a pending (not yet running) task by its task_id.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "task_id": {
+                    "type": "string",
+                    "description": "ID of the pending task to cancel",
+                },
+            },
+            "required": ["task_id"],
+        },
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Backwards-compatible wrapper (used by tests and direct Python callers)
+# ---------------------------------------------------------------------------
+
+
+class StructBioReasonerMCPServer:
+    """Compatibility wrapper providing the pre-MCP-SDK interface.
+
+    Tests and direct Python callers use ``create_server()`` which returns
+    this object.  It delegates to ``_AppState`` for state and ``_dispatch``
+    for tool handling, so behaviour is identical to the real MCP transport.
+    """
+
+    def __init__(
+        self,
+        artifact_store_root: str = "artifact_store",
+        academy_config: Optional[Any] = None,
+    ) -> None:
+        self._state = _AppState(
+            artifact_store_root=artifact_store_root,
+            academy_config=academy_config,
+        )
+
+    # Expose state properties for test mocking
+    @property
+    def reasoning_bridge(self):
+        return self._state.reasoning_bridge
+
+    @property
+    def academy_dispatch(self):
+        return self._state.academy_dispatch
+
+    @property
+    def _academy_dispatch(self):
+        return self._state._academy_dispatch
+
+    @_academy_dispatch.setter
+    def _academy_dispatch(self, value):
+        self._state._academy_dispatch = value
 
     def list_tools(self) -> list[dict[str, Any]]:
-        """List all registered MCP tools."""
-        return list(self._tools.values())
-
-    # ------------------------------------------------------------------
-    # Tool dispatch
-    # ------------------------------------------------------------------
+        """List tools as plain dicts (old interface)."""
+        return [
+            {"name": t.name, "description": t.description, "inputSchema": t.inputSchema}
+            for t in TOOLS
+        ]
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        """Call an MCP tool by name, routing to the appropriate layer."""
-        if name not in self._tools:
-            return {"error": f"Unknown tool: {name}"}
+        """Call a tool and return the result dict directly."""
+        return await _dispatch(self._state, name, arguments)
 
+
+# ---------------------------------------------------------------------------
+# Build the MCP Server
+# ---------------------------------------------------------------------------
+
+
+def _build_server(state: _AppState) -> Server:
+    """Wire tool definitions and handlers onto an ``mcp.Server``."""
+
+    app = Server(
+        name="structbioreasoner",
+        version="0.1.0",
+        instructions=(
+            "StructBioReasoner: AI-powered protein engineering platform. "
+            "Set a research goal with jnana_set_goal, then use "
+            "jnana_recommend_action and run_skill in a loop.  Use "
+            "send_directive at any time to steer the campaign."
+        ),
+    )
+
+    # -- list_tools --------------------------------------------------------
+
+    @app.list_tools()
+    async def handle_list_tools() -> list[Tool]:
+        return TOOLS
+
+    # -- call_tool ---------------------------------------------------------
+
+    @app.call_tool()
+    async def handle_call_tool(
+        name: str, arguments: dict[str, Any] | None
+    ) -> list[TextContent]:
+        arguments = arguments or {}
         try:
-            # Layer 1: Skill invocation → Academy Dispatch
-            if name == "run_skill":
-                return await self._handle_run_skill(arguments)
-            elif name == "list_skills":
-                return self._handle_list_skills()
-
-            # Layer 2: Jnana reasoning
-            elif name == "jnana_set_goal":
-                return self._handle_jnana_set_goal(arguments)
-            elif name == "jnana_generate_hypothesis":
-                return self._handle_jnana_generate_hypothesis(arguments)
-            elif name == "jnana_recommend_action":
-                return self._handle_jnana_recommend_action(arguments)
-            elif name == "jnana_bound_parameters":
-                return self._handle_jnana_bound_parameters(arguments)
-            elif name == "jnana_evaluate_results":
-                return self._handle_jnana_evaluate_results(arguments)
-            elif name == "jnana_check_convergence":
-                return self._handle_jnana_check_convergence()
-
-            # Layer 4: Academy status
-            elif name == "academy_agent_status":
-                return self._handle_academy_status(arguments)
-
-            return {"error": f"Tool '{name}' registered but handler not implemented"}
+            result = await _dispatch(state, name, arguments)
         except Exception as exc:
             logger.exception("Tool %s failed", name)
-            return {"error": str(exc), "tool": name}
+            result = {"error": str(exc), "tool": name}
+        return [TextContent(type="text", text=json.dumps(result, default=str))]
 
-    # ------------------------------------------------------------------
-    # Layer 1 handlers: skill invocation via Academy Dispatch
-    # ------------------------------------------------------------------
+    return app
 
-    async def _handle_run_skill(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        """Route a skill invocation to AcademyDispatch."""
+
+# ---------------------------------------------------------------------------
+# Tool dispatch
+# ---------------------------------------------------------------------------
+
+
+async def _dispatch(
+    state: _AppState, name: str, arguments: dict[str, Any]
+) -> dict[str, Any]:
+    """Route a tool call to the appropriate handler."""
+
+    # -- Layer 1: Skill invocation -----------------------------------------
+
+    if name == "run_skill":
         skill_name = arguments["skill_name"]
         params = arguments.get("parameters", {})
-
-        dispatch = self.academy_dispatch
+        dispatch = state.academy_dispatch
         if not dispatch._started:
             await dispatch.start()
-
+        state._tasks_submitted += 1
         result = await dispatch.dispatch(skill_name, params)
+        state._tasks_completed += 1
         return {"tool": "run_skill", "status": "success", "result": result}
 
-    def _handle_list_skills(self) -> dict[str, Any]:
-        """List skills available through AcademyDispatch."""
+    if name == "list_skills":
         return {
             "tool": "list_skills",
             "status": "success",
-            "skills": self.academy_dispatch.list_available_skills(),
+            "skills": state.academy_dispatch.list_available_skills(),
         }
 
-    # ------------------------------------------------------------------
-    # Layer 2 handlers: Jnana reasoning
-    # ------------------------------------------------------------------
+    # -- Layer 2: Jnana reasoning ------------------------------------------
 
-    def _handle_jnana_set_goal(self, arguments: dict[str, Any]) -> dict[str, Any]:
+    if name == "jnana_set_goal":
         research_goal = arguments["research_goal"]
-        plan = self.reasoning_bridge.set_research_goal(research_goal)
-        return {"tool": "jnana_set_goal", "status": "success", "plan": plan.to_dict()}
+        state._research_goal = research_goal
+        state._campaign_started_at = time.time()
+        plan = state.reasoning_bridge.set_research_goal(research_goal)
+        return {
+            "tool": "jnana_set_goal",
+            "status": "success",
+            "plan": plan.to_dict(),
+        }
 
-    def _handle_jnana_generate_hypothesis(self, arguments: dict[str, Any]) -> dict[str, Any]:
+    if name == "jnana_generate_hypothesis":
         count = arguments.get("count", 1)
-        hypotheses = self.reasoning_bridge._generate_hypotheses(count=count)
+        hypotheses = state.reasoning_bridge._generate_hypotheses(count=count)
         return {
             "tool": "jnana_generate_hypothesis",
             "status": "success",
             "hypotheses": [h.to_dict() for h in hypotheses],
         }
 
-    def _handle_jnana_recommend_action(self, arguments: dict[str, Any]) -> dict[str, Any]:
+    if name == "jnana_recommend_action":
         previous_run_type = arguments.get("previous_run_type", "starting")
         previous_conclusion = arguments.get("previous_conclusion", "")
-        rec = self.reasoning_bridge.recommend_next_action(
+        # Inject pending human directives into the conclusion context
+        pending = state.pop_directives()
+        if pending:
+            directive_text = "\n".join(
+                f"[HUMAN DIRECTIVE ({d.get('priority', 'normal')})]: {d['directive']}"
+                for d in pending
+            )
+            previous_conclusion = (
+                f"{previous_conclusion}\n\n"
+                f"--- Human directives received ---\n{directive_text}"
+            ).strip()
+        rec = state.reasoning_bridge.recommend_next_action(
             previous_run_type=previous_run_type,
             previous_conclusion=previous_conclusion,
         )
-        return {"tool": "jnana_recommend_action", "status": "success", "recommendation": rec.to_dict()}
+        return {
+            "tool": "jnana_recommend_action",
+            "status": "success",
+            "recommendation": rec.to_dict(),
+            "directives_applied": len(pending),
+        }
 
-    def _handle_jnana_bound_parameters(self, arguments: dict[str, Any]) -> dict[str, Any]:
+    if name == "jnana_bound_parameters":
         skill_name = arguments["skill_name"]
         task_type = arguments["task_type"]
-        config = self.reasoning_bridge.bound_parameters(skill_name, task_type)
-        return {"tool": "jnana_bound_parameters", "status": "success", "config": config.to_dict()}
+        config = state.reasoning_bridge.bound_parameters(skill_name, task_type)
+        return {
+            "tool": "jnana_bound_parameters",
+            "status": "success",
+            "config": config.to_dict(),
+        }
 
-    def _handle_jnana_evaluate_results(self, arguments: dict[str, Any]) -> dict[str, Any]:
+    if name == "jnana_evaluate_results":
         artifact_ids = arguments["artifact_ids"]
-        evaluation = self.reasoning_bridge.evaluate_results(artifact_ids)
-        return {"tool": "jnana_evaluate_results", "status": "success", "evaluation": evaluation.to_dict()}
+        evaluation = state.reasoning_bridge.evaluate_results(artifact_ids)
+        return {
+            "tool": "jnana_evaluate_results",
+            "status": "success",
+            "evaluation": evaluation.to_dict(),
+        }
 
-    def _handle_jnana_check_convergence(self) -> dict[str, Any]:
-        converged = self.reasoning_bridge.check_convergence()
-        return {"tool": "jnana_check_convergence", "status": "success", "converged": converged}
+    if name == "jnana_check_convergence":
+        converged = state.reasoning_bridge.check_convergence()
+        return {
+            "tool": "jnana_check_convergence",
+            "status": "success",
+            "converged": converged,
+        }
 
-    # ------------------------------------------------------------------
-    # Layer 4 handlers: Academy agent status
-    # ------------------------------------------------------------------
+    # -- Layer 4: Academy status -------------------------------------------
 
-    def _handle_academy_status(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        dispatch = self.academy_dispatch
+    if name == "academy_agent_status":
+        dispatch = state.academy_dispatch
         return {
             "tool": "academy_agent_status",
             "status": "success",
@@ -362,28 +592,151 @@ class StructBioReasonerMCPServer:
             "available_skills": dispatch.list_available_skills(),
         }
 
+    # -- Human-in-the-loop -------------------------------------------------
+
+    if name == "send_directive":
+        directive = {
+            "directive": arguments["directive"],
+            "priority": arguments.get("priority", "normal"),
+            "category": arguments.get("category", "other"),
+        }
+        state.add_directive(directive)
+        return {
+            "tool": "send_directive",
+            "status": "accepted",
+            "directive": directive,
+            "pending_count": len(state.peek_directives()),
+        }
+
+    if name == "get_campaign_status":
+        elapsed = (
+            time.time() - state._campaign_started_at
+            if state._campaign_started_at
+            else 0.0
+        )
+        return {
+            "tool": "get_campaign_status",
+            "status": "success",
+            "research_goal": state._research_goal,
+            "campaign_active": state._campaign_started_at is not None,
+            "elapsed_seconds": round(elapsed, 1),
+            "tasks_submitted": state._tasks_submitted,
+            "tasks_completed": state._tasks_completed,
+            "pending_directives": len(state.peek_directives()),
+        }
+
+    if name == "get_pending_directives":
+        return {
+            "tool": "get_pending_directives",
+            "status": "success",
+            "directives": state.peek_directives(),
+        }
+
+    # -- Orchestration: queue control --------------------------------------
+
+    if name == "get_queue_status":
+        if state._frontier is not None:
+            return {
+                "tool": "get_queue_status",
+                "status": "success",
+                **state._frontier.status_snapshot(),
+            }
+        return {
+            "tool": "get_queue_status",
+            "status": "success",
+            "pending": 0,
+            "running": 0,
+            "is_empty": True,
+            "note": "No frontier active — tasks dispatched directly via Academy",
+        }
+
+    if name == "reprioritize_task":
+        task_id = arguments["task_id"]
+        new_priority = arguments["new_priority"]
+        if state._frontier is not None:
+            ok = state._frontier.reprioritize(task_id, new_priority)
+            return {
+                "tool": "reprioritize_task",
+                "status": "success" if ok else "not_found",
+                "task_id": task_id,
+                "new_priority": new_priority,
+            }
+        return {
+            "tool": "reprioritize_task",
+            "status": "error",
+            "reason": "No frontier active",
+        }
+
+    if name == "cancel_task":
+        task_id = arguments["task_id"]
+        if state._frontier is not None:
+            ok = state._frontier.cancel_pending(task_id)
+            return {
+                "tool": "cancel_task",
+                "status": "cancelled" if ok else "not_found",
+                "task_id": task_id,
+            }
+        return {
+            "tool": "cancel_task",
+            "status": "error",
+            "reason": "No frontier active",
+        }
+
+    return {"error": f"Unknown tool: {name}"}
+
+
+# ---------------------------------------------------------------------------
+# Factory and entry point
+# ---------------------------------------------------------------------------
+
 
 def create_server(
     artifact_store_root: str = "artifact_store",
     academy_config: Optional[Any] = None,
 ) -> StructBioReasonerMCPServer:
-    """Create and return an MCP server instance."""
+    """Create a server wrapper for direct Python use and testing.
+
+    Returns a :class:`StructBioReasonerMCPServer` that exposes
+    ``list_tools()`` and ``call_tool()`` without needing MCP transport.
+    """
     return StructBioReasonerMCPServer(
         artifact_store_root=artifact_store_root,
         academy_config=academy_config,
     )
 
 
-def main() -> None:
-    """Run the MCP server (stdio transport)."""
-    server = create_server()
-    logger.info(
-        "StructBioReasoner MCP server started with %d tools",
-        len(server.list_tools()),
+def create_mcp_app(
+    artifact_store_root: str = "artifact_store",
+    academy_config: Optional[Any] = None,
+) -> tuple[Server, _AppState]:
+    """Create the real MCP ``Server`` for stdio transport."""
+    state = _AppState(
+        artifact_store_root=artifact_store_root,
+        academy_config=academy_config,
     )
-    # Full stdio transport implementation will be added
-    # when integrating with the mcp Python SDK
-    print(json.dumps({"status": "ready", "tools": len(server.list_tools())}))
+    app = _build_server(state)
+    return app, state
+
+
+def main() -> None:
+    """Run the MCP server over stdio transport."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+        stream=sys.stderr,  # MCP uses stdout for protocol; logs go to stderr
+    )
+
+    app, _state = create_mcp_app()
+
+    async def _run() -> None:
+        async with stdio_server() as (read_stream, write_stream):
+            await app.run(
+                read_stream,
+                write_stream,
+                app.create_initialization_options(),
+            )
+
+    asyncio.run(_run())
 
 
 if __name__ == "__main__":

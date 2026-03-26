@@ -22,6 +22,7 @@ dependencies = [
     "biopython>=1.79",
     "pyyaml>=6.0",
     "requests>=2.26.0",
+    "mcp>=1.0.0",
 ]
 
 [project.optional-dependencies]

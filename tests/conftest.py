@@ -76,6 +76,10 @@ def _build_fake_academy():
         fn._is_action = True
         return fn
 
+    def _loop(fn):
+        fn._is_loop = True
+        return fn
+
     class _Agent:
         pass
 
@@ -123,6 +127,7 @@ def _build_fake_academy():
 
     agent_mod.Agent = _Agent
     agent_mod.action = _action
+    agent_mod.loop = _loop
     handle_mod.Handle = _Handle
     manager_mod.Manager = _Manager
     exchange_mod.LocalExchangeFactory = _LocalExchangeFactory
