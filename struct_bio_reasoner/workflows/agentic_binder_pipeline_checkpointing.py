@@ -73,6 +73,7 @@ class PipelineCheckpoint:
         previous_config: Optional[Dict[str, Any]],
         previous_results: Optional[Dict[str, Any]],
         history: List[Any],
+        glycan_chains: Optional[List[Any]] = None,
         metadata: Optional[Dict[str, Any]] = None
     ):
         """
@@ -92,6 +93,7 @@ class PipelineCheckpoint:
             previous_config: Previous task configuration
             previous_results: Previous task results
             history: System history
+            glycan_chains: List of glycan chains
             metadata: Additional metadata
         """
         self.iteration = iteration
@@ -107,6 +109,7 @@ class PipelineCheckpoint:
         self.previous_config = previous_config
         self.previous_results = previous_results
         self.history = history
+        self.glycan_chains = glycan_chains or []
         self.metadata = metadata or {}
         self.timestamp = datetime.now().isoformat()
     
@@ -211,6 +214,18 @@ class AgenticBinderPipelineWithCheckpointing:
         self.research_goal = research_goal
         self.session_id = await self.system.set_research_goal(research_goal)
         self.target_sequence = self.system._extract_target_sequence(research_goal)
+        self.glycan_chains = self.system._extract_glycan_chains(research_goal)
+
+        if self.glycan_chains:
+            logger.info(
+                f"✓ {len(self.glycan_chains)} glycan chain(s) extracted: "
+                + ", ".join(
+                    f"{gc.attachment_residue}→chain{gc.chain_id}"
+                    for gc in self.glycan_chains
+                )
+            )
+        else:
+            logger.info("✓ No glycan chains in research goal (apo / protein-only run)")
 
         # Get global working directory
         self.global_cwd = self.system.binder_config.get("agents", {}).get(
@@ -259,6 +274,7 @@ class AgenticBinderPipelineWithCheckpointing:
             previous_config=previous_config,
             previous_results=previous_results,
             history=self.system.history.copy() if self.system else [],
+            glycan_chains=self.glycan_chains.copy() if hasattr(self, 'glycan_chains') and self.glycan_chains else [],
             metadata={
                 'global_cwd': self.global_cwd,
                 'max_iterations': self.max_iterations
@@ -854,6 +870,10 @@ class AgenticBinderPipelineWithCheckpointing:
             self.system.design_agents[task_name].config['cwd'] = config['cwd']
             await self.system.design_agents[task_name].initialize()
 
+        # Propagate glycan chains to every agent that receives a config dict
+        if hasattr(self, 'glycan_chains') and self.glycan_chains:
+            config['glycan_chains'] = self.glycan_chains
+
         # Execute the task
         logger.info(f'Before running {task_name}, {config=}')
         results = await self.system.design_agents[task_name].analyze_hypothesis(
@@ -944,12 +964,16 @@ class AgenticBinderPipelineWithCheckpointing:
                 'iterations': [],
                 'tasks': [],
                 'target_sequence': self.target_sequence,
-                'hotspot_residues': hotspot_residues
+                'hotspot_residues': hotspot_residues,
+                'glycan_chains': [gc.to_dict() for gc in self.glycan_chains] if self.glycan_chains else []
             }
         )
 
-        # Append hotspot info to history
-        self.system.append_history(key_items={'hotspot_residues': hotspot_residues})
+        # Append hotspot info and glycan chains to history
+        key_items = {'hotspot_residues': hotspot_residues}
+        if self.glycan_chains:
+            key_items['glycan_chains'] = [gc.to_dict() for gc in self.glycan_chains]
+        self.system.append_history(key_items=key_items)
 
         logger.info("\n[STARTING] Agentic optimization loop...")
 

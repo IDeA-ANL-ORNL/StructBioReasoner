@@ -284,7 +284,7 @@ class BindCraftAgent:
             )
 
             # Append any existing constraint rows so nothing is lost.
-            if constraints is not None:
+            if constraints is not None and isinstance(constraints, (str, Path)):
                 existing_lines = Path(constraints).read_text().splitlines()
                 data_rows = [l for l in existing_lines[1:] if l.strip()]  # skip header
                 if data_rows:

@@ -553,7 +553,7 @@ class BinderDesignSystem(JnanaSystem):
         # Match: single AA letter + residue number + colon +
         # glycan tree starting with a known 3-letter sugar code, to EOL.
         known_sugars = 'NAG|FUC|MAN|GAL|SIA|GLC|GLA'
-        pattern = rf'([A-Z])(\d+):((?:{known_sugars})[^\n]+)'
+        pattern = rf'([A-Z])(\d+):\s*((?:{known_sugars})[^\n]*)'
 
         matches = re.findall(pattern, research_goal)
 

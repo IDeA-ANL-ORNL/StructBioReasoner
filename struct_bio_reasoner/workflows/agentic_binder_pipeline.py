@@ -709,12 +709,16 @@ class AgenticBinderPipeline:
                 'iterations': [],
                 'tasks': [],
                 'target_sequence': self.target_sequence,
-                'hotspot_residues': hotspot_residues
+                'hotspot_residues': hotspot_residues,
+                'glycan_chains': [gc.to_dict() for gc in self.glycan_chains] if self.glycan_chains else []
             }
         )
 
-        # Append hotspot info to history
-        self.system.append_history(key_items={'hotspot_residues': hotspot_residues})
+        # Append hotspot info and glycan chains to history
+        key_items = {'hotspot_residues': hotspot_residues}
+        if self.glycan_chains:
+            key_items['glycan_chains'] = [gc.to_dict() for gc in self.glycan_chains]
+        self.system.append_history(key_items=key_items)
 
         logger.info("\n[STARTING] Agentic optimization loop...")
 

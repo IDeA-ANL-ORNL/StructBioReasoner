@@ -1,8 +1,8 @@
 """
 RBD Glycan + Disulfide Binder Design Pipeline
 
-Agentic binder design workflow targeting the SARS-CoV-2 Spike Receptor Binding
-Domain (RBD, residues 176–602 of Spike), with full glycan and disulfide bond
+Agentic binder design workflow targeting the Nipah G Attachment Glycoprotein Receptor Binding
+Domain (RBD, residues 176–602 of G Attachment Glycoprotein), with full glycan and disulfide bond
 support wired into the MD preparation step.
 
 Target features (RBD numbering):
@@ -48,10 +48,10 @@ logger = logging.getLogger(__name__)
 # RBD research goal
 # ---------------------------------------------------------------------------
 
-RBD_RESEARCH_GOAL = """Design biologic binders for the SARS-CoV-2 Spike Receptor Binding Domain (RBD).
+RBD_RESEARCH_GOAL = """Design biologic binders for the Nipah G Attachment Glycoprotein Receptor Binding Receptor Binding Domain (RBD).
 
-Target: SARS-CoV-2 Spike RBD (residues 176–602 of full-length Spike, UniProt P0DTC2)
-Target Sequence: RVQPTESIVRFPNITNLCPFDEVFNATRFASVYAWNRKRISNCVADYSVLYNSASFSTFKCYGVSPTKLNDLCFTNVYADSFVIRGDEVRQIAPGQTGNIADYNYKLPDDFTGCVIAWNSNNLDSKVGGNYNYLYRLFRKSNLKPFERDISTEIYQAGSKPCNGVEGFNCYFPLQSYGFQPTNGVGYQPYRVVVLSFELLHAPATVCGPKKSTNLVKNKCVNFNFNGLTGTGVLTESNKKFLPFQQFGRDIADTTDAVRDPQTLEILDITPCSFGGVSVITPGTNTSNQVAVLYQGVNCTEVPVAIHADQLTPTWRVYSTGSNVFQTRAGCLIGAEHVNNSYECDIPIGAGICASYQTQTNSPGSASSVASQSIIAYTMSLGAENSVAYSNNSIAIPTNFTISVTTEILPVSMTKTSVDCTMYICGDSTECSNLLLQYGSFCTQLNRALTGIAVEQDKNTQEVFAQVKQIYKTPPIKDFGGFNFSQILPDPSKPSKRSFIEDLLFNKVTLADAGFIKQYGDCLGDIAARDLICAQKFNGLTVLPPLLTDEMIAQYTSALLAGTITSGWTFGAGAALQIPFAMQMAYRFNGIGVTQNVLYENQKLIANQFNSAIGKIQDSLSSTASALGKLQDVVNQNAQALNTLVKQLSSNFGAISSVLNDILSRLDPPEAEVQIDRLITGRLQSLQTYVTQQLIRAAEIRASANLAATKMSECVLGQSKRVDFCGKGYHLMSFPQSAPHGVVFLHVTYVPAQEKNFTTAPAICHDGKAHFPREGVFVSNGTHWFVTQRNFYEPQIITTDNTFVSGNCDVVIGIVNNTVYDPLQPELDSFKEELDKYFKNHTSPDVDLGDISGINASVVNIQKEIDRLNEVAKNLNESLIDLQELGKYEQYIKWPWYIWLGFIAGLIAIVMVTIMLCCMTSCCSCLKGCCSCGSCCKFDEDDSEPVLKGVKLHYT
+Target: Nipah G Attachment Glycoprotein Receptor Binding Receptor Binding Domain (RBD) (residues 176-602 of full-length Attachment protein, UniProt Q9IH62)
+Target Sequence: EGVSNLVGLPNNICLQKTSNQILKPKLISYTLPVVGQSGTCITDPLLAMDEGYFAYSHLERIGSCSRGVSKQRIIGVGEVLDRGDEVPSLFMTNVWTPPNPNTVYHCSAVYNNEFYYVLCAVSTVGDPILNSTYWSGSLMMTRLAVKPKSNGGGYNQHQLALRSIEKGRYDKVMPYGPSGIKQGDTLYFPAVGFLVRTEFKYNDSNCPITKCQYSKPENCRLSMGIRPNSHYILRSGLLKYNLSDGENPKVVFIEISDQRLSIGSPSKIYDSLGQPVFYQASFSWDTMIKFGDVLTVNPLVVNWRNNTVISRPGQSQCPRFNTCPEICWEGVYNDAFLIDRINWISAGVFLDSNQTAENPVFTVFKDNEILYRAQLASEDTNAQKTITNCFLLKNKIWCISLVEIYDTGDNVIRPKLFAVKIPEQCT
 
 Glycosylation sites (RBD numbering, GLYCAM/AMBER convention):
   N131: NAG(6-1 FUC)(4-1 NAG(4-1 MAN(6-1 MAN(2-1 NAG))(3-1 MAN(2-1 NAG))))
@@ -63,7 +63,10 @@ Disulfide bonds (RBD numbering): C41-C65, C107-C120, C318-C328, C390-C399, C207-
 
 Objectives:
 - Design high-affinity binders (< 10 nM) that are stable under glycan shielding
-- Target accessible hotspots: F183, Y343, I413
+- Target accessible hotspots: 
+    Hotspot 1: E358, R67, E326, D380
+    Hotspot 2: Q384, E404, Y406, I413
+    Hotspot 3: W329, F283, L130
 - Scaffolds: affibody, affitin, or nanobody
 
 Goals:
@@ -79,7 +82,18 @@ Default Scaffolds:
 """
 
 # Known hotspots in RBD numbering (F183, Y343, I413)
-RBD_HOTSPOT_RESIDUES: List[int] = [183, 343, 413]
+RBD_HOTSPOT_RESIDUES: List[int] = [
+                                358,
+                                67,
+                                326,
+                                380,
+                                384,
+                                404,
+                                406,
+                                413,
+                                329,
+                                283,
+                                130]
 
 
 

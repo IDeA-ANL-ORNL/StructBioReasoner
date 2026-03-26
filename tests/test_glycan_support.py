@@ -160,7 +160,7 @@ class TestBinderHypothesisDataGlycans:
 def _parse_glycan_chains(research_goal: str) -> list:
     """Mirror of BinderDesignSystem._extract_glycan_chains without needing a config."""
     known_sugars = 'NAG|FUC|MAN|GAL|SIA|GLC|GLA'
-    pattern = rf'([A-Z])(\d+):((?:{known_sugars})[^\n]+)'
+    pattern = rf'([A-Z])(\d+):\s*((?:{known_sugars})[^\n]*)'
     matches = re.findall(pattern, research_goal)
     chain_letters = list('BCDEFGHIJKLMNOPQRSTUVWXYZ')
     chains = []
