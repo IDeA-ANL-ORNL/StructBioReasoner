@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BindCraft Design Configuration",
+  "description": "Configuration schema for BindCraft computational peptide binder design runs. Matches the config_master['computational_design'] schema from prompts.py.",
+  "type": "object",
+  "required": ["target_sequence"],
+  "properties": {
+    "target_sequence": {
+      "type": "string",
+      "description": "Amino acid sequence of the target protein"
+    },
+    "binder_sequence": {
+      "type": "string",
+      "default": "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF",
+      "description": "Initial binder scaffold sequence"
+    },
+    "num_rounds": {
+      "type": "integer",
+      "default": 3,
+      "minimum": 1,
+      "description": "Number of design-fold-score rounds"
+    },
+    "num_seq": {
+      "type": "integer",
+      "default": 25,
+      "description": "Number of sequences per ProteinMPNN batch"
+    },
+    "batch_size": {
+      "type": "integer",
+      "default": 250,
+      "description": "ProteinMPNN batch size"
+    },
+    "max_retries": {
+      "type": "integer",
+      "default": 5,
+      "description": "Maximum retries for inverse folding"
+    },
+    "sampling_temp": {
+      "type": "number",
+      "default": 0.1,
+      "description": "ProteinMPNN sampling temperature"
+    },
+    "device": {
+      "type": "string",
+      "default": "cuda:0",
+      "description": "Compute device (cuda:N or cpu)"
+    },
+    "mpnn_model": {
+      "type": "string",
+      "default": "v_48_020",
+      "description": "ProteinMPNN model name"
+    },
+    "mpnn_weights": {
+      "type": "string",
+      "default": "soluble_model_weights",
+      "description": "ProteinMPNN model weight set"
+    },
+    "proteinmpnn_path": {
+      "type": "string",
+      "default": "",
+      "description": "Path to ProteinMPNN installation directory"
+    },
+    "qc_kwargs": {
+      "type": "object",
+      "description": "Quality control filter thresholds",
+      "properties": {
+        "max_repeat": {
+          "type": "integer",
+          "default": 4,
+          "description": "Maximum consecutive residue repeat length"
+        },
+        "max_appearance_ratio": {
+          "type": "number",
+          "default": 0.33,
+          "description": "Maximum single-residue frequency ratio"
+        },
+        "max_charge": {
+          "type": "integer",
+          "default": 5,
+          "description": "Maximum net charge"
+        },
+        "max_charge_ratio": {
+          "type": "number",
+          "default": 0.5,
+          "description": "Maximum charged residue fraction"
+        },
+        "max_hydrophobic_ratio": {
+          "type": "number",
+          "default": 0.8,
+          "description": "Maximum hydrophobic residue fraction"
+        },
+        "min_diversity": {
+          "type": "integer",
+          "default": 8,
+          "description": "Minimum unique residue types in sequence"
+        }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "description": "Binding constraints for target residues",
+      "properties": {
+        "residues_bind": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of target residues to constrain binding to (e.g. ['R45', 'K78'])"
+        }
+      }
+    }
+  }
+}

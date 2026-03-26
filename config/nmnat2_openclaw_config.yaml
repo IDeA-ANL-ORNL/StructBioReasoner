@@ -1,0 +1,130 @@
+# NMNAT-2 OpenClaw HybridLoop Campaign Configuration
+# Section 4.2 of the PASC'26 paper — NMNAT-2 binder design via interactome probing
+
+target:
+  name: "NMNAT-2"
+  description: "Nicotinamide/nicotinic acid mononucleotide adenylyltransferase 2"
+  uniprot_id: "Q9BZQ4"
+  gene_name: "NMNAT2"
+  sequence: >-
+    MTETTKTHVILLACGSFNPITKGHIQMFERARDYLHKTGRFIVIGGIVSPVHDSYGKQGLVSSRHRL
+    IMCQLAVQNSDWIRVDPWECYQDTWQTTCSVLEHHRDLMKRVTGCILSNVNTPSMTPVIGQPQNET
+    PQPIYQNSNVATKPTAAKILGKVGESLSRICCVRPPVERFTFVDENANLGTVMRYEEIELRILLLCGS
+    DLLESFCIPGLWNEADMEVIVGDFGIVVVPRDAADTDRIMNHSSILRKYKNNIMVVKDDINHPMSVV
+    SSTKSRLALQHGDGHVVDYLSQPVIDYILKSQLYINASG
+  idr_region: [104, 192]
+  key_residues:
+    interface: ["R81", "M106", "L160", "V109", "L156", "L153"]
+    catalytic: ["H24", "W92", "T95"]
+
+interactome:
+  # 18 interactome members explored via HiPerRAG
+  targets:
+    - name: "p53"
+      uniprot_id: "P04637"
+      therapeutic_relevance: "high"
+      notes: "Key therapeutic target — hydrophobic interface with IDR"
+    - name: "ALDH3B1"
+      uniprot_id: "P43353"
+      therapeutic_relevance: "medium"
+    - name: "ICAM1"
+      uniprot_id: "P05362"
+      therapeutic_relevance: "medium"
+    - name: "FBXO7"
+      uniprot_id: "Q9UJR5"
+      therapeutic_relevance: "low"
+    - name: "MUM"
+      uniprot_id: "Q9ULX3"
+      therapeutic_relevance: "low"
+    - name: "FBXO45"
+      uniprot_id: "Q8NCF5"
+      therapeutic_relevance: "low"
+    - name: "BAG5"
+      uniprot_id: "Q9UL15"
+      therapeutic_relevance: "medium"
+    - name: "LRIF1"
+      uniprot_id: "Q5T3J3"
+      therapeutic_relevance: "low"
+    - name: "APP"
+      uniprot_id: "P05067"
+      therapeutic_relevance: "high"
+      notes: "Alzheimer disease link"
+    - name: "SURF1"
+      uniprot_id: "Q15526"
+      therapeutic_relevance: "low"
+    - name: "HSPA8"
+      uniprot_id: "P11142"
+      therapeutic_relevance: "medium"
+      notes: "Chaperone — may stabilize NMNAT-2"
+    - name: "RLIM"
+      uniprot_id: "Q9NVW2"
+      therapeutic_relevance: "low"
+    - name: "PTBP3"
+      uniprot_id: "O95758"
+      therapeutic_relevance: "low"
+    - name: "SKP1"
+      uniprot_id: "P63208"
+      therapeutic_relevance: "medium"
+    - name: "SPRYD3"
+      uniprot_id: "Q9H4I3"
+      therapeutic_relevance: "low"
+    - name: "HSP90"
+      uniprot_id: "P07900"
+      therapeutic_relevance: "medium"
+      notes: "Major chaperone — potential co-targeting"
+    - name: "USP9X"
+      uniprot_id: "Q93008"
+      therapeutic_relevance: "medium"
+    - name: "SIAH1"
+      uniprot_id: "Q8IUQ4"
+      therapeutic_relevance: "low"
+  selected_interface: "NMNAT-2:p53"
+  interface_type: "hydrophobic"
+  interface_residues_nmnat2: ["M106", "V109", "L153", "L156", "L160"]
+  interface_residues_p53: ["L194", "L264", "V272", "L289"]
+
+scaffolds:
+  affibody:
+    sequence: "VDNKFNKEQQNAFYEILHLPNLNEEQRNAFIQSLKDDPSQSANLLAEAKKLNDAQAPK"
+    size_kda: 6.5
+    clinical_precedent: true
+  affitin:
+    sequence: "MGSWAEFKQRLAAIKTRLQALGGSEAELAAFEKEIAAFESELQAYKGKGNPEVEALRKEAAAIRDELQAYRHN"
+    size_kda: 7.8
+    clinical_precedent: false
+  nanobody:
+    sequence: "QVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAA"
+    size_kda: 13.0
+    clinical_precedent: true
+
+campaign:
+  # Phase 1: Interactome Exploration (interactive mode)
+  exploration:
+    goal: "Identify NMNAT-2 interactome members and select therapeutic target"
+    step_sequence:
+      - rag               # HiPerRAG literature mining
+      - structure_prediction  # Fold NMNAT-2 with top partners
+      - molecular_dynamics    # Simulate interactome interfaces
+      - analysis              # Identify hotspots, rank interfaces
+    max_iterations: 10
+
+  # Phase 2: Binder Design Campaign (tournament mode)
+  design:
+    goal: "Design binders targeting NMNAT-2:p53 hydrophobic interface"
+    step_sequence:
+      - computational_design  # BindCraft binder generation
+      - molecular_dynamics    # MD assessment of stability
+      - free_energy           # MM-PBSA ranking
+    max_iterations: 15
+
+design_parameters:
+  target_binding_affinity_nm: 10.0  # < 10 nM
+  max_rmsd_angstrom: 3.0
+  validated_candidates_target: 97000
+  num_bindcraft_rounds: 5
+  fold_backend: "chai"
+  inv_fold_backend: "proteinmpnn"
+
+artifacts:
+  store_root: "artifact_store/nmnat2_openclaw"
+  provenance_tracking: true

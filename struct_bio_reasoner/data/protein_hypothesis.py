@@ -12,12 +12,50 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
 import numpy as np
 
-# Import Jnana components
+# Import Jnana components (optional — package works without Jnana installed)
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent.parent / "Jnana"))
 
-from jnana.data.unified_hypothesis import UnifiedHypothesis, Reference
+try:
+    from jnana.data.unified_hypothesis import UnifiedHypothesis, Reference
+    _JNANA_AVAILABLE = True
+except ImportError:
+    _JNANA_AVAILABLE = False
+
+    class UnifiedHypothesis:
+        """Stub base class used when Jnana is not installed."""
+        def __init__(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+            # Provide default attributes expected by ProteinHypothesis
+            for attr in (
+                "hypothesis_id", "title", "content", "description",
+                "experimental_validation", "created_at", "updated_at",
+                "generation_timestamp", "version", "version_string",
+                "hypothesis_type", "parent_id", "hypothesis_number",
+                "generation_strategy", "biomni_verification",
+                "is_biomedical",
+            ):
+                if not hasattr(self, attr):
+                    setattr(self, attr, kwargs.get(attr, "" if "id" in attr or "type" in attr else None))
+            for attr in (
+                "children_ids", "hallmarks", "evaluation_scores",
+                "references", "feedback_history", "notes",
+                "improvements_made", "user_feedback", "tournament_record",
+                "agent_contributions", "biomedical_domains", "tags",
+            ):
+                if not hasattr(self, attr):
+                    setattr(self, attr, kwargs.get(attr, []))
+            if not hasattr(self, "metadata"):
+                self.metadata = kwargs.get("metadata", {})
+
+    class Reference:
+        """Stub Reference class used when Jnana is not installed."""
+        def __init__(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
 from .mutation_model import Mutation, MutationSet, MutationEffect
 
 

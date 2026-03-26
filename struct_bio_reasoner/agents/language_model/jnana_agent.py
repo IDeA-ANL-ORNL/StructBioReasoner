@@ -13,10 +13,16 @@ from parsl import Config
 from parsl import HighThroughputExecutor
 from parsl.providers import LocalProvider
 from parsl.launchers import MpiExecLauncher
-from academy.agent import Agent, action
-from academy.handle import Handle
-from academy.exchange import LocalExchangeFactory
-from academy.manager import Manager
+try:
+    from academy.agent import Agent, action
+    from academy.handle import Handle
+    from academy.exchange import LocalExchangeFactory
+    from academy.manager import Manager
+except ImportError:
+    raise ImportError(
+        "The 'academy' package is required for Jnana agent. "
+        "Install Jnana with: pip install git+https://github.com/acadev/Jnana.git --no-deps"
+    )
 from concurrent.futures import ThreadPoolExecutor
 from ...data.protein_hypothesis import  ProteinHypothesis
 from ...core.base_agent import BaseAgent

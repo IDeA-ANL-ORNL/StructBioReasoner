@@ -18,8 +18,14 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 from pathlib import Path
 
-from academy.exchange import LocalExchangeFactory
-from academy.manager import Manager
+try:
+    from academy.exchange import LocalExchangeFactory
+    from academy.manager import Manager
+except ImportError:
+    raise ImportError(
+        "The 'academy' package is required for hierarchical_workflow. "
+        "Install Jnana with: pip install git+https://github.com/acadev/Jnana.git --no-deps"
+    )
 from concurrent.futures import ThreadPoolExecutor
 
 from ..agents.executive.executive_agent import ExecutiveAgent

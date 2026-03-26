@@ -11,8 +11,14 @@ from typing import Dict, List, Optional, Any, Union
 import numpy as np
 from datetime import datetime
 
-from academy.exchange import LocalExchangeFactory
-from academy.manager import Manager
+try:
+    from academy.exchange import LocalExchangeFactory
+    from academy.manager import Manager
+except ImportError:
+    raise ImportError(
+        "The 'academy' package is required for TrajectoryAnalysisAgent. "
+        "Install Jnana with: pip install git+https://github.com/acadev/Jnana.git --no-deps"
+    )
 from concurrent.futures import ThreadPoolExecutor
     
 from ...core.base_agent import BaseAgent

@@ -12,13 +12,19 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 import json
-# Import Jnana components
+# Import Jnana components (required for BinderDesignSystem)
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent.parent / "Jnana"))
 
-from jnana.core.jnana_system import JnanaSystem
-from jnana.protognosis.core.agent_core import ContextMemory 
-from jnana.protognosis.core.llm_interface import alcfLLM
+try:
+    from jnana.core.jnana_system import JnanaSystem
+    from jnana.protognosis.core.agent_core import ContextMemory
+    from jnana.protognosis.core.llm_interface import alcfLLM
+except ImportError:
+    raise ImportError(
+        "The 'jnana' package is required for BinderDesignSystem. "
+        "Install Jnana with: pip install git+https://github.com/acadev/Jnana.git --no-deps"
+    )
 # Import protein-specific components
 from ..data.protein_hypothesis import ProteinHypothesis
 from ..agents.analysis.trajectory_analysis import TrajectoryAnalysisAgent
