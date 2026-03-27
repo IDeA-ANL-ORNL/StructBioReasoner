@@ -58,9 +58,23 @@ class BindCraftWorker(Agent):
     @action
     async def run_design(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a BindCraft binder-design workflow."""
-        await self._ensure_agent()
-        result = await self._agent.analyze_hypothesis(None, params)
-        return result if isinstance(result, dict) else {"result": str(result)}
+        try:
+            await self._ensure_agent()
+            result = await self._agent.analyze_hypothesis(None, params)
+            return result if isinstance(result, dict) else {"result": str(result)}
+        except Exception as exc:
+            logger.warning("BindCraft unavailable, returning stub result: %s", exc)
+            return {
+                "skill": "BindCraft",
+                "status": "unavailable",
+                "error": str(exc),
+                "scaffold_type": params.get("scaffold_type", "affibody"),
+                "binders_designed": 0,
+                "binders_passed_qc": 0,
+                "qc_success_rate": 0.0,
+                "top_binders": [],
+                "hotspot_coverage": 0.0,
+            }
 
     @action
     async def get_capabilities(self) -> List[str]:
@@ -98,14 +112,27 @@ class FoldingWorker(Agent):
         constraints: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Fold protein sequences and return predicted structures."""
-        await self._ensure_agent()
-        params = {
-            "sequences": sequences,
-            "names": names,
-            "constraints": constraints or {},
-        }
-        result = await self._agent.analyze_hypothesis(None, params)
-        return result if isinstance(result, dict) else {"result": str(result)}
+        try:
+            await self._ensure_agent()
+            params = {
+                "sequences": sequences,
+                "names": names,
+                "constraints": constraints or {},
+            }
+            result = await self._agent.analyze_hypothesis(None, params)
+            return result if isinstance(result, dict) else {"result": str(result)}
+        except Exception as exc:
+            logger.warning("Chai/folding unavailable, returning stub result: %s", exc)
+            return {
+                "skill": "Chai/Boltz folding",
+                "status": "unavailable",
+                "error": str(exc),
+                "method": "Chai-1",
+                "pLDDT": 0.0,
+                "ipTM": 0.0,
+                "interface_residues": [],
+                "contact_area_A2": 0.0,
+            }
 
 
 # ---------------------------------------------------------------------------
@@ -133,9 +160,24 @@ class MDWorker(Agent):
     @action
     async def run_simulation(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Run an MD simulation with the given parameters."""
-        await self._ensure_agent()
-        result = await self._agent.analyze_hypothesis(None, params)
-        return result if isinstance(result, dict) else {"result": str(result)}
+        try:
+            await self._ensure_agent()
+            result = await self._agent.analyze_hypothesis(None, params)
+            return result if isinstance(result, dict) else {"result": str(result)}
+        except Exception as exc:
+            logger.warning("MD/OpenMM unavailable, returning stub result: %s", exc)
+            return {
+                "skill": "OpenMM MD",
+                "status": "unavailable",
+                "error": str(exc),
+                "engine": "OpenMM",
+                "production_ns": 0,
+                "rmsd_mean_A": 0.0,
+                "rmsd_std_A": 0.0,
+                "hotspot_residues": [],
+                "interface_contacts_mean": 0.0,
+                "salt_bridge_E7_occupancy": 0.0,
+            }
 
 
 # ---------------------------------------------------------------------------
@@ -161,9 +203,20 @@ class RAGWorker(Agent):
     @action
     async def generate_rag_hypothesis(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate a literature-guided hypothesis."""
-        await self._ensure_agent()
-        result = await self._agent.generate_rag_hypothesis(data)
-        return result if isinstance(result, dict) else {"result": str(result)}
+        try:
+            await self._ensure_agent()
+            result = await self._agent.generate_rag_hypothesis(data)
+            return result if isinstance(result, dict) else {"result": str(result)}
+        except Exception as exc:
+            logger.warning("HiPerRAG unavailable, returning stub result: %s", exc)
+            return {
+                "skill": "HiPerRAG",
+                "status": "unavailable",
+                "error": str(exc),
+                "papers_retrieved": 0,
+                "key_findings": [],
+                "recommended_hotspots": [],
+            }
 
 
 # ---------------------------------------------------------------------------

@@ -298,6 +298,13 @@ class BindCraftAgent:
                                  hypothesis: ProteinHypothesis,
                                  task_params: dict[str, Any]) -> BinderAnalysis:
         result = await self.generate_binder_hypothesis(task_params)
+        if result is None:
+            raise RuntimeError(
+                "BindCraft agent failed to initialize — ensure that the "
+                "BindCraft package and its dependencies (Chai, ProteinMPNN, "
+                "Parsl) are installed and available in your environment. "
+                "Install from: https://github.com/msinclair-py/bindcraft/tree/agent_acad"
+            )
         # Write result to file
         all_cycles = result['all_cycles']
         passing_structures = sum(
