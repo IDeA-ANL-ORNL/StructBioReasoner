@@ -693,8 +693,15 @@ async def run_derf21_campaign(
     )
     logger.info("-" * 72)
 
+    # Build worker_configs from YAML so Academy workers get the right paths/device
+    bindcraft_cfg = cfg.get("bindcraft", {})
+    # Fall back to target sequence constant if not in YAML
+    if "target_sequence" not in bindcraft_cfg:
+        bindcraft_cfg["target_sequence"] = DERF21_SEQUENCE
+    worker_configs = {"bindcraft": bindcraft_cfg} if bindcraft_cfg else {}
+
     # Create HybridLoop
-    loop = HybridLoop(artifact_store_root=store_root)
+    loop = HybridLoop(artifact_store_root=store_root, worker_configs=worker_configs)
 
     if dry_run:
         # Inject mocks for Jnana reasoning bridge and Academy dispatch

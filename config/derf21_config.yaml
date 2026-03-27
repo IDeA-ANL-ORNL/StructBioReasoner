@@ -90,6 +90,24 @@ free_energy:
   reference_energy_kcal_mol: -135.00
   reference_energy_std: 10.25
 
+# BindCraft binder design settings
+bindcraft:
+  # Target sequence (Der f 21 from PDB 4WKY)
+  target_sequence: "MKFFVFALILALMATQAIPEEVKKVEAEHGKLVPDDIPFNISTGKTLYYTISETKEALKKEYGATTDKQTFEINPEHIFLTQNSYTVKADIPEDNFKPETTKEYLKHTEGKSDPRDKYKEFIDEALKHSGFKY"
+  # Compute device — use cpu on Mac (no CUDA/XPU)
+  device: "cpu"
+  # ProteinMPNN installation path
+  proteinmpnn_path: "/Users/ramanathana/ProteinMPNN"
+  # Reduced round/sequence counts for local CPU testing
+  num_rounds: 1
+  num_seq: 3
+  batch_size: 3
+  retries: 1
+  mpnn_model: "v_48_020"
+  mpnn_weights: "soluble_model_weights"
+  fold_backend: "chai"
+  inv_fold_backend: "proteinmpnn"
+
 # Quality control thresholds
 quality_control:
   max_repeat: 4

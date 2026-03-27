@@ -67,6 +67,43 @@ class LocalSettings(BaseComputeSettings):
             ],
         )
 
+class MacLocalSettings(BaseComputeSettings):
+    """Mac-compatible local settings using SingleNodeLauncher (no mpiexec required).
+
+    Use this on macOS / CI environments where ``mpiexec`` is not available.
+    """
+
+    worker_init: str = ''
+    nodes: int = 1
+    max_workers_per_node: int = 1
+    cores_per_worker: float = 1.0
+    retries: int = 0
+    label: str = 'local'
+    worker_port_range: Tuple[int, int] = (54000, 55000)
+
+    def config_factory(self, run_dir: PathLike) -> Config:
+        from parsl.launchers import SingleNodeLauncher
+        return Config(
+            run_dir=str(Path(run_dir) / 'runinfo'),
+            retries=self.retries,
+            executors=[
+                HighThroughputExecutor(
+                    provider=LocalProvider(
+                        nodes_per_block=self.nodes,
+                        init_blocks=1,
+                        max_blocks=1,
+                        launcher=SingleNodeLauncher(),
+                        worker_init=self.worker_init,
+                    ),
+                    label=self.label,
+                    max_workers_per_node=self.max_workers_per_node,
+                    cores_per_worker=self.cores_per_worker,
+                    worker_port_range=self.worker_port_range,
+                ),
+            ],
+        )
+
+
 class LocalCPUSettings(BaseComputeSettings):
     worker_init: str = ''
     nodes: int = 1

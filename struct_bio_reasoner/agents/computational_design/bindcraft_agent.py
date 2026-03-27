@@ -68,23 +68,27 @@ class BindCraftAgent:
             True if initialization successful, False otherwise
         """
         try:
+            import platform
             from bindcraft.core.coordinators import ParslDesignCoordinator
             from bindcraft.core.folding import ChaiBinder
             from bindcraft.core.inverse_folding import ProteinMPNN
             from bindcraft.analysis.energy import SimpleEnergy
             from bindcraft.util.quality_control import SequenceQualityControl
             from parsl import Config
-            from ...utils.parsl_settings import LocalSettings
-            
+            if platform.system() == 'Darwin':
+                from ...utils.parsl_settings import MacLocalSettings as _ParslSettings
+            else:
+                from ...utils.parsl_settings import LocalSettings as _ParslSettings
+
             parsl_config = self.parsl_config
-            
+
             if parsl is not None:
                 for k, v in parsl.values():
                     parsl_config[k] = v
 
             self.logger.info(parsl_config)
             self.logger.info(Path.cwd())
-            parsl_settings = LocalSettings(**parsl_config).config_factory(Path.cwd())
+            parsl_settings = _ParslSettings(**parsl_config).config_factory(Path.cwd())
 
             cwd = Path(self.config.get('cwd', os.getcwd()))
             cwd.mkdir(exist_ok=True, parents=True)
@@ -94,9 +98,9 @@ class BindCraftAgent:
             fasta_dir.mkdir(exist_ok=True)
             folds_dir.mkdir(exist_ok=True)
 
-            target_sequence = self.config['target_sequence']
+            target_sequence = self.config.get('target_sequence', '')
             binder_sequence = self.config.get('binder_sequence', "MKQHKAMIVALIVICITAVVAALVTRKDLCEVHIRTGQTEVAVF")
-            device = self.config.get('device', 'cuda:0')
+            device = self.config.get('device', 'cpu')
             num_rounds = self.config.get('num_rounds', 3)
 
             if_kwargs =  self.config.get('if_kwargs', {

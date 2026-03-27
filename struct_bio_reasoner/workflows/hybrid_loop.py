@@ -209,11 +209,13 @@ class HybridLoop:
         self,
         artifact_store_root: str = "artifact_store",
         academy_config: Optional[Any] = None,
+        worker_configs: Optional[Dict[str, Dict[str, Any]]] = None,
         checkpoint_callback: Optional[CheckpointCallback] = None,
         checkpoint_interval: int = 5,
     ) -> None:
         self._artifact_store_root = artifact_store_root
         self._academy_config = academy_config
+        self._worker_configs = worker_configs or {}
 
         # Lazy-initialised layers
         self._reasoning_bridge = None
@@ -260,7 +262,10 @@ class HybridLoop:
             from struct_bio_reasoner.academy.dispatch import AcademyDispatch
             from struct_bio_reasoner.academy.config import AcademyConfig
             config = self._academy_config or AcademyConfig()
-            self._academy_dispatch = AcademyDispatch(config)
+            self._academy_dispatch = AcademyDispatch(
+                config,
+                worker_configs=self._worker_configs,
+            )
         return self._academy_dispatch
 
     @property
