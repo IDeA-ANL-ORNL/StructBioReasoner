@@ -16,6 +16,9 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
+# Skills root: <repo>/skills  (two levels up from this file's package dir)
+_SKILLS_ROOT = Path(__file__).resolve().parent.parent.parent / "skills"
+
 logger = logging.getLogger(__name__)
 
 
@@ -299,11 +302,28 @@ class StructBioReasonerMCPServer:
         return {"tool": "run_skill", "status": "success", "result": result}
 
     def _handle_list_skills(self) -> dict[str, Any]:
-        """List skills available through AcademyDispatch."""
+        """List skills by scanning SKILL.md files in the skills/ directory.
+
+        Uses SkillRegistry so that skill discovery works independently of
+        whether the Academy/Jnana package is installed, and returns the
+        same names that OpenClaw sees when it reads the skills/ tree.
+        """
+        try:
+            from skills._shared.registry import SkillRegistry
+            registry = SkillRegistry(_SKILLS_ROOT)
+            count = registry.discover()
+            skills = [s.to_dict() for s in registry.list_skills()]
+        except Exception as exc:
+            logger.warning("SkillRegistry discovery failed: %s", exc)
+            # Fall back to WORKER_REGISTRY keys so the tool never hard-errors
+            skills = self.academy_dispatch.list_available_skills()
+            count = len(skills)
+
         return {
             "tool": "list_skills",
             "status": "success",
-            "skills": self.academy_dispatch.list_available_skills(),
+            "count": count,
+            "skills": skills,
         }
 
     # ------------------------------------------------------------------

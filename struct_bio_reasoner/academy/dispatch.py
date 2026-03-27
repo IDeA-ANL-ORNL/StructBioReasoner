@@ -24,21 +24,28 @@ from .worker_agents import WORKER_REGISTRY
 
 logger = logging.getLogger(__name__)
 
-# Maps skill name → default @action method name on the worker
+# Maps skill name → default @action method name on the worker.
+# Both hyphenated (SKILL.md canonical names) and underscore aliases are
+# listed so that dispatch works regardless of which form the caller uses.
 _DEFAULT_ACTION: Dict[str, str] = {
     "bindcraft": "run_design",
     "binder_design": "run_design",
     "folding": "fold_sequences",
     "structure_prediction": "fold_sequences",
+    "structure-prediction": "fold_sequences",
     "md": "run_simulation",
     "simulation": "run_simulation",
     "molecular_dynamics": "run_simulation",
+    "molecular-dynamics": "run_simulation",
     "rag": "generate_rag_hypothesis",
     "literature": "generate_rag_hypothesis",
     "hiperrag": "generate_rag_hypothesis",
     "conservation": "run_conservation",
+    "evolutionary-conservation": "run_conservation",
     "protein_lm": "embed_sequence",
+    "protein-lm": "embed_sequence",
     "trajectory_analysis": "cluster_trajectories",
+    "trajectory-analysis": "cluster_trajectories",
     "clustering": "cluster_trajectories",
 }
 

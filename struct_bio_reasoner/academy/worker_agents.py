@@ -247,6 +247,7 @@ class TrajectoryAnalysisWorker(Agent):
 # ---------------------------------------------------------------------------
 
 WORKER_REGISTRY: Dict[str, type[Agent]] = {
+    # Underscore names (legacy / internal aliases)
     "bindcraft": BindCraftWorker,
     "binder_design": BindCraftWorker,
     "folding": FoldingWorker,
@@ -261,4 +262,11 @@ WORKER_REGISTRY: Dict[str, type[Agent]] = {
     "protein_lm": ProteinLMWorker,
     "trajectory_analysis": TrajectoryAnalysisWorker,
     "clustering": TrajectoryAnalysisWorker,
+    # Hyphenated names — canonical names from SKILL.md files so that
+    # OpenClaw skill names resolve correctly in dispatch
+    "structure-prediction": FoldingWorker,
+    "molecular-dynamics": MDWorker,
+    "evolutionary-conservation": ConservationWorker,
+    "protein-lm": ProteinLMWorker,
+    "trajectory-analysis": TrajectoryAnalysisWorker,
 }
